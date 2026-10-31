@@ -1,0 +1,9 @@
+data/
+src/pipelines/seeded_atlas_standalone/solver/sa_bvp4c_traced.m
+src/pipelines/seeded_atlas_standalone/solver/private/
+src/pipelines/seeded_atlas_standalone/solver/sa_bvp4c_generated.txt
+metadata_log.csv
+*.mat
+*.fig
+*.asv
+.DS_Store
