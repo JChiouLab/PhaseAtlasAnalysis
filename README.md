@@ -43,7 +43,7 @@ no MathWorks file is in this repository. `run_seeded_atlas.m` calls `setup_atlas
 
 1. **A small coupled run.** Open `run_seeded_atlas.m`, edit the block at the top and run the file. For a first try:
    `run_mode = 'smoke';` and a small library grid, e.g. fission yeast `res = 15;` (or the Guzzo_noXA example in the
-   block, with `res = 11;`). When the library folder is empty the script builds the library itself (Stages 1-3 of the
+   block's comment, with `res = 11;` instead of its commissioned `res = 25;`; about 4,000 library calls). When the library folder is empty the script builds the library itself (Stages 1-3 of the
    uncoupled pipeline; the fission-yeast build opens a parallel pool and can take an hour or more). It prints every
    path before any work.
 2. **Plot.** The run saves `plots/roots_3d.fig` and the 2-D sheets; redraw with `seeded_atlas_plot(run_dir)`.
@@ -54,6 +54,7 @@ no MathWorks file is in this repository. `run_seeded_atlas.m` calls `setup_atlas
    ```matlab
    addpath('src/solvers/atlas_surface_pipeline_dependencies');
    % Guzzo_noXA also: addpath('src/solvers/atlas_surface_pipeline_dependencies/models/guzzo_noxa'); addpath('src/models/guzzo_noxa');
+   par = struct('L', 6, 'r_speed', 0.35, 'dba_factor', 1, 'rho_R', 1, 'rho_B', 1, 'dn_half_range', 1.8);   % as in run_seeded_atlas.m
    m = atlas_build_libraries('guzzo_noxa', par, 25, fullfile(pwd, 'data', 'my_library'));
    ```
 5. **The 12-stage uncoupled pipeline:** edit and run `run_atlas_surface_pipeline.m` (see `docs/UNCOUPLED_GUIDE.md`).
