@@ -73,6 +73,8 @@ function varargout = sa_report(action, varargin)
 %   by the cap (NMax = mesh_reject = c): n of m"; the search block prints
 %   the route defaults (rescue rungs, ring, root_pass.enabled), the
 %   no_basis count and the per-root pass rounds.
+%   summary.txt of an import run (milestone 10) counts import returns in the
+%   all-routes line and adds the Import section (sa_import 'report_lines').
 %   summary.txt says "mesh proposals recorded
 %   for n of m calls", and the cut-by-cap line says whether its count is
 %   exact (every cold call's proposals recorded) or a lower bound.
@@ -565,7 +567,16 @@ for f = 1:numel(st.T.families)
 end
 L{end+1} = sprintf('Roots in store: %d (from %d accepted cold returns)', X.n_roots, ...
     sum(strcmp({cold.outcome}, 'accepted')));
-if S.routes.continuation || S.routes.rescue
+imp_on = sa_import('active', st);               % milestone 10: an import run
+if imp_on
+    L{end+1} = sprintf(['  all routes: %d accepted node returns (%d cold, %d import, %d continuation, ' ...
+        '%d rescue); %d substep records; %d interrupted records'], ...
+        sum(strcmp({A.outcome}, 'accepted')), sum(strcmp({A.outcome}, 'accepted') & strcmp({A.kind}, 'cold')), ...
+        sum(strcmp({A.outcome}, 'accepted') & strcmp({A.kind}, 'import')), ...
+        sum(strcmp({A.outcome}, 'accepted') & strcmp({A.kind}, 'continuation')), ...
+        sum(strcmp({A.outcome}, 'accepted') & strcmp({A.kind}, 'rescue')), ...
+        sum(startsWith({A.outcome}, 'substep')), sum(strcmp({A.outcome}, 'interrupted')));
+elseif S.routes.continuation || S.routes.rescue
     L{end+1} = sprintf(['  all routes: %d accepted node returns (%d cold, %d continuation, ' ...
         '%d rescue); %d substep records; %d interrupted records'], ...
         sum(strcmp({A.outcome}, 'accepted')), sum(strcmp({A.outcome}, 'accepted') & strcmp({A.kind}, 'cold')), ...
@@ -635,7 +646,11 @@ end
 % refinement
 L{end+1} = '';
 L{end+1} = sprintf('Refinement re-solves at tighter tolerances (expectation scaled_rms <= %g):', S.validity.refine_expected_distance);
-if isempty(st.refinement), L{end+1} = '  none'; end
+if isempty(st.refinement) && imp_on && ~any(strcmp({cold.outcome}, 'accepted'))
+    L{end+1} = '  no cold roots: refinement not run';
+elseif isempty(st.refinement)
+    L{end+1} = '  none';
+end
 for k = 1:numel(st.refinement)
     r = st.refinement(k);
     L{end+1} = sprintf('  %-10s %s -> %s  %s  scaled_rms %.3g  relsup %.3g/%.3g  %s', r.family, ...
@@ -665,6 +680,10 @@ if ~isempty(st.pairs)
         rc.n_multi_route_roots, rc.n_cross_route_pairs);
     L{end+1} = '  similarity_tolerance remains PROVISIONAL.';
 end
+% the import section (milestone 10)
+if imp_on
+    L = [L, sa_import('report_lines', st)];
+end
 % search report (node classes, edges, lineages, rescue, ring)
 if (S.routes.continuation || S.routes.rescue) && isfield(st, 'Q') && ~isempty(st.Q)
     Lc = sa_continuation('report_lines', st);
@@ -678,7 +697,12 @@ end
 L{end+1} = '';
 done = [cold.target_number];
 unf = setdiff(1:numel(st.T.list), done);
-L{end+1} = sprintf('Unfinished targets: %d', numel(unf));
+if ~S.routes.cold
+    unf = [];                                   % no cold pass: no cold target is pending
+    L{end+1} = 'Unfinished targets: 0 (routes.cold false: no cold calls)';
+else
+    L{end+1} = sprintf('Unfinished targets: %d', numel(unf));
+end
 for k = unf
     L{end+1} = sprintf('  %s %s', st.T.list(k).family, st.T.list(k).key); %#ok<AGROW>
 end

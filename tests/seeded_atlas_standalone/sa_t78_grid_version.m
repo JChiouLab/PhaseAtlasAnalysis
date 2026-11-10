@@ -14,8 +14,9 @@ v = sa_settings('version');
 % P4 amended: 0.11 (mode names as the family label, uniform-state flatness); was 0.10
 % M8 amended: 0.12 (seed_modes, mode-n libraries, length scaling); was 0.11
 % M9 amended: 1.0.0-rc1 (the release self-check of the traced bvp4c, provenance.arch); was 0.12
-rows = sa_check(rows, T, 'software version is seeded_atlas_standalone/1.0.0-rc1 (no milestone text)', ...
-    strcmp(v, 'seeded_atlas_standalone/1.0.0-rc1'), v);
+% M10 amended: 1.0.0-rc2 (import, uncapped defaults); was 1.0.0-rc1
+rows = sa_check(rows, T, 'software version is seeded_atlas_standalone/1.0.0-rc2 (no milestone text)', ...
+    strcmp(v, 'seeded_atlas_standalone/1.0.0-rc2'), v);
 
 % ---- the shipped script --------------------------------------------------------------------------------------
 w = fileread(fullfile(E.root, 'run_seeded_atlas.m'));

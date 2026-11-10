@@ -15,10 +15,17 @@ function W = seeded_atlas_wrapper(cfg)
 %                         resolved lattice.points_per_axis, else lattice.step,
 %                         after points_per_axis, settings_overrides and
 %                         from_pilot), e.g. ..._MP3p444_n51_92260295
-%     mode                'smoke' | 'pilot' | 'production'; production's cold
-%                         targets are per_seed (one cold call per library
-%                         seed); settings_overrides.targets.policy =
-%                         'all_seedable' calls every seedable node instead
+%     mode                'smoke' | 'pilot' | 'production' | 'focus';
+%                         production's cold targets are per_seed (one cold
+%                         call per library seed); settings_overrides
+%                         .targets.policy = 'all_seedable' calls every
+%                         seedable node instead. focus: roots of an earlier
+%                         run (import_from, required) as the only seeds, a
+%                         selection of them (settings_overrides
+%                         .import.root_ids / .import.families) and a family
+%                         fence (continuation.families, default the
+%                         selected roots' labels and their mirrors); budget
+%                         required as in production
 %     points_per_axis     the coupled grid: an odd point count per pool axis
 %                         (scalar or one per pool), passed as
 %                         settings lattice.points_per_axis; [] = the fixed
@@ -26,7 +33,19 @@ function W = seeded_atlas_wrapper(cfg)
 %                         settings_overrides.lattice.step). Setting it here and
 %                         in settings_overrides.lattice.points_per_axis is
 %                         refused (one setting, one place)
+%     max_mode            the highest mode-n seed library built beside the three
+%                         base files (atlas_build_libraries opts.max_mode; 2,
+%                         the default, builds no mode-n file; 3..: the files
+%                         branch_MODE3.._latest.mat that seed_modes 'all'
+%                         uses; existing ones are reused). Ignored with a ready
+%                         library_manifest. Refused when build_opts.max_mode
+%                         is also set to another value
 %     from_pilot          production: a pilot run folder whose settings to keep
+%     import_from         '' = no import; a finished run folder whose roots
+%                         seed this run (settings import.source_dir; each
+%                         root re-solved once at the nearest node; milestone
+%                         10). The default run_dir then ends in _imp<stamp8>;
+%                         the status line reports a changed source (E_IMPORT)
 %     budget              struct (max_calls, max_wall_s, ...): a user leaf; it
 %                         overrides every mode's budget
 %     settings_overrides  struct of further settings leaves (user guide,
@@ -77,6 +96,8 @@ function W = seeded_atlas_wrapper(cfg)
 %   journaled, when nothing resumes). seeded_atlas_plot(run_dir) and
 %   seeded_atlas_trace(run_dir, entry) give the same files without the
 %   status check.
+%   W.build_opts: the options the library step passes to
+%   atlas_build_libraries (build_opts with max_mode when above 2).
 %   W: the resolved paths, status (before the run), status_after, result
 %   (seeded_atlas_run's, when a run happened), plot, traces, path_at_run,
 %   lattice (the grid printed in the header: rule, steps, sizes, n_nodes).
@@ -92,7 +113,7 @@ deps_noxa = fullfile(deps, 'models', 'guzzo_noxa');
 core = fullfile(repo, 'src', 'models', 'guzzo_noxa');
 W = struct('model', cfg.model, 'library_dir', '', 'run_dir', '', 'plot', '', 'trace_dirs', {{}}, ...
     'status', [], 'status_after', [], 'result', [], 'plot_out', [], 'traces', [], 'path_at_run', '', ...
-    'compaction', [], 'lattice', []);
+    'compaction', [], 'lattice', [], 'build_opts', build_options(cfg));
 
 % ---- 1. resolve and print ---------------------------------------------------
 direct = ~isempty(cfg.library_manifest);
@@ -124,7 +145,7 @@ if isempty(run_dir)
     % folder is not part of the grid: any text stands in for it here)
     S0 = sa_settings('resolve', user_settings(cfg, fullfile(repo, 'data', 'standalone_runs')), M);
     run_dir = fullfile(repo, 'data', 'standalone_runs', sa_run_name(par, struct('model', cfg.model, ...
-        'mode', cfg.mode, 'lattice', S0.lattice)));
+        'mode', cfg.mode, 'lattice', S0.lattice, 'import', S0.import)));
 end
 U = user_settings(cfg, run_dir);
 [S, SRCw] = sa_settings('resolve', U, M);
@@ -145,11 +166,18 @@ fprintf('\n================ seeded coupled atlas (%s) ================\n', sa_se
 fprintf(' model            %s   mode %s\n', cfg.model, cfg.mode);
 fprintf(' parameters       %s\n', param_text(par));
 fprintf(' library folder   %s   (%s)\n', library_dir, tern(lib_ok, 'exists', 'will be built'));
+if ~direct && cfg.max_mode > 2
+    fprintf(' library modes    max_mode %d: mode-n files n = 3..%d built beside the base files (existing ones reused)\n', ...
+        cfg.max_mode, cfg.max_mode);
+end
 if isfield(manifest, 'confirmation')
     fprintf(' confirmation     %s\n', manifest.confirmation);
 end
 fprintf(' grid             %s\n', W.lattice.text);
 fprintf(' run folder       %s\n', run_dir);
+if ~isempty(cfg.import_from)
+    fprintf(' import from      %s\n', cfg.import_from);
+end
 fprintf(' run status       %s: %s\n', Z.state, Z.message);
 fprintf(' plot             %s\n', W.plot);
 for k = 1:numel(W.trace_dirs), fprintf(' trace            %s\n', W.trace_dirs{k}); end
@@ -163,7 +191,7 @@ end
 % ---- 2. library -----------------------------------------------------------------
 if ~direct
     if ~lib_ok, sa_progress('stage', 'library build (Stages 1-3 of the uncoupled pipeline)', struct()); end
-    manifest = atlas_build_libraries(cfg.model, lib_par, cfg.res, library_dir, cfg.build_opts);
+    manifest = atlas_build_libraries(cfg.model, lib_par, cfg.res, library_dir, W.build_opts);
     if strcmp(cfg.model, 'guzzo_noxa') && ~isempty(cfg.library_confirmation)
         manifest.confirmation = cfg.library_confirmation;
     end
@@ -231,6 +259,7 @@ end
 function cfg = fill(cfg)
 d = struct('model', 'original_polarity', 'par', struct(), 'res', 50, 'library_dir', '', ...
     'library_confirmation', '', 'run_dir', '', 'mode', 'pilot', 'points_per_axis', [], 'from_pilot', '', ...
+    'import_from', '', 'max_mode', 2, ...
     'budget', struct(), ...
     'settings_overrides', struct(), 'traces', struct('name', {}, 'root', {}), 'make_plot', true, ...
     'compact_after', false, 'corrector', [], 'integrator', [], 'status_only', false, 'build_opts', struct(), ...
@@ -243,6 +272,23 @@ for f = fieldnames(d).'
     if ~isfield(cfg, f{1}), cfg.(f{1}) = d.(f{1}); end
 end
 if isempty(cfg.traces), cfg.traces = d.traces; end
+v = cfg.max_mode;
+if ~(isnumeric(v) && isscalar(v) && isreal(v) && v == fix(v) && v >= 2)
+    error('SA:WRAPPER:E_FIELD', 'max_mode must be an integer >= 2 (2 = no mode-n library).');
+end
+end
+
+function o = build_options(cfg)
+% build_opts for atlas_build_libraries: max_mode added when above 2 (at 2
+% the options are passed unchanged, so the builder runs as before)
+o = cfg.build_opts;
+if cfg.max_mode > 2
+    if isfield(o, 'max_mode') && ~isempty(o.max_mode) && o.max_mode ~= cfg.max_mode
+        error('SA:WRAPPER:E_FIELD', ['max_mode is set twice: max_mode = %d and build_opts.max_mode = %d; set it ' ...
+            'in one place.'], cfg.max_mode, o.max_mode);
+    end
+    o.max_mode = cfg.max_mode;
+end
 end
 
 function U = user_settings(cfg, run_dir)
@@ -262,6 +308,9 @@ if ~isempty(cfg.points_per_axis)
     U.lattice.points_per_axis = cfg.points_per_axis;
 end
 U = merge(U, so);
+if ~isempty(cfg.import_from)
+    U.import.source_dir = cfg.import_from;        % milestone 10 (edit block import_from)
+end
 b = cfg.budget;                     % the edit block's budget wins over every other budget leaf
 for f = fieldnames(b).'
     U.budget.(f{1}) = b.(f{1});

@@ -11,7 +11,8 @@ M = sa_model('stub_two_pool');
 ok = true; det = {};
 for m = sa_modes('modes')
     u = struct('model', 'stub_two_pool', 'run_dir', 'x', 'mode', m{1});
-    if strcmp(m{1}, 'production'), u.budget = struct('max_calls', 10, 'max_wall_s', 10); end
+    if any(strcmp(m{1}, {'production', 'focus'})), u.budget = struct('max_calls', 10, 'max_wall_s', 10); end
+    if strcmp(m{1}, 'focus'), u.import = struct('source_dir', 'x'); end   % M11 amended: focus needs a source
     [S, P] = sa_settings('resolve', u, M);
     % M5 amendment (packet v0.2 section 3): every mode layer sets rescue.ring
     % false and rescue.rungs {secant}; the package default keeps ring true and

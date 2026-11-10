@@ -60,6 +60,18 @@ function result = seeded_atlas_run(parameters, library_manifest, settings, corre
 %   preconditions, reconciliation, zero-solve replay of every stored attempt
 %   with re-derived verdicts and checkpoint comparison, then live.
 %   Without resume an existing non-empty run_dir is refused.
+%   Import (milestone 10; settings import.source_dir): a new run builds the
+%   import plan (sa_import 'plan', zero solves) after the inputs and BEFORE
+%   the run folder is prepared, so a refusal or a kill during the plan
+%   leaves no folder; the plan is stored as effective.import (an inactive
+%   plan when no import is set) and placed in ctx.import. On resume the
+%   stored plan is loaded (sa_resume 'prepare' returns it), never rebuilt;
+%   the source stamp is compared (E_IMPORT).
+%   Mode focus (selected roots of an earlier run as seeds): the plan keeps
+%   only the roots selected by import.root_ids / import.families; the
+%   family fence in force (sa_import 'fence': continuation.families, or
+%   for 'selected' the plan's list) goes into ctx.fence, from the stored
+%   plan on resume, and is printed before the first call.
 %   Screen: stage and status lines through sa_progress (interval
 %   report.progress_interval_s; display only).
 %   Memory: result.shards and result.store hold the LIGHT
@@ -84,12 +96,17 @@ theta = M.normalize(parameters);                 % writes nothing
 [S, SRC] = sa_lattice('derive_step', M, theta, S, SRC);
 [S, SRC] = sa_settings('scale_counts', M, theta, S, SRC);      % point counts above the reference L
 [M, S, A] = sa_seed_modes('activate', M, S, library_manifest); % seed_modes: active types (zero solves)
-prepare_run_dir(S.run_dir, S.resume);
+new_import = ~S.resume && ~isempty(S.import.source_dir);
+if ~new_import
+    prepare_run_dir(S.run_dir, S.resume);
+else
+    check_new_run_dir(S.run_dir);                % refused before the plan; created after it
+end
 sa_progress('begin', S.report.progress_interval_s);
 progress_end = onCleanup(@() sa_progress('end')); %#ok<NASGU>
 sa_progress('stage', 'inputs (library, lattice, seedability census, targets)', ...
     struct('calls', 0, 'max_calls', S.budget.max_calls, 'roots', 0));
-D = sa_layout('state', S.run_dir);               % the state folder, computed once
+D = sa_layout('state', S.run_dir);               % the state folder, computed once (made below for an import)
 
 % ---- inputs ----------------------------------------------------------------
 lib = sa_seed_modes('load', M, library_manifest, theta, parameters, A);
@@ -101,6 +118,15 @@ types = unique([{T.list.left_type}, {T.list.right_type}]);
 lib = M.library('profiles', lib, types);
 fs = M.field_scale(theta, lib, S);
 K = sa_identity('store_settings', M, theta, S, fs);
+IMP = sa_import('blank');
+if new_import
+    sa_progress('stage', 'import plan (the source run''s roots; zero solves)', ...
+        struct('calls', 0, 'max_calls', S.budget.max_calls, 'roots', 0));
+    IMP = sa_import('plan', S, M, theta, parameters, L, K.field_scale);
+    print_plan(IMP);
+    prepare_run_dir(S.run_dir, false);           % the plan is built: now the folder
+    D = sa_layout('state', S.run_dir);
+end
 
 prov = sa_settings('provenance');
 runtime = runtime_evidence(M, corrector);
@@ -110,8 +136,11 @@ hashes = sa_resume('code_hashes', M);
 
 if S.resume
     cur = struct('provenance', prov, 'code_hashes', hashes, 'library_files', lib.files, ...
-        'model_version', M.version, 'parameters', parameters);
+        'model_version', M.version, 'parameters', parameters, ...
+        'import_check', true);                   % the source identity, checked by prepare (E_IMPORT)
     replay = sa_resume('prepare', S.run_dir, S, cur);
+    IMP = replay.import;                         % the stored plan, never rebuilt
+    replay = rmfield(replay, 'import');
     sa_progress('stage', sprintf('resume: %d stored call(s) are replayed and checked first (no solves)', ...
         numel(replay.files)), struct('calls', 0, 'max_calls', S.budget.max_calls, 'roots', 0));
 else
@@ -140,6 +169,7 @@ else
     effective.started_at = datestr(now, 'yyyy-mm-ddTHH:MM:SS'); %#ok<DATST,TNOW1>
     effective.provenance = prov;
     effective.code_hashes = hashes;
+    effective.import = IMP;                      % milestone 10 (inactive plan when no import)
     sa_write('mat', fullfile(D, 'settings_effective.mat'), effective);
     sa_write('mat', fullfile(D, 'settings_user.mat'), struct('settings', settings));
     sa_write('text', fullfile(S.run_dir, 'settings_effective.txt'), [strjoin([ ...
@@ -163,7 +193,16 @@ ctx = struct('S', S, 'M', M, 'theta', theta, 'K', K, 'T', T, 'C', C, 'L', L, ...
     'guess_nodes', zeros(1, 0), 'guess_fp', {cell(1, 0)}, 'state_dir', D, ...
     'nroots', zeros(L.n_nodes, 1), ...                                 % roots per lattice node
     'node_of', containers.Map(L.key(:).', num2cell(1:L.n_nodes)), ...   % key -> node
-    't_reports', tic, 'rep', []);                                      % report interval, render cache
+    't_reports', tic, 'rep', [], ...                                   % report interval, render cache
+    'import', IMP, 'ik', [], ...                                       % the import plan; source-edge knowledge
+    'fence', {sa_import('fence', S, IMP)});                            % the family fence ({} = none)
+if ~isempty(ctx.fence)
+    fprintf('family fence (continuation.families): {%s}\n', strjoin(ctx.fence, ', '));
+elseif strcmp(S.mode, 'focus')
+    % only a user-set {} gets here ('selected' resolving empty is refused, SA:IMPORT:E_FENCE)
+    fprintf(['note: focus mode WITHOUT a family fence (continuation.families = {} set by the user): every ' ...
+        'family is expanded.\n']);
+end
 ctx = sa_search('run', ctx);
 sa_progress('stage', sprintf('final reports (stop: %s)', ctx.stop_reason), ...
     struct('calls', ctx.calls, 'roots', root_count(ctx)));
@@ -184,7 +223,7 @@ result = struct('run_dir', S.run_dir, 'stop_reason', ctx.stop_reason, ...
     'n_outside', sum(~C.in_range), 'worst_offset', C.worst_offset, 'rule', C.rule), ...
     'targets', T, 'field_scale', fs, 'runtime_clean', runtime.clean, 'L', L, 'settings', S, ...
     'replay_interrupted', replay.interrupted, 'guess_nodes', ctx.guess_nodes, ...
-    'wall_s', toc(t_run));
+    'wall_s', toc(t_run), 'import', ctx.import);
 end
 
 % =========================================================================
@@ -192,6 +231,37 @@ end
 function n = root_count(ctx)
 % The roots held now, for the progress lines (the result's n_roots at the end)
 n = sum(ctx.nroots);
+end
+
+function check_new_run_dir(d)
+% A new run's folder must not exist or be empty (prepare_run_dir's rule),
+% checked before an import plan is built; nothing is created here.
+if exist(d, 'dir') == 7 && numel(dir(d)) > 2
+    error('SA:RUN', ['run_dir %s exists and is not empty; a new run needs a new ' ...
+        'directory (or settings.resume = true to continue it).'], d);
+end
+end
+
+function print_plan(P)
+% The pre-run line of an import run (screen only)
+R = P.rows;
+st = {R.status};
+dm = strcmp({R.kind}, 'direct');
+pl = strcmp(st, 'planned');
+fprintf(['import: %d planned (%d direct, %d mirror), skipped %d (no_node_near %d, outside_box %d, ' ...
+    'mirror_twin_planned %d); source %s, stamp %s\n'], sum(pl), sum(pl & dm), sum(pl & ~dm), sum(~pl), ...
+    sum(strcmp(st, 'no_node_near')), sum(strcmp(st, 'outside_box')), sum(strcmp(st, 'mirror_twin_planned')), ...
+    P.source_dir, P.stamp(1:min(8, end)));
+if isfield(P, 'selection')
+    fprintf('import selection: %d of %d source roots selected (%d skipped); labels {%s}\n', ...
+        P.selection.n_selected, P.selection.n_source, P.selection.n_skipped, strjoin(P.selection.labels, ', '));
+end
+if isfield(P, 'source_stopped')
+    fprintf(['import: the source was killed (import.source_stopped); last call started %s; %d call(s) without ' ...
+        'an end line and %d root(s) of such calls ignored; source edges from queue.mat at call count %g\n'], ...
+        P.source_stopped.last_started, numel(P.source_stopped.open_calls), numel(P.source_stopped.ignored_roots), ...
+        P.source_stopped.checkpoint_queue);
+end
 end
 
 function prepare_run_dir(d, resume)

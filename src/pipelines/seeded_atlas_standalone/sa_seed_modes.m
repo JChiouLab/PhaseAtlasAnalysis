@@ -14,7 +14,10 @@ function varargout = sa_seed_modes(action, varargin)
 %       After settings are resolved (zero solves). Resolves 'all' from the
 %       library folder (every shape it offers; each skipped 'empty' mode
 %       file is named in a printed line) and stores the resolved list in
-%       S.seed_modes; maps the shapes to type ids in the module's type
+%       S.seed_modes; when 'all' finds no mode-n file with n >= 3 in the
+%       folder, a warning (SA:SEED:W_NO_MODE_FILES) says that only the base
+%       shapes are seeded and how to build the files (max_mode); maps the
+%       shapes to type ids in the module's type
 %       order; when the types differ from the module's library_types,
 %       M.library_types becomes the active list and M.mode_families the map
 %       built from it. A = struct(shapes, types, skipped, default). At the
@@ -62,6 +65,17 @@ if ischar(shapes) || isequal(shapes, {'all'})
     end
     A.skipped = skipped;
     S.seed_modes = shapes;
+    hi = false;
+    for k = 1:numel(shapes)
+        i = M.seed_shape('resolve', shapes{k});
+        hi = hi || i.n >= 3;
+    end
+    if ~hi
+        warning('SA:SEED:W_NO_MODE_FILES', ['seed_modes ''all'': the library folder %s holds no usable mode-n ' ...
+            'file (branch_MODE<n>_latest.mat, n >= 3), so only the shapes %s are seeded. To seed more peaks, ' ...
+            'build them first: max_mode in run_seeded_atlas.m (atlas_build_libraries opts.max_mode).'], ...
+            manifest.directory, strjoin(shapes, ' '));
+    end
 end
 types = cell(1, numel(shapes));
 for k = 1:numel(shapes)

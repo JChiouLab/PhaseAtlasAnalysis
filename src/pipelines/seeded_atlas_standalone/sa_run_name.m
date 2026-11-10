@@ -24,6 +24,13 @@ function name = sa_run_name(parameters, settings)
 %       parent folder; a changed scientific setting is a new run, so reusing
 %       a name for other settings is refused by seeded_atlas_run (non-empty
 %       run_dir).
+%       Milestone 10: when settings.import.source_dir is set, the name gains
+%       _imp<stamp8>, the first 8 hex digits of the source run's stamp
+%       (sa_import 'stamp'), so a same-grid follow-up never collides with
+%       its source. With import.source_stopped true (a killed source) the
+%       eight digits are those of the SHA-256 of the source's
+%       settings_effective.mat instead, which stays the same when the
+%       source is resumed later, so the default name of the run does too.
 
 if ~isstruct(parameters) || ~isscalar(parameters)
     error('SA:RUN_NAME', 'parameters must be a scalar struct.');
@@ -54,7 +61,13 @@ md = java.security.MessageDigest.getInstance('SHA-256');
 md.update(typecast(uint8(full), 'int8'));
 d = typecast(md.digest(), 'uint8');
 h = lower(reshape(dec2hex(d, 2).', 1, []));
-name = regexprep(strjoin([{model, mode}, shown, grid, {h(1:8)}], '_'), '[^A-Za-z0-9_]', '');
+imp = {};
+if isfield(settings, 'import') && isstruct(settings.import) && isfield(settings.import, 'source_dir') && ...
+        ~isempty(settings.import.source_dir)
+    st = sa_import('name_stamp', settings.import);   % the folder stamp (a stopped source: its settings file)
+    imp = {['imp' st(1:8)]};
+end
+name = regexprep(strjoin([{model, mode}, shown, grid, {h(1:8)}, imp], '_'), '[^A-Za-z0-9_]', '');
 end
 
 function g = grid_part(settings)

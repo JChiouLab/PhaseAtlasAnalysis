@@ -1,6 +1,6 @@
 # Standalone seeded coupled atlas: user guide
 
-The code is `src/pipelines/seeded_atlas_standalone/` (software 1.0.0-rc1). The one-file entry point is
+The code is `src/pipelines/seeded_atlas_standalone/` (software 1.0.0-rc2). The one-file entry point is
 `run_seeded_atlas.m` in the package folder. Before the first run, `setup_atlas` (section 11) makes the traced
 `bvp4c` copy from your own MATLAB; `run_seeded_atlas.m` also does this by itself when the copy is missing or stale.
 
@@ -157,6 +157,10 @@ the half long, copied n times; it is built after the three base libraries exist,
 atlas_build_libraries('original_polarity', par, res, out_dir, struct('max_mode', 12, 'pool_workers', 1));
 ```
 
+- **From `run_seeded_atlas.m`:** set `max_mode` in the edit block (default 2 = none; for example 12). The wrapper
+  passes it to this call for the run's library folder; existing mode files are reused. `seed_modes = 'all'` uses only
+  the mode files present: when the folder holds none with n ≥ 3, the run prints a warning
+  (`SA:SEED:W_NO_MODE_FILES`) naming the folder and saying that only the base shapes are seeded.
 - **`out_dir` must be given** (an empty one is refused when `max_mode` > 2). `max_mode` is the highest n to try
   (default 2 = build nothing new); a mode whose file already exists is reused. `pool_workers` creates the parallel
   pool with that many workers (a pool of another size already open is refused). Guzzo_noXA is built by the same call
@@ -167,6 +171,118 @@ atlas_build_libraries('original_polarity', par, res, out_dir, struct('max_mode',
 - **An unused `MODE<n>` file changes nothing**: it is not loaded unless an active shape needs it, it does not enter
   the library fingerprint, and a run folder with such a file present still resumes.
 
+### Roots of an earlier run as seeds (`import`, since 1.0.0-rc2)
+
+A new run can start from the roots of a finished run folder (the **source**). Each source root goes to the nearest
+node of the new grid and is solved there **once**, from its stored solution (route, kind and phase `import`; the
+run's solver settings, no cold cap, no halving, no retry). An accepted import is a starting root like a cold root:
+it may start or join a continuation lineage (under the default `continuation.starts = 'anchor_and_cold'`) and the
+per-root pass steps from it in round 1. The source must have the same model and parameters; its grid, box, library,
+solver and search settings may differ (they are listed in the summary). Set it in the wrapper:
+
+```matlab
+import_from = '<a finished run folder>';               % the edit block of run_seeded_atlas.m
+settings_overrides.routes.cold = false;                % import only: on the same grid cold would repeat the source
+settings_overrides.import.source_edges = 'none';      % or 'same_or_stronger' or 'all': your per-run choice, same grid only (below)
+```
+
+- **Mapping.** Nearest node by the distance in new-lattice steps (ties to the lowest lattice row); a root farther
+  than `import.max_map_steps` (default 1) from every node is skipped (`no_node_near`), one outside
+  `continuation.box` / region is skipped (`outside_box`). The grid may be the same or finer and not nested.
+- **Mirror images** (`import.mirror`, default true). The left/right mirror image of every source root is also
+  imported at the mirror node (the halves swapped, the coordinate negated), unless the source's own mirror twin is
+  already a planned import (a twin within the identity tolerance at the node nearest −c). Both shipped models declare
+  the reflection (module member `reflection`); for a model without one a default `true` becomes `false` with a printed
+  line, and a `true` you set is refused (`SA:IMPORT:E_OPTION`).
+- **Guess mesh** (`import.guess_mesh`): `'source'` (default: the stored solution on its own mesh) or `'rule'` (the
+  continuation guess-mesh rule, `continuation.guess_mesh`).
+- **Source-edge knowledge** (`import.source_edges`, default `'none'`; a per-run choice). On the same grid with the
+  same `solver` and `validity` groups, the same `continuation.guess_mesh`, `guess_nodes` and `step_rule` and the same
+  model version (the corrector and solver code: a refusal depends on it) (else refused, `SA:IMPORT:E_OPTION`; in
+  focus mode the default `'auto'` becomes `'none'` with a printed note instead), the run skips edges the source already tried and refused, from the new root its
+  imported parent landed on: `'same_or_stronger'` skips a lineage edge only when the source refused it with at least
+  as many halvings (h ≥ `continuation.max_halvings`; the per-root pass skips every source refusal); `'all'` also
+  lets a lineage skip edges only the source's per-root pass (h = 1) refused (weaker evidence: deeper halving might
+  have completed some). A completed source edge is used by the pass only when its child was imported too. A
+  refused secant-rescue call carries no knowledge: its guess is extrapolated from a lineage, not taken from the
+  parent root's own solution, so it says nothing about a step from that root. Skips are
+  counted by category in the summary; a node whose only edges were skipped is `refused` with the reason "refused in
+  the source run (not posed here)".
+- **The plan** is built with zero solves before the run folder is created (a refusal or a kill during it leaves no
+  folder): reading every root of the source (`seeded_atlas_roots`, unverified) and hashing every planned source
+  attempt file. It is stored in `internal/settings_effective.mat` (`import`) and never rebuilt on resume. The run
+  prints `import: N planned (D direct, M mirror), skipped ...` before the first call.
+- **Selecting roots** (`import.root_ids`, `import.families`). Only the source roots whose id is listed in
+  `import.root_ids` (a cell row such as `{'k:1,4/R000001'}`, or the path of a CSV file with a `root_id` column, for
+  example rows cut from the source's `roots_index.csv`) or whose observed family label is listed in
+  `import.families` (`{'1+/0'}`) are imported; both empty (the default) imports every root. Mirror rows are made for
+  the selected roots only (a mirror whose twin is not selected is called). An id or label the source does not hold
+  is refused (`SA:IMPORT:E_SELECTION`, listing them). The summary gives the lists and the selected / skipped counts.
+- **A killed source** (`import.source_stopped = true`). There is no lock or process file, so a running source cannot
+  be told from a killed one: set it only when the source will not write again. Its calls without an `end` line in
+  the journal are ignored (and the roots they made); a journal written in the last 10 minutes is refused. Its
+  identity is the SHA-256 of each planned row's attempt file (attempt files are never rewritten), not the folder
+  stamp, so the source may be resumed later without blocking this run's resume (and the default run folder name uses
+  the source's `settings_effective.mat` instead, so it stays the same too). Source-edge knowledge comes from its last
+  checkpoint `queue.mat` only. The summary says that the source was killed, at which call, and which checkpoint was
+  used. The source needs at least one checkpoint (`attempts.mat`).
+- **Refusals (before any folder):** no finished run at `import.source_dir`, a flat (0.5 or earlier) folder or the
+  run folder itself (`SA:IMPORT:E_SOURCE`); a source still running or killed: a journal start without an end, or a
+  `queue_final.mat` count that differs from the attempt files (`E_LIVE`, unless `import.source_stopped` is set; the
+  message says so; a budget-stopped source is allowed); another
+  model (`E_MODEL`), other parameters (`E_PARAMETERS`, naming the fields), other states (`E_STATES`); import only
+  with nothing planned (`E_EMPTY`); the option refusals above (`E_OPTION`); an import in pilot mode (the pilot
+  projection has no import model).
+- **Reports.** `summary.txt` gains an Import section: source path, stamp and versions, the differing settings,
+  planned / skipped / called / accepted (new root or matched) / invalid / no-return for direct and mirror rows, the
+  re-solve wall time by returned-mesh bin, the refused imports by root and label, label mismatches (information
+  only: labels are descriptions), the largest map distance, and the root counts per node of the source and of this
+  run. An import that is refused is listed, never retried, never a stop. The default run folder name ends in
+  `_imp<stamp8>`. With no cold roots, refinement is not run.
+- **What an import shows:** that one call converged there from the stored solution, nothing more; the imports are
+  not shown to be all the roots near those nodes.
+
+### Focus mode: chosen roots as seeds, with a family fence
+
+`run_mode = 'focus'` is import with three differences: you pick the roots, nothing else is seeded, and the search is
+fenced to the families you care about.
+
+- **Defaults in focus:** `import_from` (`import.source_dir`) is required (refused without); `routes.cold = false`
+  (the imports are the only seeds); `budget` is required, as in production; `import.source_edges = 'auto'`
+  (`'same_or_stronger'` when the grid, solver, validity, step-rule settings and model version equal the source's,
+  else `'none'` with a printed note); `continuation.families = 'selected'` (the fence, below). A value you set wins.
+  Every other setting is production's.
+- **The family fence** (`continuation.families`; not the top-level `families`, which names library families for
+  cold seeding). A list of observed family labels. A root whose label (the label of the call that created it) is
+  outside the list is stored, reported and counted, but it never becomes a lineage's expandable root, never starts a
+  lineage (the anchor lineage starts from the first root inside the fence), never starts the per-root pass and is
+  never a rescue parent or secant basis. A step aimed from a fenced family may land on another family; that root is
+  kept (it is a result), only not stepped from. `'selected'` (the focus default) is the labels of the selected source
+  roots plus their mirror labels when `import.mirror` is on; `{}` turns the fence off (focus then prints a note that it
+  runs without a fence). If `'selected'` would give no label at all (selected roots without an observed label), the
+  run is refused (`SA:IMPORT:E_FENCE`) rather than run unfenced. The fence can also be set in the other modes (default
+  `{}` there). The summary gets a fence section: roots stored outside the fence (by label), the lineage expansions,
+  lineage starts and per-root pass starts it withheld, and the rescue nodes whose ladder had no parent or basis
+  inside the fence (recorded `no_basis`, counted apart from genuine `no_basis` nodes).
+- **What the fence costs.** A branch that crosses into another family and back is not followed through the other
+  family; roots beyond it are found only if some fenced root reaches them directly.
+
+Worked example: an earlier production run on 51 points per axis found a family `2-/1-` worth refining, and you want
+it on a grid twice as fine, without spending calls on the other families:
+
+```matlab
+run_mode    = 'focus';
+points_per_axis = 101;                                  % the new, finer grid (import maps each root to its nearest node)
+import_from = '<the earlier run folder>';
+budget      = struct('max_calls', 20000, 'max_wall_s', 3*86400);
+settings_overrides.import.families = {'2-/1-'};          % or import.root_ids = '<a CSV of chosen roots_index.csv rows>'
+% the fence defaults to {'2-/1-', '1+/2-'} (the family and its mirror); source edges resolve to 'none'
+% (another grid), with a printed note
+```
+
+The run plans the selected roots (zero solves), prints the selection and the fence, re-solves each root once at its
+nearest node of the 101-point grid, and continues only from roots labelled `2-/1-` or `1+/2-`.
+
 ## 4. Modes and reading the reports
 
 | mode | cold targets | continuation | budget |
@@ -174,6 +290,7 @@ atlas_build_libraries('original_polarity', par, res, out_dir, struct('max_mode',
 | smoke | the central nine (the node nearest equal halves and its 8 neighbours) | inside that 3 × 3 box | 100 calls, 1 h |
 | pilot | the central nine plus a 7 × 7 sample over the library's range | along the two lattice lines through the centre | 500 calls, 2 h |
 | production | one cold call per library seed (`per_seed`, below) | the whole lattice | none of its own: required (the wrapper's edit-block `budget` supplies it; raise it for a full atlas) |
+| focus | none: the selected roots of an earlier run are the seeds (`import_from` required; section 3) | the whole lattice, fenced to the selected families | required, as production |
 
 **Production cold targets (`per_seed`).** A library seed is a family and one library cell (its mirror cell follows).
 Several grid nodes can map to the same cell; the seed gets one cold call, at the seedable node nearest the cell
@@ -345,6 +462,14 @@ convergence is lost); 7 identity and multiplicity; 8 the production projection (
   unfinished run and verifies the roots before removing anything. Afterwards the run cannot be resumed, and the
   tools that count every call (the cut-set recount, the pilot report rebuild) refuse; roots, plots, traces and
   comparisons keep working.
+  A run that **stopped cleanly without completing** (a `disk_floor`, `budget_calls` or wall-time stop: its
+  `queue_final.mat` is present and counts every attempt file) is compacted only on request,
+  `seeded_atlas_compact(run_dir, struct('stopped_ok', true))`; without it the refusal says so. It prints that the run
+  can no longer be resumed, and `compaction.mat` / `compaction.txt` record that it was compacted from a stopped run,
+  with the stop reason. A killed run (no final queue, a count that differs, or a call started without an end) is
+  refused even then: resume it to a stop first. A compacted stopped run still plots, traces and serves as an import
+  source (section 3; a focus run can start from it), but cannot be resumed (`E_COMPACTED`). On large runs most of the
+  disk is in the files of calls that found no root, so this frees most of the space.
 
 ## 6. Tuning
 
@@ -358,7 +483,12 @@ A changed scientific setting is a **new run** in a new folder. Set only what you
 | Only part of the lattice is wanted | `lattice.max_abs_coordinate` (scalar or one per pool) | keeps nodes with \|coordinate\| ≤ cap; the cap must keep the anchor |
 | Many calls hit the mesh limit (NMax share high, `convergence_*` refusals) | `solver.nmax` and `solver.mesh_reject` (≤ nmax); `continuation.guess_nodes` | fission yeast: 802 guess nodes is the documented lever (default 401); Guzzo_noXA default 482 |
 | Cold roots that need a large mesh are cut | `cold.mesh_cap` (cold calls only; default 10,000; `Inf` = off; ≤ `solver.mesh_reject`) | a call cut by the cap is a refusal of the capped search, not evidence that no root exists; `sa_report('cutset', run_dir, c)` counts, without solving, which cold calls a cap c cuts |
-| Coexisting roots missed, or the pass too expensive | `root_pass.enabled`; `root_pass.max_calls_per_round`, `root_pass.max_rounds` | Guzzo_noXA: opt in with `true` |
+| Coexisting roots missed, or the pass too expensive | `root_pass.enabled`; `root_pass.max_calls_per_round`, `root_pass.max_rounds` (default 10000 since 1.0.0-rc2, was 8: the pass runs until a round adds nothing) | Guzzo_noXA: opt in with `true`; `max_calls_per_round` ends the pass for the current search pass (a user cost cap) |
+| Lineages blocked or cut | `continuation.max_lineages`, `continuation.max_calls_per_lineage`, `multiseed.max_roots_per_node` (all default 10000 since 1.0.0-rc2; were 16, 100 and 4) | the old values cut the L = 30 run's lineages (16 of 16 slots, 10 at the call cap, 575 of 1,286 nodes closed to lineages); set the old values to reproduce a 1.0.0-rc1 run; a pilot's projection then prints the cap column as "unbounded" |
+| Start from an earlier run's roots | wrapper `import_from`; `import.mirror`, `import.guess_mesh`, `import.max_map_steps`, `import.source_edges` | section 3; `routes.cold = false` for import only |
+| Only some roots of the earlier run are wanted | `import.root_ids` (a cell row of root ids or a CSV path with a `root_id` column), `import.families` (labels); `run_mode = 'focus'` | section 3; an unknown id or label is refused, listing them |
+| Calls spent on families you do not care about | `continuation.families` (the fence: a list of labels; focus default `'selected'`; `{}` = none) | roots outside the fence are kept and counted, never stepped from |
+| The earlier run was killed | `import.source_stopped = true` | only when it will not write again; its calls without an end line are ignored; a journal written in the last 10 minutes is refused |
 | Nodes next to reached ones stay empty | `rescue.rungs = {'diagonal', 'secant', 'deep'}` (that order); `rescue.ring = true` (rescue also outside the library's range) | default secant only, no ring rescue |
 | Rescue spends calls and rescues nothing | `routes.rescue = false`, or `rescue.max_calls_per_node` | |
 | Projection above your hours or disk | `lattice.step`, `lattice.points_per_axis`, `lattice.max_abs_coordinate`; `targets.policy = 'central_nine'` | `central_nine` maps only the branch connected to the centre and does not test multiplicity |
@@ -409,7 +539,7 @@ The wrapper decides from the run folder (`sa_resume('status', ...)`, which write
 | `budget_exhausted` | stopped at `budget.max_calls` and the budget is not raised | no solve: raise `budget.max_calls` to continue |
 | `resumable` | any other stop | resumes: every stored call is replayed and checked without solving, then the run continues |
 
-Only `budget.*`, `checkpoint.*` and `report.*` may differ on resume. Everything else, including the mode,
+Only `budget.*`, `checkpoint.*`, `report.*` and `import.source_dir` (a moved source) may differ on resume. Everything else, including the mode,
 `lattice.step` and `lattice.points_per_axis`, is scientific. Edits to the plot, trace, wrapper, compaction, loader or
 `post/` code never block a resume.
 
@@ -429,6 +559,25 @@ Through the wrapper instead, add `settings_overrides.resume = true` and
 `settings_overrides.resume_code_override = '<why the code changed>'` with the run's own settings and the same
 MATLAB thread mode: the status is then `completed`, and still nothing is solved or replayed. A call cut off by a kill leaves an `interrupted` record that counts toward
 `budget.max_calls`; the resume runs the same unit again.
+
+**An import run and its source (since 1.0.0-rc2).** The source's identity is a stamp (SHA-256 over its
+`settings_effective.mat`, `attempts.mat`, `queue_final.mat`, `journal.txt`, `compaction.mat` and the attempt-file
+count). A resume of the follow-up recomputes it and refuses a changed source (`E_IMPORT`, after `E_LIBRARY` and
+before `E_CODE`); each import call also checks the SHA-256 of its source attempt file (an integrity stop). A moved
+source resumes with `import.source_dir` set to its new place. Resuming or compacting the source after the follow-up
+has started changes the stamp and so blocks the follow-up's resume, by design; a `completed` follow-up keeps the
+status `completed` (with a note), so it can still be plotted and traced. Plotting or tracing the source does not
+change the stamp.
+
+**A focus or import run from a killed source** (`import.source_stopped`) is identified by the SHA-256 of its
+planned attempt files instead of the stamp, so resuming the source does not block it.
+
+**The per-root pass and `root_pass_cap`.** With `root_pass.max_rounds` 10000 a `max_rounds` end is practically
+unreachable. `root_pass.max_calls_per_round` is a user cost cap: when reached, the pass ends for the current search
+pass (`root_pass_cap`); a later closure pass (when rescue added a node) may pose the rest. Imports do not change this.
+
+**`from_run` across 1.0.0-rc2.** `sa_settings('from_run', ...)` keeps only the leaves you set, so a production run
+made at rc2 from a pilot run made at rc1 resolves the new defaults (10000) unless you set the old ones.
 
 Directly: `s.resume = true; s.budget.max_calls = 1000; seeded_atlas_run(p, manifest, s)`. For production after a
 pilot, `[s, dropped] = sa_settings('from_run', pilot_dir, 'production')` keeps your own pilot settings and drops the
@@ -474,6 +623,12 @@ Guzzo_noXA at L = 6, f = 1 (mode 3: 4 of 625 cells). Operating notes from that L
   the cap. **`cold.mesh_cap` is the lever** if those roots are wanted: a value you set wins over the derived one
   (`Inf` = no cap; it must not exceed `solver.mesh_reject`).
 - Any run at L = 30 remains uncommissioned: the milestone tested the machinery, not validated results.
+
+**What 1.0.0-rc2 was and was not tested on (milestone 10 of the development repository).** With the four cap leaves pinned at 8 / 4 / 16 / 100 and no
+import, rc2 is bit-identical to rc1 on the fission-yeast L = 7 box and the Guzzo_noXA K2' box. Import was tested on
+the fission-yeast L = 7 box (same grid and a 2/3-step grid), with kill and resume, and on 15 nodes of the L = 30 run
+(re-solve time per mesh size); the mirror symmetry was checked on stored roots of both models. The L = 30 follow-up
+run itself was not run; its cost is an extrapolation (milestone-10 packet section 7, development repository).
 
 ## 11. Operating notes
 

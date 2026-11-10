@@ -43,6 +43,16 @@ function varargout = sa_root_pass(action, varargin)
 %       -axis1, +axis2, -axis2. T: struct array (p, q, root, attempt,
 %       family, dn, dir). D: counts (start_roots, start_nodes, candidates,
 %       known_a, known_b_only, posed).
+%       Milestone 10, source-edge knowledge (ctx.ik active, sa_import
+%       'knowledge'): a target is also left out when the source run already
+%       posed it -- (a) ik.pass_a holds root|q, (b) ik.pass_b holds root|q --
+%       counted in D.source_a / D.source_b (only then present) and recorded
+%       in Q.source_skips (categories pass_a, pass_b) by 'run'.
+%       Family fence (ctx.fence, sa_continuation): a root whose observed
+%       family is outside the fence is never a start root r (not counted in
+%       start_roots); D.fence_withheld (only with a fence) counts them, and
+%       'run' adds it to Q.fence.pass_starts_withheld. Its children are
+%       kept whatever their family.
 %   R = SA_ROOT_PASS('blank_rounds')     1x0 rounds table (Q.root_pass)
 %   L = SA_ROOT_PASS('report_lines', ctx)  summary.txt lines
 
@@ -70,6 +80,14 @@ P = S.root_pass;
 start = [];                                   % round 1: every root in the region
 for k = 1:P.max_rounds
     [T, D] = targets(ctx, start);
+    if isfield(D, 'fence_withheld') && isfield(ctx.Q, 'fence')
+        ctx.Q.fence.pass_starts_withheld = ctx.Q.fence.pass_starts_withheld + D.fence_withheld;
+    end
+    if isfield(D, 'source_list') && ~isempty(D.source_list)
+        sk = D.source_list;
+        [sk.round] = deal(k);
+        ctx.Q = sa_continuation('record_skips', ctx.Q, sk);
+    end
     row = blank_row();
     row.search_pass = ctx.Q.pass; row.phase = ctx.Q.phase; row.round = k;
     row.start_roots = D.start_roots; row.candidates = D.candidates; row.known_a = D.known_a;
@@ -155,6 +173,18 @@ end
 E = Q.edges;
 [KA, KB] = known_sets(E);
 fam_of = family_lookup(ctx);
+fence = {};
+if isfield(ctx, 'fence') && iscell(ctx.fence) && ~isempty(ctx.fence)
+    fence = ctx.fence;                       % the family fence
+    D.fence_withheld = 0;
+    lab_of = label_lookup(ctx);
+end
+K = [];
+if isfield(ctx, 'ik') && isstruct(ctx.ik) && isfield(ctx.ik, 'active') && ctx.ik.active
+    K = ctx.ik;                              % source-edge knowledge (milestone 10)
+    D.source_a = 0; D.source_b = 0;
+    D.source_list = struct('category', {}, 'lineage', {}, 'round', {}, 'p', {}, 'q', {}, 'root', {});
+end
 nodes = 0;
 for p = find(Q.box(:)).'
     key = ctx.L.key{p};
@@ -166,6 +196,10 @@ for p = find(Q.box(:)).'
     for r = o
         id = sprintf('%s/%s', key, st.roots(r).root_id);
         if ~isempty(start) && ~any(strcmp(start, id)), continue; end
+        if ~isempty(fence) && ~any(strcmp(lab_of(st.roots(r).representative_attempt_id), fence))
+            D.fence_withheld = D.fence_withheld + 1;         % outside the fence: never a start
+            continue
+        end
         hit = true;
         D.start_roots = D.start_roots + 1;
         att = st.roots(r).representative_attempt_id;
@@ -177,6 +211,18 @@ for p = find(Q.box(:)).'
             b = isKey(KB, sprintf('%s|%d', id, q));
             if a, D.known_a = D.known_a + 1; elseif b, D.known_b_only = D.known_b_only + 1; end
             if a || b, continue; end
+            if ~isempty(K)
+                kk = sprintf('%s|%d', id, q);
+                cat = '';
+                if isKey(K.pass_a, kk), cat = 'pass_a'; D.source_a = D.source_a + 1;
+                elseif isKey(K.pass_b, kk), cat = 'pass_b'; D.source_b = D.source_b + 1;
+                end
+                if ~isempty(cat)
+                    D.source_list(end+1) = struct('category', cat, 'lineage', 0, 'round', 0, 'p', p, ...
+                        'q', q, 'root', id);
+                    continue
+                end
+            end
             T(end+1) = struct('p', p, 'q', q, 'root', id, 'attempt', att, 'family', fam_of(st.roots(r)), ...
                 'dn', st.roots(r).created_discovery_number, 'dir', d); %#ok<AGROW>
         end
@@ -185,6 +231,23 @@ for p = find(Q.box(:)).'
 end
 D.start_nodes = nodes;
 D.posed = numel(T);
+end
+
+function fn = label_lookup(ctx)
+% the observed family of an attempt id (ids are A###### = the row number)
+A = ctx.attempts;
+fn = @(att) label_of(A, att);
+end
+
+function lab = label_of(A, att)
+lab = '';
+k = sscanf(att, 'A%d');
+if isscalar(k) && k >= 1 && k <= numel(A) && strcmp(A(k).attempt_id, att)
+    lab = A(k).observed_family;
+else
+    j = find(strcmp({A.attempt_id}, att), 1, 'last');
+    if ~isempty(j), lab = A(j).observed_family; end
+end
 end
 
 function [KA, KB] = known_sets(E)
@@ -224,14 +287,15 @@ fn = @(root) fam(root, A, ids, types, map);
 end
 
 function f = fam(root, A, ids, types, map)
-f = '';
+% the shared rule (sa_import 'family_of', also the import plan's): the
+% library family of the observed mode name, else the creating discovery's
+% seed family
+lab = '';
 if isKey(ids, root.representative_attempt_id)
-    f = sa_mode_name('library_family', A(ids(root.representative_attempt_id)).observed_family, types, map);
+    lab = A(ids(root.representative_attempt_id)).observed_family;
 end
-if isempty(f)
-    d = root.discoveries([root.discoveries.discovery_number] == root.created_discovery_number);
-    f = d(1).seed_family;
-end
+d = root.discoveries([root.discoveries.discovery_number] == root.created_discovery_number);
+f = sa_import('family_of', lab, d(1).seed_family, types, map);
 end
 
 % =========================================================================

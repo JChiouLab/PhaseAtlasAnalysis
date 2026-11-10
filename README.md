@@ -9,7 +9,7 @@ myxobacterial Guzzo_noXA model, `guzzo_noxa`) on a cell split into two halves:
   steady states of the whole two-half cell at every node of a lattice of pool splits, with continuation, rescue,
   resume after a stop or a kill, plots and full-PDE traces.
 
-Version `1.0.0-rc1` (see `VERSION`, `CHANGELOG.md`). Shared privately for testing; see `LICENSE`.
+Version `1.0.0-rc2` (see `VERSION`, `CHANGELOG.md`). Shared privately for testing; see `LICENSE`.
 
 ## Requirements
 
@@ -58,6 +58,10 @@ no MathWorks file is in this repository. `run_seeded_atlas.m` calls `setup_atlas
    m = atlas_build_libraries('guzzo_noxa', par, 25, fullfile(pwd, 'data', 'my_library'));
    ```
 5. **The 12-stage uncoupled pipeline:** edit and run `run_atlas_surface_pipeline.m` (see `docs/UNCOUPLED_GUIDE.md`).
+6. **Seeding from an earlier run (since 1.0.0-rc2).** Set `import_from` in the block to a finished run folder of the
+   same model and parameters: its roots (and their mirror images) are solved once at the nearest nodes of the new
+   grid and seed the new run. `run_mode = 'focus'` imports only the roots you pick (`import.root_ids` or
+   `import.families`) and fences the search to their families. See `docs/USER_GUIDE.md` section 3.
 
 Documents: `docs/USER_GUIDE.md` (the coupled pipeline; settings, modes, results, resume), `docs/UNCOUPLED_GUIDE.md`
 (the uncoupled pipeline), `docs/MODELS.md` (models, parameters, commissioned scope), `docs/SPEC.md` (the product
@@ -144,7 +148,7 @@ each release, kept apart by their SHA-256 in the coupled run's identity.
 
 ## Provenance and notes
 
-Exported from the development repository (private), commit `5d05db64` of `main`, on 2026-10-31; history not
+Exported from the development repository (private), commit `5c61d6ac` of `main`, on 2026-11-10; history not
 included. `EXPORT_MANIFEST.txt` lists every file's SHA-256.
 
 Comments in the code cite documents of the development repository (packets, reports, `docs/...`, `figures/...`);

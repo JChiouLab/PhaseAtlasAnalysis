@@ -17,7 +17,13 @@ function varargout = sa_resume(action, varargin)
 %          identity, recorded in resume_<n>.mat -- may differ); software
 %          version, MATLAB version, architecture and thread mode equal
 %          (never waived); model version (a toolbox change named as such)
-%          and library SHA-256 equal; code hashes equal, unless
+%          and library SHA-256 equal; the import source's stamp equals
+%          the stored one (SA:RESUME:E_IMPORT; milestone 10, when the
+%          caller carries current.import_check = true (the stamp is
+%          then computed here) or current.import_stamp; for a killed source
+%          imported with import.source_stopped the stamp is recomputed over
+%          its planned attempt files, so resuming that source does not
+%          block this run); code hashes equal, unless
 %          S.resume_code_override holds a reason, which is journaled with
 %          both hash sets. Otherwise SA:RESUME:E_* (a changed setting or a
 %          repair is a new run).
@@ -34,7 +40,15 @@ function varargout = sa_resume(action, varargin)
 %          stored checkpoints (queue.mat, attempts.mat, every shard), each to
 %          be compared at its own attempt count (sa_search).
 %       4. resume_<n>.mat: budget, checkpoint, time, pid, attempt count,
-%          override use, interrupted ids, stray temporary files.
+%          override use, interrupted ids, stray temporary files, the import
+%          source folder used.
+%       replay.import: the stored import plan (effective.import), loaded and
+%       never rebuilt (sa_import('blank') for a run without one).
+%       Both settings structs are compared after sa_settings
+%       'fill_focus_leaves' (the selection and fence leaves at their
+%       neutral values where a struct made before them lacks them: a
+%       folder's stored settings, or a caller passing them, such as
+%       seeded_atlas_compact).
 %   Z = SA_RESUME('status', run_dir, S, current)
 %       What a run with settings S would do with run_dir, from the same
 %       preconditions as 'prepare', without reconciliation and WITHOUT
@@ -46,7 +60,9 @@ function varargout = sa_resume(action, varargin)
 %                           resumable; it still loads
 %         refused           a precondition differs (Z.id E_PARAMETERS,
 %                           E_SETTINGS, E_VERSION, E_MODEL, E_LIBRARY,
-%                           E_CODE, in that order; Z.items lists every
+%                           E_IMPORT, E_CODE, in that order; E_IMPORT
+%                           alone leaves a completed run completed, with a
+%                           note; Z.items lists every
 %                           differing item), or a journal integrity note
 %                           follows the last end line (Z.id E_INTEGRITY),
 %                           or a non-empty folder that holds no run
@@ -61,9 +77,11 @@ function varargout = sa_resume(action, varargin)
 %                           that left queue_final.mat stale or missing)
 %       Z: state, id, message, items, compacted, layout, state_dir,
 %       attempt_count, stop_reason, settings (S after the derivation).
-%   cur = SA_RESUME('current', M, parameters, library_manifest)
+%   cur = SA_RESUME('current', M, parameters, library_manifest [, S])
 %       The current identities for 'status' (M, theta, provenance, code
-%       hashes, library files, model version, parameters); zero solves.
+%       hashes, library files, model version, parameters; with S also
+%       import_check = true: status compares the import source's identity,
+%       computing only the stamp the stored plan needs); zero solves.
 %   L = SA_RESUME('scientific_diff', A, B)   differing scientific leaves
 %   H = SA_RESUME('code_hashes', M)          SHA-256 of every sa_*.m, the
 %                                            entry point and module file;
@@ -120,6 +138,8 @@ if isempty(v), v = ''; else, v = v{1}; end
 end
 
 function L = scientific_diff(A, B)
+% free entries: a top-level name frees the whole group; a dotted path
+% (import.source_dir) frees that one leaf (leaf_diff consults the list)
 free = sa_settings('resume_free');
 L = {};
 fa = fieldnames(A); fb = fieldnames(B);
@@ -130,7 +150,7 @@ for k = 1:numel(names)
     if ~isfield(A, n) || ~isfield(B, n)
         L{end+1} = n; %#ok<AGROW>
     elseif isstruct(A.(n)) && isstruct(B.(n)) && isscalar(A.(n)) && isscalar(B.(n))
-        sub = leaf_diff(A.(n), B.(n), n);
+        sub = leaf_diff(A.(n), B.(n), n, free);
         L = [L, sub]; %#ok<AGROW>
     elseif ~isequaln(A.(n), B.(n)) || ~strcmp(class(A.(n)), class(B.(n)))
         L{end+1} = n; %#ok<AGROW>
@@ -138,17 +158,63 @@ for k = 1:numel(names)
 end
 end
 
-function L = leaf_diff(a, b, path)
+function L = leaf_diff(a, b, path, free)
+if nargin < 4, free = {}; end
 L = {};
 names = union(fieldnames(a), fieldnames(b));
 for k = 1:numel(names)
     n = names{k}; p = [path '.' n];
+    if any(strcmp(p, free)), continue; end
     if ~isfield(a, n) || ~isfield(b, n)
         L{end+1} = p; %#ok<AGROW>
     elseif isstruct(a.(n)) && isstruct(b.(n)) && isscalar(a.(n)) && isscalar(b.(n))
-        L = [L, leaf_diff(a.(n), b.(n), p)]; %#ok<AGROW>
+        L = [L, leaf_diff(a.(n), b.(n), p, free)]; %#ok<AGROW>
     elseif ~isequaln(a.(n), b.(n)) || ~strcmp(class(a.(n)), class(b.(n)))
         L{end+1} = p; %#ok<AGROW>
+    end
+end
+end
+
+function [bad, item] = import_diff(E0, cur, S)
+% E_IMPORT (milestone 10): the stored import (effective.import: plan,
+% stamp) against the current source. Checked only when the caller asks for
+% it: cur.import_check = true (the current stamp is computed here, once,
+% and only the kind the stored plan needs) or cur.import_stamp (a stamp the
+% caller computed; '' = no source set or unreadable). A killed source's
+% plan (field source_stopped) is checked by its planned attempt files
+% instead (sa_import 'current_stamp' with the stored plan; the folder stamp
+% is not computed for it).
+bad = false; item = '';
+if ~isfield(cur, 'import_stamp') && ~(isfield(cur, 'import_check') && isequal(cur.import_check, true)), return; end
+st = '';
+if isfield(E0, 'import') && isstruct(E0.import) && isfield(E0.import, 'active') && E0.import.active
+    st = E0.import.stamp;
+end
+killed = ~isempty(st) && isfield(E0.import, 'source_stopped');
+if killed
+    cs = sa_import('current_stamp', S, E0.import);
+elseif isfield(cur, 'import_stamp')
+    cs = cur.import_stamp;
+else
+    cs = sa_import('current_stamp', S);
+end
+cur.import_stamp = cs;
+if ~strcmp(st, cur.import_stamp)
+    bad = true;
+    if isempty(st)
+        item = 'import: the stored run has no import but import.source_dir is set';
+    elseif killed && isempty(cs)
+        item = sprintf(['import: a planned source attempt file of the killed source (identity %s) is missing, ' ...
+            'or the source is not found at import.source_dir'], st(1:8));
+    elseif killed
+        item = sprintf(['import: a planned source attempt file of the killed source changed (identity %s -> %s; ' ...
+            'attempt files are never rewritten, and resuming that source does not change them)'], st(1:8), cs(1:8));
+    elseif isempty(cur.import_stamp)
+        item = sprintf('import: the source run (stamp %s) is not found at import.source_dir', st(1:8));
+    else
+        item = sprintf(['import: the source run changed since this run started (stamp %s -> %s; ' ...
+            'a source resumed or compacted after the follow-up started blocks its resume)'], st(1:8), ...
+            cur.import_stamp(1:min(8, end)));
     end
 end
 end
@@ -163,10 +229,15 @@ if exist(f, 'file') ~= 2
     error([eid ':E_NO_RUN'], 'resume: %s holds no settings_effective.mat.', run_dir);
 end
 if exist(fullfile(run_dir, 'compaction.mat'), 'file') == 2
-    Zc = load(fullfile(run_dir, 'compaction.mat'), 'compacted_at', 'n_removed');
+    Zc = load(fullfile(run_dir, 'compaction.mat'));
+    if isfield(Zc, 'compacted_from')
+        st = sprintf('it was compacted after it stopped (%s) without completing', Zc.stop_reason);
+    else
+        st = 'it is complete';
+    end
     error([eid ':E_COMPACTED'], ['resume refused: %s was compacted on %s: %d files removed; a ' ...
-        'compacted run cannot be resumed (it is complete; choose a new run_dir for more work).'], ...
-        top, Zc.compacted_at, Zc.n_removed);
+        'compacted run cannot be resumed (%s; choose a new run_dir for more work).'], ...
+        top, Zc.compacted_at, Zc.n_removed, st);
 end
 E0 = load(f);
 % ---- 1. preconditions ----------------------------------------------------
@@ -175,7 +246,7 @@ if isfield(cur, 'parameters') && isfield(E0, 'parameters') && ~isequaln(E0.param
         'other parameters are a new run: choose a new run_dir.'], ...
         strjoin(param_diff(E0.parameters, cur.parameters), ', '));
 end
-d = scientific_diff(E0.settings, S);
+d = scientific_diff(sa_settings('fill_focus_leaves', E0.settings), sa_settings('fill_focus_leaves', S));
 if ~isempty(d)
     error([eid ':E_SETTINGS'], ['resume refused: scientific setting(s) changed (%s); a ' ...
         'changed setting is a new run.'], strjoin(d, ', '));
@@ -194,6 +265,10 @@ if ~strcmp(E0.model.version, cur.model_version)
 end
 if ~isequal({E0.library_files.sha256}, {cur.library_files.sha256})
     error([eid ':E_LIBRARY'], 'resume refused: a library file''s SHA-256 differs.');
+end
+[bad, item] = import_diff(E0, cur, S);
+if bad
+    error([eid ':E_IMPORT'], 'resume refused: %s.', item);
 end
 override = '';
 if ~isequal(E0.code_hashes, cur.code_hashes)
@@ -265,6 +340,8 @@ P = struct('active', ~isempty(names), ...
     'shard_stamp', containers.Map('KeyType', 'char', 'ValueType', 'double'), ...
     'shard_matched', containers.Map('KeyType', 'char', 'ValueType', 'logical'), ...
     'override', override, 'interrupted', interrupted, 'tmp', {tmpl});
+% the stored import plan (milestone 10): loaded, never rebuilt on resume
+if isfield(E0, 'import'), P.import = E0.import; else, P.import = sa_import('blank'); end
 sh = sa_store_io('shard_files', run_dir);   % without the stray temporary files listed above
 for k = 1:numel(sh)
     Z = load(fullfile(sh(k).folder, sh(k).name), 'key', 'attempt_count');
@@ -281,7 +358,7 @@ sa_write('mat', fullfile(run_dir, sprintf('resume_%d.mat', n)), struct( ...
     'time', datestr(now, 'yyyy-mm-ddTHH:MM:SS'), 'pid', feature('getpid'), ... %#ok<DATST,TNOW1>
     'attempt_count', numel(names), 'override', override, 'interrupted', interrupted, ...
     'stray_tmp', {tmpl}, 'provenance', cur.provenance, 'run_dir', top, ...
-    'run_dir_stored', E0.settings.run_dir, ...
+    'run_dir_stored', E0.settings.run_dir, 'import_source_dir', import_dir(S), ...
     'budget_stored', E0.settings.budget, 'checkpoint_stored', E0.settings.checkpoint));
 sa_journal('note', run_dir, sprintf(['resume %d: %d attempt file(s), %d interrupted, %d stray ' ...
     'temporary file(s), override %d'], n, numel(names), numel(interrupted), numel(tmpl), ~isempty(override)));
@@ -306,6 +383,9 @@ cur = struct('M', M, 'theta', theta, 'provenance', sa_settings('provenance'), ..
     'code_hashes', code_hashes(M), 'library_files', lib.files, 'model_version', M.version, ...
     'parameters', parameters);
 if ~isempty(seed_modes), cur.seed_modes = seed_modes; end
+if nargin >= 4 && ~isempty(S)
+    cur.import_check = true;          % the import stamp: computed by status / prepare when needed
+end
 end
 
 function Z = status(top, S, cur)
@@ -344,7 +424,7 @@ if isfield(cur, 'parameters') && isfield(E0, 'parameters') && ~isequaln(E0.param
     ids{end+1} = 'E_PARAMETERS';
     items{end+1} = ['parameters: ' strjoin(param_diff(E0.parameters, cur.parameters), ', ')];
 end
-d = scientific_diff(E0.settings, S);
+d = scientific_diff(sa_settings('fill_focus_leaves', E0.settings), sa_settings('fill_focus_leaves', S));
 if ~isempty(d), ids{end+1} = 'E_SETTINGS'; items{end+1} = ['settings: ' strjoin(d, ', ')]; end
 if isfield(cur, 'provenance') && (~isfield(E0, 'provenance') || ~isequal(E0.provenance, cur.provenance))
     ids{end+1} = 'E_VERSION'; items{end+1} = 'software version, MATLAB version, architecture or thread mode';
@@ -361,10 +441,18 @@ end
 if isfield(cur, 'library_files') && ~isequal({E0.library_files.sha256}, {cur.library_files.sha256})
     ids{end+1} = 'E_LIBRARY'; items{end+1} = 'a library file''s SHA-256';
 end
+[bad, imp_item] = import_diff(E0, cur, S);
+if bad, ids{end+1} = 'E_IMPORT'; items{end+1} = imp_item; end
 if isfield(cur, 'code_hashes') && ~isequal(E0.code_hashes, cur.code_hashes) && ...
         ~(isfield(S, 'resume_code_override') && ischar(S.resume_code_override))
     ids{end+1} = 'E_CODE'; items{end+1} = sprintf('code hashes (%s)', strjoin(hash_diff(E0.code_hashes, ...
         cur.code_hashes), ', '));
+end
+% A-1: a changed source refuses only a run that would resume; a completed
+% follow-up keeps its state (plot and traces), with a note
+imp_note = '';
+if isequal(ids, {'E_IMPORT'}) && completed_now(D)
+    imp_note = items{1}; ids = {}; items = {};
 end
 if ~isempty(ids)
     Z.state = 'refused'; Z.id = ['SA:RESUME:' ids{1}]; Z.items = items;
@@ -394,9 +482,18 @@ if exist(qf, 'file') == 2
     Q = load(qf, 'attempt_count', 'stop_reason');
     Z.stop_reason = Q.stop_reason;
     if Q.attempt_count == nfiles
+        if ~strcmp(Q.stop_reason, 'completed') && Z.compacted
+            % compacted after a clean stop (seeded_atlas_compact opts.stopped_ok)
+            Z.state = 'refused'; Z.id = 'SA:RESUME:E_COMPACTED';
+            Z.message = sprintf(['%s was compacted after it stopped (%s) without completing: it can no longer ' ...
+                'be resumed (choose a new run_dir for more work; plot, traces and import still work).'], top, ...
+                Q.stop_reason);
+            return
+        end
         if strcmp(Q.stop_reason, 'completed')
             Z.state = 'completed';
             Z.message = sprintf('%s is complete (%d calls): no solve; plot and traces only.', top, nfiles);
+            if ~isempty(imp_note), Z.message = sprintf('%s Note: %s.', Z.message, imp_note); end
             if Z.compacted, Z.message = [Z.message ' It is compacted: a resume is refused (E_COMPACTED).']; end
             return
         end
@@ -441,6 +538,27 @@ end
 
 function s = tern(c, a, b)
 if c, s = a; else, s = b; end
+end
+
+function tf = completed_now(D)
+% queue_final.mat says completed at the current attempt-file count (the
+% 'completed' state below; a compacted folder counts its files before
+% compaction)
+tf = false;
+qf = fullfile(D, 'queue_final.mat');
+if exist(qf, 'file') ~= 2, return; end
+Q = load(qf, 'attempt_count', 'stop_reason');
+n = numel(attempt_files(D));
+if exist(fullfile(D, 'compaction.mat'), 'file') == 2
+    Zc = load(fullfile(D, 'compaction.mat'), 'attempt_count_before');
+    n = Zc.attempt_count_before;
+end
+tf = strcmp(Q.stop_reason, 'completed') && Q.attempt_count == n;
+end
+
+function d = import_dir(S)
+d = '';
+if isfield(S, 'import') && isstruct(S.import) && isfield(S.import, 'source_dir'), d = S.import.source_dir; end
 end
 
 function f = attempt_files(run_dir)

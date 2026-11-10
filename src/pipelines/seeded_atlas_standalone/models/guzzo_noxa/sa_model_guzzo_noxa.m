@@ -47,6 +47,10 @@ M.shape_label = @shape_label;
 M.shape_label_profile = @shape_label_profile;
 M.mode_families = mode_families();
 M.seed_shape = @sag_seed_shape;          % milestone 8: seed shapes, type order, mirror rule
+% Milestone 10: the left/right half swap (halves, shifts and accumulators in
+% blocks; sag_coupled24's layout) and the permutation it induces on the 8
+% identity rows (L then R)
+M.reflection = struct('state_perm', [9:16 1:8 19 20 17 18 23 24 21 22], 'identity_perm', [5:8 1:4]);
 M.scale_counts = @scale_counts;          % milestone 8: point counts that grow with L
 M.field_scale = @field_scale;
 M.comparison_mesh = @(theta, S) linspace(0, theta.Lh, S.identity.n_comparison_nodes);

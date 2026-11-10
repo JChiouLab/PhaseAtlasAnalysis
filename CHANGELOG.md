@@ -1,5 +1,43 @@
 # Changelog
 
+## 1.0.0-rc2 (2026-11-10)
+
+New features (development milestones 10 and 11; details in `docs/USER_GUIDE.md` section 3):
+
+- **Roots of an earlier run as seeds (import).** Set `import_from` in `run_seeded_atlas.m` to a finished run folder of
+  the same model and parameters. Each of its roots, and by default its left/right mirror image, is solved once at the
+  nearest node of the new grid (the grid may be the same, finer, or not nested) and then serves as a starting root
+  like a cold root. Optional: skip steps the earlier run already tried and refused (`import.source_edges`
+  `'same_or_stronger'` or `'all'`; same grid, solver settings and model version only; default `'none'`). The earlier
+  run is identified by a stamp, and a resume refuses a changed source (`E_IMPORT`).
+- **Focus mode** (`run_mode = 'focus'`). Pick roots of an earlier run, by id (`import.root_ids`, a list or a CSV with a
+  `root_id` column) or by family label (`import.families`); only those are seeded (no cold calls), and the search is
+  fenced to their families and the mirror families: roots of other families are kept and reported but never stepped
+  from. A budget and `import_from` are required.
+- **The family fence** (`continuation.families`) can also be set in the other modes (off by default there).
+- **Killed sources.** A run that was killed can serve as a source with `import.source_stopped = true`; its unfinished
+  calls are ignored, and it is identified by its attempt files, so resuming it later does not block the new run.
+- **Source-edge reuse requires the same model version** (the corrector and solver code), since a refusal depends on it.
+- **`max_mode` in the edit block of `run_seeded_atlas.m`** builds mode-n seed libraries beside the base files; with
+  `seed_modes = 'all'` and no mode files present, the run warns (`SA:SEED:W_NO_MODE_FILES`).
+- **Compaction of a cleanly stopped run** (stopped on disk, budget or wall time, not killed):
+  `seeded_atlas_compact(run_dir, struct('stopped_ok', true))`. The run can no longer be resumed; it still plots,
+  traces and serves as an import source.
+
+Default changes:
+
+- `root_pass.max_rounds` 8 -> 10000, `multiseed.max_roots_per_node` 4 -> 10000, `continuation.max_lineages`
+  16 -> 10000, `continuation.max_calls_per_lineage` 100 -> 10000: the per-root pass runs until a round adds nothing,
+  and lineages are no longer cut by these caps. A pilot's projection prints the cap column as "unbounded".
+
+Compatibility:
+
+- With those four settings pinned at 8 / 4 / 16 / 100 and no import, rc2 gives bit for bit the same results as rc1
+  (checked on the fission-yeast L = 7 box and the Guzzo_noXA K2' box). At the new defaults, runs differ wherever an
+  old cap bound.
+- `model.version` is unchanged. Run folders record `seeded_atlas_standalone/1.0.0-rc2`; folders written by rc1 still
+  load, plot, trace and serve as import sources, but cannot be resumed by rc2.
+
 ## 1.0.0-rc1 (2026-10-31)
 
 The first export of the two pipelines as one standalone package, from the development repository's software 0.12

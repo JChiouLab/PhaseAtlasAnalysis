@@ -30,6 +30,9 @@ par      = struct('a', 2.38/4, 'b', 0.185, 'c', 151.6/2, 'd', 0.552, 'e', 0.828,
 % guzzo_noxa example: par = struct('L', 6, 'r_speed', 0.35, 'dba_factor', 1, 'rho_R', 1, 'rho_B', 1, ...
 %                                  'dn_half_range', 1.8); res = 25;
 res      = 50;                             % uncoupled seed library grid (noxa: also passed in par)
+max_mode = 2;                              % mode-n seed libraries built beside the base files: 2 = none;
+                                           %   e.g. 12 builds branch_MODE3..12_latest.mat (stops after the first
+                                           %   empty mode; existing files reused), which seed_modes 'all' uses
 points_per_axis = 51;                      % coupled grid points per pool axis (odd), each over its own pool's range
                                            %   [] = a fixed step instead: 0.02 (noxa 0.15), or
                                            %   settings_overrides.lattice.step = 0.01 below
@@ -38,8 +41,15 @@ library_dir = '';                          % '' = data/<uncoupled run name>/outp
 run_dir  = '';                             % '' = data/standalone_runs/<model>_<mode>_<parameters>_<grid>_<hash>
                                            %   e.g. original_polarity_pilot_a0p595_..._L7_MBG14_MP3p444_n51_92260295
                                            %   (grid: n51 = points_per_axis, step0p02 = a fixed step)
-run_mode = 'pilot';                        % 'smoke' | 'pilot' | 'production'
+run_mode = 'pilot';                        % 'smoke' | 'pilot' | 'production' | 'focus'
+                                           %   focus: chosen roots of an earlier run (import_from, required) are the
+                                           %   only seeds, the search fenced to their families; budget required
+                                           %   (USER_GUIDE section 3, "Focus mode")
 from_pilot = '';                           % production: a pilot run folder whose settings to keep
+import_from = '';                          % '' = none; a finished run folder whose roots seed this run
+                                           %   (each re-solved once at the nearest node of this grid; same
+                                           %   model and parameters). Import only (no cold calls):
+                                           %   settings_overrides.routes.cold = false below
 budget   = struct('max_calls', 500, 'max_wall_s', 7200);  % ALWAYS the limit, in every mode (production too):
                                            %   the run stops at max_calls calls in total or after max_wall_s seconds
                                            %   of this process, whichever comes first. Running the file again resumes
@@ -86,6 +96,20 @@ compact_after = false;                     % true: after a completed run, remove
 % settings_overrides.report.files_interval_s = 1800;         % rewrite attempts.csv, summary.txt, roots_index.csv
 %                                                            %   every 30 min during the run (default 600 s)
 % settings_overrides.report.solver_warnings = true;          % print bvp4c's warnings again (debugging)
+% settings_overrides.routes.cold = false;                    % with import_from: import only (no cold calls)
+% settings_overrides.import.mirror = false;                  % no mirror images of the imported roots
+% settings_overrides.import.source_edges = 'same_or_stronger';  % same grid, solver settings and model version
+%                                                            %   only: skip edges the source refused ('all': also
+%                                                            %   its weaker per-root pass refusals; default 'none';
+%                                                            %   focus default 'auto')
+% settings_overrides.import.root_ids = {'k:1,4/R000001'};    % import only these source roots (or the path of a
+%                                                            %   CSV with a root_id column, e.g. rows of the
+%                                                            %   source's roots_index.csv)
+% settings_overrides.import.families = {'2-/1-'};            % and/or the source roots with these labels
+% settings_overrides.continuation.families = {'2-/1-', '1+/2-'};  % the family fence: roots with other labels are
+%                                                            %   kept but never stepped from ({} = none; focus
+%                                                            %   default 'selected': the chosen labels + mirrors)
+% settings_overrides.import.source_stopped = true;           % import_from was killed and will not write again
 
 % ---- traces (one struct per trace; [] fields take the model's defaults) -------
 % Start from a root id, or from a position on plots/roots_3d.fig: click a root in
@@ -104,7 +128,9 @@ addpath(fullfile(here, 'src', 'pipelines', 'seeded_atlas_standalone'));
 addpath(here);
 setup_atlas('quiet');                     % the traced bvp4c copy: made or remade when missing or stale
 cfg = struct('model', model, 'par', par, 'res', res, 'library_dir', library_dir, 'run_dir', run_dir, ...
-    'mode', run_mode, 'points_per_axis', points_per_axis, 'from_pilot', from_pilot, 'budget', budget, ...
+    'mode', run_mode, 'points_per_axis', points_per_axis, 'from_pilot', from_pilot, 'import_from', import_from, ...
+    'max_mode', max_mode, ...
+    'budget', budget, ...
     'settings_overrides', settings_overrides, ...
     'traces', traces, 'make_plot', make_plot, 'compact_after', compact_after);
 if exist('library_confirmation', 'var'), cfg.library_confirmation = library_confirmation; end

@@ -3,7 +3,8 @@ function varargout = sa_continuation(action, varargin)
 %
 %   Q = SA_CONTINUATION('init', ctx)
 %       Scheduler state: lattice geometry, box, ring, lineages (the anchor
-%       lineage from the first accepted cold root at the anchor node), root
+%       lineage from the first accepted cold or import root at the anchor
+%       node, in attempt order; milestone 10), root
 %       ownership, edge table, rescue table. Q holds no clock and no handle.
 %   ctx = SA_CONTINUATION('expand', ctx)
 %       One continuation pass of the current phase: every existing lineage in
@@ -75,6 +76,17 @@ function varargout = sa_continuation(action, varargin)
 %   pass-created roots (a root whose creating discovery has route
 %   'root_pass'), so no lineage opens from a root the pass steps from;
 %   Q.root_pass holds the pass's rounds table.
+%   Family fence (settings continuation.families; the run context carries
+%   the list in force as ctx.fence, {} or absent = no fence): a root whose
+%   observed family (its representative call's label) is outside the fence
+%   is stored and reported, but a lineage landing on it adopts it without
+%   making it expandable (counted: expansions withheld), next_start and
+%   unowned_roots skip it (lineage starts withheld), the anchor lineage
+%   starts from the first accepted cold or import root at the anchor node
+%   that is inside the fence, and node_parent (the rescue parents) offers
+%   only roots inside it. Q.fence (only when a fence is in force) holds the
+%   list and the counts; a run without a fence keeps its queue state
+%   unchanged.
 
 switch action
     case 'init',         varargout{1} = init(varargin{:});
@@ -90,7 +102,8 @@ switch action
     case 'targets',      varargout{1} = phase_targets(varargin{:});
     case 'next_start',   [varargout{1}, varargout{2}, varargout{3}, varargout{4}] = next_start(varargin{:});
     case 'unowned_roots', varargout{1} = unowned_roots(varargin{:});
-    case 'next_target',  [varargout{1}, varargout{2}] = next_target(varargin{:});
+    case 'next_target',  [varargout{1:max(nargout, 2)}] = next_target(varargin{:});
+    case 'record_skips', varargout{1} = record_skips(varargin{:});
     otherwise, error('SA:CONTINUATION', 'Unknown sa_continuation action %s.', action);
 end
 end
@@ -126,10 +139,31 @@ Q.rescue_done = false(Q.n, 1);
 Q.rescue_calls = zeros(Q.n, 1);
 Q.rescue_result = repmat({''}, Q.n, 1);
 Q.root_pass = sa_root_pass('blank_rounds');      % the pass's rounds table
-% the anchor lineage: the first accepted cold root at the anchor node
+if knowledge_on(ctx)
+    % source-edge skips (milestone 10; only when import.source_edges is not
+    % 'none', so a run without them keeps its queue state unchanged)
+    Q.source_skips = struct('category', {}, 'lineage', {}, 'round', {}, 'p', {}, 'q', {}, 'root', {});
+    Q.source_skip_keys = {};
+end
+if fence_on(ctx)
+    Q.fence = struct('labels', {reshape(ctx.fence, 1, [])}, 'expansions_withheld', 0, ...
+        'starts_withheld', {{}}, 'pass_starts_withheld', 0, 'rescue_withheld', zeros(1, 0));
+end
+% the anchor lineage: the first accepted cold or import root at the anchor
+% node, in attempt order (cold calls come first, so with cold on it is the
+% first accepted cold root, as before); with a fence, the first one inside it
 A = ctx.attempts;
-k = find(strcmp({A.kind}, 'cold') & strcmp({A.outcome}, 'accepted') & ...
+k = find((strcmp({A.kind}, 'cold') | strcmp({A.kind}, 'import')) & strcmp({A.outcome}, 'accepted') & ...
     strcmp({A.target_key}, L.key{Q.anchor_node}), 1);
+if ~isempty(k) && fence_on(ctx)
+    cand = find((strcmp({A.kind}, 'cold') | strcmp({A.kind}, 'import')) & strcmp({A.outcome}, 'accepted') & ...
+        strcmp({A.target_key}, L.key{Q.anchor_node}));
+    k = [];
+    for c = cand
+        if root_in_fence(ctx, A(c).root_id), k = c; break; end
+        if Q.box(Q.anchor_node), Q.fence.starts_withheld = union(Q.fence.starts_withheld, {A(c).root_id}); end
+    end
+end
 if ~isempty(k) && Q.box(Q.anchor_node)
     Q = new_lineage(Q, 'anchor', Q.anchor_node, A(k).root_id, A(k).attempt_id, A(k).family);
 end
@@ -229,7 +263,12 @@ end
 if ~strcmp(S.continuation.starts, 'anchor_and_cold'), return; end
 while true
     [root, q, att, fam] = next_start(ctx);
-    if isempty(root), break; end
+    if isempty(root)
+        if isfield(ctx.Q, 'fence')                 % the unowned roots the fence keeps from starting
+            ctx.Q.fence.starts_withheld = union(ctx.Q.fence.starts_withheld, fenced_unowned(ctx));
+        end
+        break
+    end
     if ctx.Q.slots_used >= S.continuation.max_lineages
         % no slot: every remaining unowned root is recorded, none started
         ctx.Q.no_slot = union(ctx.Q.no_slot, unowned_roots(ctx));
@@ -245,11 +284,61 @@ function R = unowned_roots(ctx)
 R = {};
 T = phase_targets(ctx);
 owned = id_set(ctx.Q.owner_root);              % owner_of(Q, id) ~= 0 (owner_lin >= 1)
+fon = fence_on(ctx);
 for q = T.'
     ids = roots_at(ctx, q);
     pr = pass_created(ctx, q);
     for k = 1:numel(ids)
+        if fon && ~root_in_fence(ctx, ids{k}), continue; end     % outside the fence: never a start
         if ~isKey(owned, ids{k}) && ~pr(k), R{end+1} = ids{k}; end %#ok<AGROW>
+    end
+end
+end
+
+function R = fenced_unowned(ctx)
+% unowned non-pass roots at the targets that the fence keeps from starting
+R = {};
+T = phase_targets(ctx);
+owned = id_set(ctx.Q.owner_root);
+for q = T.'
+    ids = roots_at(ctx, q);
+    pr = pass_created(ctx, q);
+    for k = 1:numel(ids)
+        if ~isKey(owned, ids{k}) && ~pr(k) && ~root_in_fence(ctx, ids{k}), R{end+1} = ids{k}; end %#ok<AGROW>
+    end
+end
+end
+
+function tf = fence_on(ctx)
+% a family fence is in force (ctx.fence: the observed labels inside it)
+tf = isfield(ctx, 'fence') && iscell(ctx.fence) && ~isempty(ctx.fence);
+end
+
+function tf = att_in_fence(ctx, att)
+% the observed family of attempt att (ids are A###### = the row number)
+A = ctx.attempts;
+k = sscanf(att, 'A%d');
+lab = '';
+if isscalar(k) && k >= 1 && k <= numel(A) && strcmp(A(k).attempt_id, att)
+    lab = A(k).observed_family;
+else
+    j = find(strcmp({A.attempt_id}, att), 1, 'last');
+    if ~isempty(j), lab = A(j).observed_family; end
+end
+tf = any(strcmp(lab, ctx.fence));
+end
+
+function tf = root_in_fence(ctx, root)
+% a root (<key>/R######) is inside the fence when its representative call's
+% observed family is
+key = regexprep(root, '/R\d+$', '');
+tf = false;
+if ~isKey(ctx.shards, key), return; end
+st = ctx.shards(key);
+for r = 1:numel(st.roots)
+    if strcmp(sprintf('%s/%s', key, st.roots(r).root_id), root)
+        tf = att_in_fence(ctx, st.roots(r).representative_attempt_id);
+        return
     end
 end
 end
@@ -264,6 +353,7 @@ a = Q.index(Q.anchor_node, :);
 owned = id_set(Q.owner_root);                  % owner_of(Q, id) ~= 0 (owner_lin >= 1)
 noslot = id_set(Q.no_slot);
 NR = lineage_roots(Q);                         % lineage x node root ids
+fon = fence_on(ctx);
 for q = T.'
     key = ctx.L.key{q};
     if ~isKey(ctx.shards, key), continue; end
@@ -273,6 +363,7 @@ for q = T.'
         id = sprintf('%s/%s', key, st.roots(r).root_id);
         if isKey(owned, id) || isKey(noslot, id), continue; end
         if pr(r), continue; end                      % pass roots never seed a lineage
+        if fon && ~att_in_fence(ctx, st.roots(r).representative_attempt_id), continue; end   % outside the fence
         % key 1: distinct by membership from every lineage root at q. A
         % redundant guard: the roots of one node's store are distinct by
         % membership by construction (each discovery joins exactly one
@@ -327,7 +418,8 @@ while true
         ctx.Q.lin(l).status = 'lineage_cap';
         return
     end
-    [q, p] = next_target(ctx, l);
+    [q, p, skips] = next_target(ctx, l);
+    if ~isempty(skips), ctx.Q = record_skips(ctx.Q, skips); end
     if q == 0
         ctx.Q.lin(l).status = 'done';
         return
@@ -352,9 +444,17 @@ while true
 end
 end
 
-function [qbest, pbest] = next_target(ctx, l)
+function [qbest, pbest, skips] = next_target(ctx, l)
+% skips (milestone 10): the candidate edges p -> q left out on source-edge
+% knowledge (sa_import 'knowledge'): the lineage root at p maps to a source
+% root whose edge into q the source refused with h >= continuation
+% .max_halvings ('lineage_same_or_stronger'), or, under 'all', with a
+% smaller h ('lineage_weaker')
 Q = ctx.Q; S = ctx.S;
 lin = Q.lin(l);
+skips = struct('category', {}, 'lineage', {}, 'round', {}, 'p', {}, 'q', {}, 'root', {});
+K = [];
+if knowledge_on(ctx), K = ctx.ik; end
 s = Q.index(lin.start_node, :);
 qbest = 0; pbest = 0; best = [];
 nc = size(Q.index, 2);
@@ -373,6 +473,18 @@ for q = 1:Q.n
             p = row_of(Q, kp);
             if p == 0 || isempty(lin.node_root{p}) || ~lin.expandable(p), continue; end
             if any(lin.tried(:, 1) == p & lin.tried(:, 2) == q), continue; end
+            if ~isempty(K)
+                kk = sprintf('%s|%d', lin.node_root{p}, q);
+                cat = '';
+                if isKey(K.lin_ss, kk), cat = 'lineage_same_or_stronger';
+                elseif strcmp(K.mode, 'all') && isKey(K.lin_weak, kk), cat = 'lineage_weaker';
+                end
+                if ~isempty(cat)
+                    skips(end+1) = struct('category', cat, 'lineage', l, 'round', 0, 'p', p, 'q', q, ...
+                        'root', lin.node_root{p}); %#ok<AGROW>
+                    continue
+                end
+            end
             nearer = abs(kp(c) - s(c)) < abs(kq(c) - s(c));
             rank = c + nc * ~nearer;
             cand(end+1, :) = [rank, p, 0]; %#ok<AGROW>
@@ -388,6 +500,22 @@ for q = 1:Q.n
 end
 end
 
+function tf = knowledge_on(ctx)
+tf = isfield(ctx, 'ik') && isstruct(ctx.ik) && isfield(ctx.ik, 'active') && ctx.ik.active;
+end
+
+function Q = record_skips(Q, skips)
+% each skipped (category, lineage or round, p, q, root) once
+if ~isfield(Q, 'source_skips'), return; end
+for k = 1:numel(skips)
+    s = skips(k);
+    key = sprintf('%s|%d|%d|%d|%d|%s', s.category, s.lineage, s.round, s.p, s.q, s.root);
+    if any(strcmp(Q.source_skip_keys, key)), continue; end
+    Q.source_skip_keys{end+1} = key;
+    Q.source_skips(end+1) = s;
+end
+end
+
 function ctx = attach(ctx, l, q, root, att)
 % The lineage's success at q (one per lineage and node).
 o = owner_of(ctx.Q, root);
@@ -395,7 +523,13 @@ ctx.Q.lin(l).node_root{q} = root;
 ctx.Q.lin(l).node_attempt{q} = att;
 if o == 0
     ctx.Q = set_owner(ctx.Q, root, l);
-    ctx.Q.lin(l).expandable(q) = true;
+    if fence_on(ctx) && ~root_in_fence(ctx, root)
+        % outside the fence: adopted and kept, never expanded
+        ctx.Q.lin(l).expandable(q) = false;
+        ctx.Q.fence.expansions_withheld = ctx.Q.fence.expansions_withheld + 1;
+    else
+        ctx.Q.lin(l).expandable(q) = true;
+    end
 elseif o ~= l
     ctx.Q.lin(l).merged_with = unique([ctx.Q.lin(l).merged_with, o]);
     ctx.Q.lin(l).expandable(q) = false;
@@ -404,9 +538,15 @@ end
 
 function [root, att, lin] = node_parent(ctx, p)
 % The preferred root at node p and the attempt whose iterate represents it:
-% lineage-owned roots first (lineage id order), then unowned ones.
+% lineage-owned roots first (lineage id order), then unowned ones; with a
+% fence, only roots inside it (none: root '').
 root = ''; att = ''; lin = 0;
 ids = roots_at(ctx, p);
+if fence_on(ctx)
+    keep = false(size(ids));                 % a loop: no closure over ctx
+    for k = 1:numel(ids), keep(k) = root_in_fence(ctx, ids{k}); end
+    ids = ids(keep);
+end
 if isempty(ids), return; end
 own = zeros(size(ids));                      % a loop: no closure over ctx
 for k = 1:numel(ids), own(k) = owner_of(ctx.Q, ids{k}); end
@@ -606,6 +746,9 @@ for q = find(Q.box).'
         elseif ~isempty(into)
             cls = 'refused';
             reasons = unique({into.failing});
+        elseif isfield(Q, 'source_skips') && any([Q.source_skips.q] == q)
+            cls = 'refused';                         % milestone 10: only skipped edges
+            reasons = {'refused in the source run (not posed here)'};
         elseif ~any(strcmp(Q.phases_run, phase_of(Q, ctx.S, q)))
             cls = 'policy_skipped';
             reasons = {'phase not run'};
@@ -699,6 +842,54 @@ end
 if isfield(Q, 'root_pass')
     L = [L, sa_root_pass('report_lines', ctx)];
 end
+if isfield(Q, 'fence')
+    L = [L, fence_lines(ctx)];
+end
+end
+
+function L = fence_lines(ctx)
+% The fence section: the roots stored outside it (by label), the
+% expansions, lineage starts and per-root pass starts it withheld
+F = ctx.Q.fence;
+labs = {};
+keys = ctx.shards.keys;
+n = 0;
+for k = 1:numel(keys)
+    st = ctx.shards(keys{k});
+    for r = 1:numel(st.roots)
+        n = n + 1;
+        a = st.roots(r).representative_attempt_id;
+        if ~att_in_fence(ctx, a)
+            j = sscanf(a, 'A%d');
+            if isscalar(j) && j <= numel(ctx.attempts), labs{end+1} = ctx.attempts(j).observed_family; end %#ok<AGROW>
+        end
+    end
+end
+L = {sprintf('Fence (continuation.families): {%s}', strjoin(F.labels, ', '))};
+by = '';
+if ~isempty(labs)
+    [u, ~, j] = unique(labs);
+    c = accumarray(j(:), 1).';
+    [~, o] = sort(-c);
+    o = o(1:min(end, 12));
+    by = [' (' strjoin(cellfun(@(a, b) sprintf('%s %d', a, b), u(o), num2cell(c(o)), 'UniformOutput', false), ...
+        ', ') tern(numel(u) > 12, ', ...', '') ')'];
+end
+L{end+1} = sprintf('  roots stored outside the fence: %d of %d%s', numel(labs), n, by);
+L{end+1} = sprintf(['  withheld by the fence: lineage expansions %d (roots adopted, not expanded); lineage ' ...
+    'starts %d (roots); per-root pass starts %d (root-rounds)'], F.expansions_withheld, ...
+    numel(F.starts_withheld), F.pass_starts_withheld);
+if isfield(F, 'rescue_withheld')
+    Q = ctx.Q;
+    nb = find(strcmp(Q.rescue_result(:).', 'no_basis') & ~Q.rescue_done(:).');
+    fw = intersect(nb, F.rescue_withheld);
+    L{end+1} = sprintf(['  rescue: %d node(s) whose ladder had no parent or basis inside the fence (recorded no_basis; ' ...
+        'genuine no_basis %d)'], numel(fw), numel(nb) - numel(fw));
+end
+end
+
+function s = tern(c, a, b)
+if c, s = a; else, s = b; end
 end
 
 function v = getf_pass(S)

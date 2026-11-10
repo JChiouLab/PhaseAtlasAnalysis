@@ -114,6 +114,10 @@ end
 end
 
 function s = mapstr(s, m)
+% M10 amended (packet v0.2 section 3.4): an import unit's key and its
+% guess_source ('import <stamp8> <source attempt id>', seed_right) carry the
+% SOURCE run's attempt ids, which a resume never renumbers: left as they are
+if startsWith(s, 'import'), return; end
 [tok, sp] = regexp(s, 'A\d{6}', 'match', 'split');
 for k = 1:numel(tok)
     if isKey(m, tok{k}), tok{k} = m(tok{k}); end

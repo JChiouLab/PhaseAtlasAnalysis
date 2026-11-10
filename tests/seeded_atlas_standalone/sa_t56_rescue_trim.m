@@ -19,7 +19,8 @@ ok = true;
 for mm = {Mf, Mn}
     for m = sa_modes('modes')
         u = struct('model', mm{1}.id, 'run_dir', 'x', 'mode', m{1});
-        if strcmp(m{1}, 'production'), u.budget = struct('max_calls', 10, 'max_wall_s', 10); end
+        if any(strcmp(m{1}, {'production', 'focus'})), u.budget = struct('max_calls', 10, 'max_wall_s', 10); end
+        if strcmp(m{1}, 'focus'), u.import = struct('source_dir', 'x'); end   % M11 amended: focus needs a source
         S = sa_settings('resolve', u, mm{1});
         ok = ok && isequal(S.rescue.rungs, {'secant'}) && ~S.rescue.ring && S.routes.rescue;
     end

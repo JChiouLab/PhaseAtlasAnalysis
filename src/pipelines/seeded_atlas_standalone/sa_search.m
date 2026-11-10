@@ -2,7 +2,9 @@ function varargout = sa_search(action, varargin)
 %SA_SEARCH  Scheduler and executor.
 %
 %   ctx = SA_SEARCH('run', ctx)
-%       Passes: cold -> refinement ->
+%       Passes: cold -> import (milestone 10: one call per planned row of
+%       ctx.import, sa_import; S.solver, no cold cap, no retry; then the
+%       source-edge knowledge ctx.ik) -> refinement ->
 %       [continuation -> rescue] up to search.max_passes (repeated only while
 %       rescue added roots), per phase: 'interior' then 'ring' when
 %       search.ring_last (the ring = lattice nodes outside the library's
@@ -103,6 +105,22 @@ if ~ctx.stop && S.routes.cold
         ctx = do_call(ctx, u, tg, guess, solver_for(S, 'cold'));   % cold mesh cap
         if ctx.stop, break; end
     end
+end
+% ---- import (one call per planned source root; milestone 10) -------------
+if ~ctx.stop && sa_import('active', ctx)
+    stage(ctx, 'import (one call per source root)', 'import');
+    rows = ctx.import.rows(strcmp({ctx.import.rows.status}, 'planned'));
+    for t = 1:numel(rows)
+        [u, tg] = sa_import('unit', ctx, rows(t));
+        [ok, why] = budget_ok(ctx, u);
+        if ~ok, ctx = set_stop(ctx, why); break; end
+        guess = sa_import('guess', ctx, rows(t));      % SHA-256 checked, live and on replay
+        ctx = do_call(ctx, u, tg, guess, S.solver);     % no cold cap, one call, no retry
+        if ctx.stop, break; end
+    end
+end
+if isfield(ctx, 'import')
+    ctx.ik = sa_import('knowledge', ctx);              % source-edge knowledge ('none': inactive)
 end
 % ---- refinement (budget refusals are recorded, not a stop) ---------------
 ctx.refinement = sa_report('blank_refinement');
@@ -352,6 +370,9 @@ switch kind
         I.within = sprintf('%d of %d cold targets called', count_kind(ctx, 'cold'), numel(ctx.T.list));
     case 'refinement'
         I.within = sprintf('%d refinement call(s)', count_kind(ctx, 'refinement'));
+    case 'import'
+        I.within = sprintf('%d of %d planned imports called', count_kind(ctx, 'import'), ...
+            sum(strcmp({ctx.import.rows.status}, 'planned')));
     case {'continuation', 'root_pass', 'rescue'}
         if isstruct(ctx.Q) && isfield(ctx.Q, 'box')
             [r, b] = reached(ctx);

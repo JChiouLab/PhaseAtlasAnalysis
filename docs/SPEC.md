@@ -1,7 +1,7 @@
 # Seeded coupled atlas: operating contract (specification)
 
 The product contract of the seeded coupled atlas, as adopted in the development repository (operating contract
-version 1.1, 2026-10-12, with later milestone addenda), for software 1.0.0-rc1. The development history, decisions,
+version 1.1, 2026-10-12, with later milestone addenda), for software 1.0.0-rc2. The development history, decisions,
 milestone packets, reports and reviews are not part of this package; where this page names them, they are in the
 development repository. Usage is in the [user guide](USER_GUIDE.md); models and the commissioned scope are in
 [MODELS](MODELS.md).
@@ -9,7 +9,7 @@ development repository. Usage is in the [user guide](USER_GUIDE.md); models and 
 ## Deliverable and claim ceiling
 
 Deliver a MATLAB pipeline for bounded discovery of valid coupled/forced roots,
-with smoke/pilot/production modes, inspectable profiles and diagnostics, shared
+with smoke/pilot/production (and focus) modes, inspectable profiles and diagnostics, shared
 root identity, saved effective settings and restart. The user can inspect a
 completed pilot and tune a new invocation; no AI or manual intervention is
 required between stages within an invocation.
@@ -55,7 +55,17 @@ commissioned.
 ## Search and performance
 
 Retain library-seeded cold search, continuation, rescue and exhaustive cold search
-as a reference option. Add an optional anchor-first strategy using a small,
+as a reference option. Since 1.0.0-rc2 (milestone 10 of the development repository) a declared `import` route may
+seed a run from the roots of a finished run folder of the same model and
+parameters: each root (and, by default, its mirror image) is re-solved once at the
+nearest node, under the run's own validity boundary, with the source identified by
+a stamp; an import is evidence of its own call only, and the source run is never a
+hidden seed (the route, stamp and source path are recorded and reported). Since
+milestone 11 (also 1.0.0-rc2) a fourth mode, `focus`, imports a declared selection of those roots
+(by id or observed family label) as the only seeds and fences the search to the
+selected families: roots outside the fence are kept and reported but never
+stepped from; a killed source is accepted only on an explicit setting, with
+its calls lacking an end line ignored. Add an optional anchor-first strategy using a small,
 declared set of direct anchors or library seeds. Direct anchors supplement the
 library route; library-free use must be explicitly configured, never silently
 triggered by a missing or malformed library. Report library seedability separately

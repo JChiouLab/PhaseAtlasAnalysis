@@ -5,7 +5,7 @@ function varargout = sa_modes(action, varargin)
 %   Lay = SA_MODES('layer', mode)       the mode layer (model-free leaves)
 %   P = SA_MODES('layer_leaves', Lay)   leaf paths a layer struct sets
 %   P = SA_MODES('mode_leaves')         union of every mode layer's leaves
-%   names = SA_MODES('modes')           {'smoke','pilot','production'}
+%   names = SA_MODES('modes')           {'smoke','pilot','production','focus'}
 %
 %   Mode layer:
 %                     smoke            pilot                 production
@@ -22,6 +22,15 @@ function varargout = sa_modes(action, varargin)
 %     budget          100 / 3,600 s    500 / 7,200 s         REQUIRED from the user
 %     budget.wall_s   Inf              Inf                   Inf
 %     pilot           -                sample_per_axis 7     -
+%
+%   focus (selected roots of an earlier run as seeds, family fence): the
+%   production layer with routes.cold false (import only). The resolver
+%   (sa_settings) adds the focus rules that depend on the other settings:
+%   import.source_dir required (refused without), budgets required from
+%   the user (as production), and, unless set by the user,
+%   import.source_edges 'auto' and continuation.families 'selected' (both
+%   source 'mode'). The focus layer sets the same leaves as production, so
+%   mode_leaves (and from_run) are unchanged by it.
 %
 %   L = SA_MODES('cap_lattice', L, S)
 %       lattice.max_abs_coordinate: a per-axis cap on
@@ -57,7 +66,7 @@ switch action
     case 'layer',        varargout{1} = layer(varargin{:});
     case 'layer_leaves', varargout{1} = leaves_of(varargin{1}, '');
     case 'mode_leaves',  varargout{1} = mode_leaves();
-    case 'modes',        varargout{1} = {'smoke', 'pilot', 'production'};
+    case 'modes',        varargout{1} = {'smoke', 'pilot', 'production', 'focus'};
     case 'cap_lattice',  varargout{1} = cap_lattice(varargin{:});
     case 'central_node', varargout{1} = central_node(varargin{:});
     case 'central_nine', [varargout{1}, varargout{2}] = central_nine(varargin{:});
@@ -93,15 +102,21 @@ switch mode
             'continuation', struct('region', 'box', 'box', []), ...
             'rescue', rescue, ...
             'budget', struct('wall_s', Inf));
+    case 'focus'
+        Lay = struct('targets', struct('policy', 'per_seed'), ...
+            'routes', struct('cold', false, 'continuation', true, 'rescue', true), ...
+            'continuation', struct('region', 'box', 'box', []), ...
+            'rescue', rescue, ...
+            'budget', struct('wall_s', Inf));
     otherwise
-        error('SA:SETTINGS:E_MODE', 'mode must be one of smoke, pilot, production (got %s).', ...
+        error('SA:SETTINGS:E_MODE', 'mode must be one of smoke, pilot, production, focus (got %s).', ...
             char(string(mode)));
 end
 end
 
 function P = mode_leaves()
 P = {};
-for m = {'smoke', 'pilot', 'production'}
+for m = {'smoke', 'pilot', 'production', 'focus'}
     P = union(P, leaves_of(layer(m{1}), ''));
 end
 end

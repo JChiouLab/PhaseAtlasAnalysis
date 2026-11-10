@@ -81,6 +81,14 @@ function varargout = sa_model(action, varargin)
 %     scale_counts              fh(theta, S, SRC) -> [S, SRC]: point counts
 %                               that grow with L above
 %                               scaling.reference_length (milestone 8)
+%     reflection                struct('state_perm', p, 'identity_perm', pi)
+%                               (milestone 10; sa_import's mirror images):
+%                               the left/right half swap as a state row
+%                               permutation p (the mirror image of y is
+%                               y(p, :)) and the permutation pi it induces
+%                               on the identity_fields rows; both are
+%                               involutions, validated here. Not part of
+%                               the model version.
 
 switch action
     case 'validate', varargout{1} = validate(varargin{:});
@@ -148,7 +156,7 @@ if ~isempty(missing)
         'worked around.'], strjoin(sort(missing)', ', '));
 end
 extra = setdiff(have, [need, {'setting_defaults', 'shape_label_profile', 'mode_families', ...
-    'seed_shape', 'scale_counts'}]);
+    'seed_shape', 'scale_counts', 'reflection'}]);
 if ~isempty(extra)
     error(id, ['Model module declares member(s) outside the boundary: %s. Add ' ...
         'them to sa_model only by an agreed boundary change.'], ...
@@ -194,6 +202,9 @@ for f = {'seed_shape', 'scale_counts'}
         error(id, 'Optional member %s must be a function handle.', f{1});
     end
 end
+if isfield(M, 'reflection')
+    check_reflection(M, id);
+end
 if isfield(M, 'shape_label_profile') && ~isa(M.shape_label_profile, 'function_handle')
     error(id, 'Optional member shape_label_profile must be a function handle.');
 end
@@ -215,6 +226,35 @@ function require_text(v, name, id)
 if ~(ischar(v) && isrow(v) && ~isempty(v))
     error(id, 'Member %s must be nonempty character text.', name);
 end
+end
+
+function check_reflection(M, id)
+% Optional member reflection (milestone 10): state_perm p a permutation row
+% of 1..n_states, identity_perm pi one of 1..numel(identity_fields), each an
+% involution, and pi the permutation p induces on the identity rows: the
+% identity row k maps to identity row pi(k) iff p(row_k) = row_pi(k).
+R = M.reflection;
+if ~(isstruct(R) && isscalar(R) && all(isfield(R, {'state_perm', 'identity_perm'})))
+    error(id, 'Optional member reflection must be a struct with state_perm and identity_perm.');
+end
+p = R.state_perm; q = R.identity_perm;
+ni = numel(M.identity_fields);
+if ~is_perm(p, M.n_states) || ~is_perm(q, ni)
+    error(id, ['Optional member reflection: state_perm must be a permutation row of 1..%d and identity_perm ' ...
+        'one of 1..%d.'], M.n_states, ni);
+end
+if ~isequal(p(p), 1:M.n_states) || ~isequal(q(q), 1:ni)
+    error(id, 'Optional member reflection: state_perm and identity_perm must be involutions.');
+end
+rows = [M.identity_fields.row];
+if ~isequal(p(rows), rows(q))
+    error(id, ['Optional member reflection: identity_perm must be the permutation state_perm induces on the ' ...
+        'identity_fields rows.']);
+end
+end
+
+function tf = is_perm(v, n)
+tf = isa(v, 'double') && isrow(v) && numel(v) == n && isequal(sort(v), 1:n);
 end
 
 function require_cellstr(v, name, id)

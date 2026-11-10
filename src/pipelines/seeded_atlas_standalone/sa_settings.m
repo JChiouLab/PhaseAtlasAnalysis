@@ -16,8 +16,9 @@ function varargout = sa_settings(action, varargin)
 %
 %   T = SA_SETTINGS('template', model_id, mode)
 %       The editable user struct of a mode: model, mode, run_dir '' (to be
-%       set); production adds budget.max_calls / max_wall_s = NaN, which the
-%       resolver refuses until the user sets them.
+%       set); production and focus add budget.max_calls / max_wall_s = NaN,
+%       which the resolver refuses until the user sets them (focus also
+%       needs import.source_dir).
 %   [U, dropped] = SA_SETTINGS('from_run', run_dir, new_mode)
 %       The user-set leaves of an earlier run (settings_user.mat), with every
 %       mode-layer leaf (sa_modes('mode_leaves')), pilot.*, mode, run_dir,
@@ -35,8 +36,11 @@ function varargout = sa_settings(action, varargin)
 %
 %   GROUPS AND DOCUMENTED DEFAULTS (shared, model-free)
 %     model              (char, REQUIRED)  model-module id, resolved by sa_model
-%     mode               'smoke'           'smoke' | 'pilot' | 'production'
-%                                          (a scientific leaf: a
+%     mode               'smoke'           'smoke' | 'pilot' | 'production' |
+%                                          'focus' (selected roots of an
+%                                          earlier run as seeds, with a
+%                                          family fence; see FOCUS MODE
+%                                          below) (a scientific leaf: a
 %                                          resume with another mode is refused)
 %     run_dir            (char, REQUIRED)  output directory for this run; must
 %                                          not exist yet or be empty
@@ -125,8 +129,10 @@ function varargout = sa_settings(action, varargin)
 %                                               refusals > h (<= 2h+1 calls)
 %     continuation.starts           'anchor_and_cold'  | 'anchor'
 %     continuation.max_edges_per_node 2         per lineage and node
-%     continuation.max_lineages     16          non-anchor lineage slots
-%     continuation.max_calls_per_lineage 100    non-anchor lineages
+%     continuation.max_lineages     10000       non-anchor lineage slots
+%                                               (milestone 10; was 16)
+%     continuation.max_calls_per_lineage 10000  non-anchor lineages
+%                                               (milestone 10; was 100)
 %     continuation.box              []          [] = whole lattice, or [b1 b2]:
 %                                               nodes with |k_c| <= b_c
 %     continuation.region           'box'       'box' (continuation.box) |
@@ -139,6 +145,33 @@ function varargout = sa_settings(action, varargin)
 %                                               its own mesh | 'uniform' |
 %                                               'subsample'
 %     continuation.guess_nodes      1000        N for 'uniform' / 'subsample'
+%     continuation.families         {}          the family fence: {} = none;
+%                                               a cell row of observed family
+%                                               labels (mode names such as
+%                                               '1+/0'); or 'selected' (with
+%                                               an import: the labels of the
+%                                               selected source roots, plus
+%                                               their mirror labels when
+%                                               import.mirror is on; the
+%                                               focus default; refused,
+%                                               SA:IMPORT:E_FENCE, when it
+%                                               resolves to no label). A root whose
+%                                               observed family (its
+%                                               representative call's label)
+%                                               is outside the fence is
+%                                               stored, reported and counted,
+%                                               but never made expandable by
+%                                               a lineage, never starts a
+%                                               lineage (the anchor lineage
+%                                               included), never starts the
+%                                               per-root pass and is never a
+%                                               rescue parent or secant
+%                                               basis. Steps aimed at fenced
+%                                               families may land on other
+%                                               families; those roots are
+%                                               kept. Not the top-level
+%                                               families (library families
+%                                               for cold seeding)
 %     rescue.rungs                  {'diagonal','secant','deep'} (that order)
 %     rescue.max_calls_per_node     16
 %     rescue.ring                   true        rescue
@@ -176,8 +209,9 @@ function varargout = sa_settings(action, varargin)
 %     search.ring_last              true        ring nodes (outside the
 %                                               library's native range) only
 %                                               after the interior
-%     multiseed.max_roots_per_node  4           no edge into a node holding
-%                                               this many distinct roots
+%     multiseed.max_roots_per_node  10000       no lineage edge into a node
+%                                               holding this many distinct
+%                                               roots (milestone 10; was 4)
 %     checkpoint.every_calls        25          checkpoint files (attempts.mat,
 %                                               queue.mat, process_time.mat)
 %                                               rewritten
@@ -204,7 +238,8 @@ function varargout = sa_settings(action, varargin)
 %                                               fission yeast true, noxa false
 %     root_pass.max_halvings        1           h of a pass edge (<= 2h+1
 %                                               calls); <= continuation.max_halvings
-%     root_pass.max_rounds          8           rounds per search pass
+%     root_pass.max_rounds          10000       rounds per search pass
+%                                               (milestone 10; was 8)
 %     root_pass.max_calls_per_round Inf         reached: the pass ends for the
 %                                               current search pass
 %                                               (status root_pass_cap)
@@ -215,6 +250,71 @@ function varargout = sa_settings(action, varargin)
 %     targets.thin.stride           1           positive integer
 %     targets.thin.offset           []          one integer per pool in
 %                                               [0, stride-1] ([] = zeros)
+%   IMPORT GROUP (milestone 10; inert while import.source_dir is ''):
+%     import.source_dir             ''          a finished run folder whose
+%                                               roots seed this run: each is
+%                                               re-solved once at the nearest
+%                                               node (sa_import); a free leaf
+%                                               on resume (its identity is
+%                                               the source stamp, E_IMPORT)
+%     import.guess_mesh             'source'    'source' (the stored x, y on
+%                                               its own mesh) | 'rule'
+%                                               (sa_guess_mesh 'from')
+%     import.max_map_steps          1           a source root farther than
+%                                               this (in new-lattice steps)
+%                                               from every node is skipped
+%     import.mirror                 true        also import each source
+%                                               root's mirror image; a model
+%                                               without a reflection member
+%                                               resolves a package-default
+%                                               true to false (printed); a
+%                                               user-set true is refused
+%     import.source_edges           'none'      'none' | 'same_or_stronger' |
+%                                               'all': skip edges the source
+%                                               refused (same grid, solver
+%                                               settings and model version
+%                                               only) | 'auto' (the focus
+%                                               default): 'same_or_stronger'
+%                                               when those conditions hold,
+%                                               else 'none' with a printed
+%                                               note
+%     import.root_ids               {}          a cell row of source root ids
+%                                               ('k:1,4/R000001', as in the
+%                                               source's roots_index.csv), or
+%                                               the path of a CSV file with a
+%                                               root_id column
+%     import.families               {}          a cell row of observed family
+%                                               labels of source roots
+%                                               ('1+/0'); a source root is
+%                                               imported when it matches
+%                                               either list; both empty =
+%                                               every root. An id or label
+%                                               the source does not hold is
+%                                               refused (SA:IMPORT:E_SELECTION,
+%                                               listing them). Mirror rows
+%                                               are made for selected roots
+%                                               only
+%     import.source_stopped         false       true: accept a source that
+%                                               was killed (no lock or pid
+%                                               file exists, so a running
+%                                               source cannot be told from a
+%                                               killed one: set it only when
+%                                               the source will not write
+%                                               again). Its calls without an
+%                                               end line are ignored; a
+%                                               journal written in the last
+%                                               10 minutes is refused; its
+%                                               identity is the SHA-256 of
+%                                               each planned row's attempt
+%                                               file (the source may be
+%                                               resumed later); source-edge
+%                                               knowledge comes from its
+%                                               last checkpoint queue.mat
+%   FOCUS MODE: the production mode layer with routes.cold false (import
+%   only); import.source_dir is required; budgets are required from the
+%   user; import.source_edges defaults to 'auto' and continuation.families
+%   to 'selected' (source 'mode'; a value set by the user wins, {} = no
+%   fence).
 %     model_options      (from M.model_options_defaults; for the original model
 %                         hss_branch, guess mesh, corrector gate tolerances and
 %                         the family label's constants (shape_flat_tol,
@@ -242,6 +342,7 @@ switch action
     case 'provenance', varargout{1} = provenance();
     case 'resume_free', varargout{1} = resume_free_leaves();
     case 'legacy_fill', varargout{1} = legacy_fill(varargin{:});
+    case 'fill_focus_leaves', varargout{1} = fill_focus_leaves(varargin{:});
     case 'scale_counts', [varargout{1}, varargout{2}] = scale_counts(varargin{:});
     otherwise
         error('SA:SETTINGS:E_ACTION', 'Unknown sa_settings action %s.', action);
@@ -251,7 +352,7 @@ end
 % =========================================================================
 
 function v = software_version()
-v = 'seeded_atlas_standalone/1.0.0-rc1';
+v = 'seeded_atlas_standalone/1.0.0-rc2';
 end
 
 function P = provenance()
@@ -265,9 +366,12 @@ end
 
 function L = resume_free_leaves()
 % Leaves that may differ on resume; everything else is a
-% scientific leaf and must equal the stored effective settings.
+% scientific leaf and must equal the stored effective settings. A dotted
+% entry frees one leaf of a group (import.source_dir: the source folder may
+% move; its identity is the source stamp, sa_resume E_IMPORT).
 L = {'budget', 'checkpoint', 'resume', 'resume_code_override', 'resolved_at', 'run_dir', ...
-    'report'};                            % report-only, may change on resume
+    'report', ...                         % report-only, may change on resume
+    'import.source_dir'};
 end
 
 function v = settings_format()
@@ -308,19 +412,23 @@ D.budget   = struct('max_calls', 35, 'max_wall_s', 28800, 'wall_s', Inf, ...
 D.routes   = struct('cold', true, 'continuation', false, 'rescue', false);
 D.continuation = struct('step_rule', 'adaptive', 'max_halvings', 4, ...
                     'starts', 'anchor_and_cold', 'max_edges_per_node', 2, ...
-                    'max_lineages', 16, 'max_calls_per_lineage', 100, 'box', [], ...
-                    'guess_mesh', 'parent', 'guess_nodes', 1000, 'region', 'box');
+                    'max_lineages', 10000, 'max_calls_per_lineage', 10000, 'box', [], ...
+                    'guess_mesh', 'parent', 'guess_nodes', 1000, 'region', 'box', ...
+                    'families', {{}});                                   % the family fence (off)
 D.rescue   = struct('rungs', {{'diagonal', 'secant', 'deep'}}, 'max_calls_per_node', 16, ...
                     'ring', true);
 D.pilot    = struct('sample_per_axis', 7);
 D.cold     = struct('mesh_cap', Inf);                                  % off at package level
-D.root_pass = struct('enabled', false, 'max_halvings', 1, 'max_rounds', 8, ...
+D.root_pass = struct('enabled', false, 'max_halvings', 1, 'max_rounds', 10000, ...
                     'max_calls_per_round', Inf);                         % off at package level
 D.report   = struct('large_change_factor', 3, 'replay_s_per_record', 0.65, 'solver_warnings', false, ...
                     'progress_interval_s', 300, ...                      % screen only
                     'files_interval_s', 600);                            % human-facing files
 D.search   = struct('max_passes', 3, 'ring_last', true);
-D.multiseed = struct('max_roots_per_node', 4);
+D.multiseed = struct('max_roots_per_node', 10000);
+D.import   = struct('source_dir', '', 'guess_mesh', 'source', 'max_map_steps', 1, ...
+                    'mirror', true, 'source_edges', 'none', ...
+                    'root_ids', {{}}, 'families', {{}}, 'source_stopped', false);   % (off)
 D.checkpoint = struct('every_calls', 25, 'min_free_gib', 8);
 D.resume   = false;
 D.resume_code_override = false;
@@ -335,8 +443,10 @@ end
 function S = legacy_fill(S)
 % Fill the leaves missing from an older stored effective settings struct
 % with their NEUTRAL values (cap
-% Inf, pass off, no thinning), so loaders treat a legacy folder as it ran.
-% Never written back; leaves present are left untouched.
+% Inf, pass off, no thinning, import off), so loaders treat a legacy folder
+% as it ran. Never written back; leaves present are left untouched. A
+% missing root_pass group takes today's defaults (max_rounds 10000): inert,
+% since such a folder (before milestone 5) ran with the pass off.
 if ~isstruct(S), return; end
 D = defaults();
 if isfield(S, 'lattice') && isstruct(S.lattice) && ~isfield(S.lattice, 'points_per_axis')
@@ -351,11 +461,38 @@ for f = fieldnames(D.root_pass).'
     if ~isfield(S.root_pass, f{1}), S.root_pass.(f{1}) = D.root_pass.(f{1}); end
 end
 S.root_pass.enabled = logical(S.root_pass.enabled);
+if ~isfield(S, 'import') || ~isstruct(S.import), S.import = D.import; end   % before 1.0.0-rc2: no import
+S = fill_focus_leaves(S);
 if isfield(S, 'targets') && isstruct(S.targets)
     if ~isfield(S.targets, 'thin') || ~isstruct(S.targets.thin), S.targets.thin = D.targets.thin; end
     for f = fieldnames(D.targets.thin).'
         if ~isfield(S.targets.thin, f{1}), S.targets.thin.(f{1}) = D.targets.thin.(f{1}); end
     end
+end
+end
+
+function S = fill_focus_leaves(S)
+% The selection, stopped-source and fence leaves (focus mode) at their
+% neutral values, where a stored struct lacks them (a folder made before
+% they existed ran without them); leaves present are left untouched. Used
+% by legacy_fill and by the resume comparison (sa_resume), so such a
+% folder is compared as it ran.
+if ~isstruct(S), return; end
+if isfield(S, 'import') && isstruct(S.import)
+    if ~isfield(S.import, 'root_ids'), S.import.root_ids = {}; end
+    if ~isfield(S.import, 'families'), S.import.families = {}; end
+    if ~isfield(S.import, 'source_stopped'), S.import.source_stopped = false; end
+end
+if isfield(S, 'continuation') && isstruct(S.continuation) && ~isfield(S.continuation, 'families')
+    S.continuation.families = {};
+end
+end
+
+function check_label_list(v, name, id)
+% a cell row of distinct nonempty texts ({} allowed)
+if ~(iscell(v) && (isempty(v) || isrow(v)) && all(cellfun(@(c) ischar(c) && isrow(c) && ~isempty(c), v)) ...
+        && numel(unique(v)) == numel(v))
+    error(id, '%s must be a cell row of distinct nonempty texts ({} = none).', name);
 end
 end
 
@@ -460,6 +597,16 @@ SRC = mark_all(D, 'package');
 S = merge(D, ML, 'settings(model layer)', id);   SRC = mark(SRC, ML, 'model');
 S = merge(S, MO, 'settings(mode layer)', id);    SRC = mark(SRC, MO, 'mode');
 S = merge(S, user, 'settings', id);              SRC = mark(SRC, user, 'user');
+% focus mode: the defaults that depend on an import (the mode's own, unless
+% the user set the leaf)
+if strcmp(S.mode, 'focus')
+    if strcmp(source_of(SRC, {'import', 'source_edges'}), 'package')
+        S.import.source_edges = 'auto'; SRC.import.source_edges = 'mode';
+    end
+    if strcmp(source_of(SRC, {'continuation', 'families'}), 'package')
+        S.continuation.families = 'selected'; SRC.continuation.families = 'mode';
+    end
+end
 
 % ---- required members ---------------------------------------------------
 require_text(S.model, 'settings.model', id);
@@ -470,12 +617,18 @@ if ~strcmp(S.model, M.id)
         'settings.model is %s but the supplied module reports id %s.', S.model, M.id);
 end
 cid = 'SA:SETTINGS:E_CONTRADICTION';
-% contradiction: production needs user-set budgets
-if strcmp(S.mode, 'production') && (~strcmp(SRC.budget.max_calls, 'user') || ...
+% contradiction: production and focus need user-set budgets
+if any(strcmp(S.mode, {'production', 'focus'})) && (~strcmp(SRC.budget.max_calls, 'user') || ...
         ~strcmp(SRC.budget.max_wall_s, 'user') || any(isnan(double(S.budget.max_calls))) || ...
         any(isnan(double(S.budget.max_wall_s))))
-    error(cid, ['mode production needs budget.max_calls and budget.max_wall_s set by the ' ...
-        'user (there is no production default).']);
+    error(cid, ['mode %s needs budget.max_calls and budget.max_wall_s set by the ' ...
+        'user (there is no %s default).'], S.mode, S.mode);
+end
+% contradiction: focus needs the earlier run whose roots seed it
+if strcmp(S.mode, 'focus') && ~(ischar(S.import.source_dir) && ~isempty(S.import.source_dir))
+    error(cid, ['mode focus needs import.source_dir: the earlier run folder whose (selected) roots seed ' ...
+        'this run (the wrapper''s import_from). Pick roots with import.root_ids or import.families; ' ...
+        'without a source use smoke, pilot or production.']);
 end
 % contradiction: pilot.* leaves outside pilot mode
 if isfield(user, 'pilot') && ~strcmp(S.mode, 'pilot')
@@ -579,6 +732,15 @@ require_posint(S.continuation.max_calls_per_lineage, ...
 require_member(S.continuation.guess_mesh, {'parent', 'uniform', 'subsample'}, ...
     'settings.continuation.guess_mesh', id);
 require_member(S.continuation.region, {'box', 'cross'}, 'settings.continuation.region', id);
+v = S.continuation.families;
+if ischar(v)
+    if ~strcmp(v, 'selected')
+        error(id, ['settings.continuation.families must be {} (no fence), a cell row of observed family ' ...
+            'labels, or ''selected'' (the labels of the imported selection).']);
+    end
+else
+    check_label_list(v, 'settings.continuation.families', id);
+end
 require_logical(S.rescue.ring, 'settings.rescue.ring', id);
 require_posint(S.pilot.sample_per_axis, 'settings.pilot.sample_per_axis', id);
 require_pos(S.report.large_change_factor, 'settings.report.large_change_factor', id);
@@ -646,6 +808,28 @@ end
 require_posint(S.search.max_passes, 'settings.search.max_passes', id);
 require_logical(S.search.ring_last, 'settings.search.ring_last', id);
 require_posint(S.multiseed.max_roots_per_node, 'settings.multiseed.max_roots_per_node', id);
+% ---- import (milestone 10) ------------------------------------------------
+require_scalar_struct(S.import, 'settings.import', id);
+v = S.import.source_dir;
+if ~(ischar(v) && (isempty(v) || isrow(v)))
+    error(id, 'settings.import.source_dir must be character text ('''' = no import).');
+end
+require_member(S.import.guess_mesh, {'source', 'rule'}, 'settings.import.guess_mesh', id);
+require_pos(S.import.max_map_steps, 'settings.import.max_map_steps', id);
+require_logical(S.import.mirror, 'settings.import.mirror', id);
+require_member(S.import.source_edges, {'none', 'same_or_stronger', 'all', 'auto'}, ...
+    'settings.import.source_edges', id);
+v = S.import.root_ids;
+if ischar(v)
+    if ~(isrow(v) && ~isempty(v))
+        error(id, ['settings.import.root_ids must be a cell row of source root ids or the path of a CSV ' ...
+            'file with a root_id column ({} = none).']);
+    end
+else
+    check_label_list(v, 'settings.import.root_ids', id);
+end
+check_label_list(S.import.families, 'settings.import.families', id);
+require_logical(S.import.source_stopped, 'settings.import.source_stopped', id);
 require_posint(S.checkpoint.every_calls, 'settings.checkpoint.every_calls', id);
 v = S.checkpoint.min_free_gib;
 if ~(isa(v, 'double') && isreal(v) && isscalar(v) && isfinite(v) && v >= 0)
@@ -748,9 +932,39 @@ end
 if numel(unique(S.families)) ~= numel(S.families)
     error(cid, 'settings.families lists a family twice.');
 end
-if (S.routes.continuation || S.routes.rescue) && ~S.routes.cold
-    error(cid, ['routes.continuation/rescue need routes.cold: continuation starts from ' ...
-        'an accepted cold root (the anchor), so a run without cold has no start.']);
+imp = ~isempty(S.import.source_dir);
+if (S.routes.continuation || S.routes.rescue) && ~S.routes.cold && ~imp
+    error(cid, ['routes.continuation/rescue need routes.cold or import: continuation starts from ' ...
+        'an accepted cold or imported root (the anchor), so a run without either has no start.']);
+end
+if imp && strcmp(S.mode, 'pilot')
+    error(cid, ['import.source_dir is set but mode is pilot: the pilot projection has no model of ' ...
+        'imported roots; import in smoke or production mode.']);
+end
+if ~imp && ~strcmp(S.import.source_edges, 'none')
+    error(cid, 'import.source_edges is %s but import.source_dir is empty.', S.import.source_edges);
+end
+if ~imp && (~isempty(S.import.root_ids) || ~isempty(S.import.families) || S.import.source_stopped)
+    error(cid, ['import.root_ids, import.families or import.source_stopped is set but import.source_dir ' ...
+        'is empty (they select roots of a source run).']);
+end
+if ~imp && ischar(S.continuation.families)
+    error(cid, ['continuation.families is ''selected'' but import.source_dir is empty (the fence is made ' ...
+        'from the labels of the imported selection; give a list of labels instead).']);
+end
+% import.mirror on a model without a reflection member (sa_model): a
+% package-default true resolves to false, with a printed line when an
+% import is set; a user-set true is refused
+if S.import.mirror && ~isfield(M, 'reflection')
+    if strcmp(source_of(SRC, {'import', 'mirror'}), 'user')
+        error('SA:IMPORT:E_OPTION', ['import.mirror = true is set but model %s declares no reflection ' ...
+            '(module member reflection): mirror images cannot be made.'], M.id);
+    end
+    S.import.mirror = false;
+    SRC.import.mirror = 'derived';
+    if imp
+        fprintf('import.mirror: model %s declares no reflection; mirror images are off (false).\n', M.id);
+    end
 end
 if ischar(S.resume_code_override) && ~S.resume
     error(cid, 'resume_code_override is given but resume is false.');
@@ -803,7 +1017,7 @@ end
 function T = template(model, mode)
 sa_modes('layer', mode);                     % validates the mode name
 T = struct('model', model, 'mode', mode, 'run_dir', '');
-if strcmp(mode, 'production')
+if any(strcmp(mode, {'production', 'focus'}))
     T.budget = struct('max_calls', NaN, 'max_wall_s', NaN);
 end
 end

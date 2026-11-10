@@ -236,9 +236,9 @@ end
 end
 
 function c = route_class(a)
-% cold | refinement | continuation | substep | rescue_<rung> (substeps of a
-% rescue edge are rescue_<rung>_substep)
-if strcmp(a.kind, 'cold') || strcmp(a.kind, 'refinement'), c = a.kind; return; end
+% cold | refinement | import | continuation | substep | rescue_<rung>
+% (substeps of a rescue edge are rescue_<rung>_substep; import: milestone 10)
+if strcmp(a.kind, 'cold') || strcmp(a.kind, 'refinement') || strcmp(a.kind, 'import'), c = a.kind; return; end
 r = a.route; if isempty(r), r = a.kind; end
 if isfinite(a.fraction) && a.fraction < 1
     if strcmp(r, 'continuation'), c = 'substep'; else, c = [r '_substep']; end
@@ -1001,7 +1001,12 @@ if S.routes.rescue && isequal(S.rescue.rungs, {'secant'}) && nref == 0
 end
 per_node_cap = (S.continuation.max_lineages + 1) * S.continuation.max_edges_per_node * (2 * h + 1) + ...
     S.rescue.max_calls_per_node;
+% milestone 10: with the lineage slots at or above the number of box nodes
+% the per-node cap bounds nothing: the cap column is unbounded (Inf)
+nbox = nreg; if nbox == 0, nbox = N; end
+unbounded = S.continuation.max_lineages >= nbox;
 C = [cold + N * f * a + N * (1 - f) * b, cold + N * a + N * (1 - f) * b, cold + N * per_node_cap];
+if unbounded, C(3) = Inf; end
 if ~completed && nreg == 0
     out{end+1} = sprintf(['  PARTIAL: stop reason %s before the scheduler held a region (cold pass unfinished or 0 ' ...
         'calls): f, a and the central and high calls are not computed; resume the pilot to completion'], X.stop_reason);
@@ -1021,9 +1026,15 @@ out{end+1} = sprintf(['  calls = cold + N f a + N (1 - f) b: %s; N = %d ' ...
     'unfinished %d: every unreached node is charged b); a = %.3g calls per reached node; b = %.3g calls per ' ...
     'refused node (%s)'], cold_txt, N, f, rc.reached, nreg, rc.refused, rc.unattempted, ...
     rc.policy_skipped, rc.unfinished, a, b, b_src);
-out{end+1} = sprintf(['  central %.0f; high (every node reached: cold + N a + N (1 - f) b) %.0f; cap (cold + N x ' ...
-    '[(max_lineages + 1) x max_edges_per_node x (2h + 1) + rescue.max_calls_per_node = %d]) %.0f'], C(1), C(2), ...
-    per_node_cap, C(3));
+if unbounded
+    out{end+1} = sprintf(['  central %.0f; high (every node reached: cold + N a + N (1 - f) b) %.0f; cap unbounded ' ...
+        '(lineage caps above the box size: max_lineages %g >= %d box nodes)'], C(1), C(2), ...
+        S.continuation.max_lineages, nbox);
+else
+    out{end+1} = sprintf(['  central %.0f; high (every node reached: cold + N a + N (1 - f) b) %.0f; cap (cold + N x ' ...
+        '[(max_lineages + 1) x max_edges_per_node x (2h + 1) + rescue.max_calls_per_node = %d]) %.0f'], C(1), C(2), ...
+        per_node_cap, C(3));
+end
 out{end+1} = sprintf(['  with central_nine cold instead: central %.0f, high %.0f (branch connected to the central nine ' ...
     'only; multiplicity not tested: coexisting roots elsewhere are not looked for)'], C(1) - cold + cold_c9, ...
     C(2) - cold + cold_c9);

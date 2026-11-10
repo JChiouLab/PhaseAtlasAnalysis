@@ -39,6 +39,14 @@ function varargout = sa_rescue(action, varargin)
 %       are never a secant basis) is not marked rescue_done; it records
 %       rescue_result 'no_basis' and stays eligible for the next closure
 %       pass. At most one ladder WITH calls per node, as before.
+%       Family fence (ctx.fence, sa_continuation): a root whose observed
+%       family is outside the fence is never a rescue parent (diagonal,
+%       deep: sa_continuation node_parent offers only roots inside it; a
+%       refused edge from such a root is not resumed) and never a secant
+%       basis (a lineage pair at q-e, q-2e must both be inside it). A
+%       zero-call ladder that would have had a parent or basis without the
+%       fence records no_basis as before and is added to
+%       Q.fence.rescue_withheld (reported in the fence section).
 %   g = SA_RESCUE('secant_guess', solP1, solP2 [, S])    the secant guess (test hook)
 
 switch action
@@ -111,6 +119,11 @@ for q = todo
         % sees is unchanged; it is undone here only when no call was made)
         ctx.Q.rescue_done(q) = false;
         result = 'no_basis';
+        if fenced(ctx) && isfield(ctx.Q, 'fence') && basis_without_fence(ctx, q, card, nc)
+            % the fence alone left the ladder without a basis (counted in
+            % the fence section, apart from genuine no_basis nodes)
+            ctx.Q.fence.rescue_withheld = union(ctx.Q.fence.rescue_withheld, q);
+        end
     end
     ctx.Q.rescue_result{q} = result;
 end
@@ -140,6 +153,7 @@ for s1 = [-1 1]
         p = sa_continuation('row', Q, k);
         if p == 0 || sa_continuation('n_roots', ctx, p) == 0, continue; end
         [root, att, lin] = sa_continuation('node_parent', ctx, p);
+        if isempty(root), continue; end                 % no root inside the fence at p
         lk = lin; if lk == 0, lk = Inf; end
         key = [lk, p];
         if isempty(best) || key(1) < best(1) || (key(1) == best(1) && key(2) < best(2))
@@ -154,6 +168,7 @@ Q = ctx.Q; P = []; best = [];
 E = Q.edges;
 for p = card
     [root, att, lin] = sa_continuation('node_parent', ctx, p);
+    if isempty(root), continue; end                     % no root inside the fence at p
     m = [E.q] == q & [E.p] == p & strcmp({E.status}, 'refused');
     if any(m), fr = max([E(m).fraction_valid]); else, fr = -1; end
     lk = lin; if lk == 0, lk = Inf; end
@@ -191,6 +206,7 @@ best = [];
 for k = find([E.q] == q & strcmp({E.status}, 'refused') & strcmp({E.rule}, 'adaptive') & [E.calls] > 0)
     e = E(k);
     if sum(abs(ctx.Q.index(e.p, :) - kq)) ~= 1, continue; end      % cardinal only
+    if fenced(ctx) && ~in_fence(ctx, e.parent_root), continue; end  % outside the fence: not resumed
     lk = e.lineage; if lk == 0, lk = Inf; end
     key = [-e.fraction_valid, lk, e.p, e.id];
     if isempty(best) || lexless(key, best)
@@ -237,6 +253,13 @@ for c = 1:nc
         p2 = sa_continuation('row', Q, kq - 2 * e1);
         if p1 == 0 || p2 == 0, continue; end
         l = find(arrayfun(@(L) ~isempty(L.node_root{p1}) && ~isempty(L.node_root{p2}), Q.lin), 1);
+        if fenced(ctx)
+            % the first lineage whose pair lies inside the fence
+            l = [];
+            for j = find(arrayfun(@(L) ~isempty(L.node_root{p1}) && ~isempty(L.node_root{p2}), Q.lin))
+                if in_fence(ctx, Q.lin(j).node_root{p1}) && in_fence(ctx, Q.lin(j).node_root{p2}), l = j; break; end
+            end
+        end
         if isempty(l), continue; end
         L = Q.lin(l);
         s1 = sa_search('get_sol', ctx, L.node_attempt{p1});
@@ -285,6 +308,61 @@ for c = 1:nc
         ctx.Q.edges(E.id) = E;
     end
 end
+end
+
+function tf = basis_without_fence(ctx, q, card, nc)
+% would some rung of the ladder have had a parent or basis without the
+% fence (the same rules, every root counted)
+S = ctx.S; Q = ctx.Q;
+kq = Q.index(q, :);
+tf = false;
+for rg = S.rescue.rungs
+    switch rg{1}
+        case 'deep'
+            tf = ~isempty(card);
+        case 'diagonal'
+            if size(Q.index, 2) >= 2
+                for s1 = [-1 1]
+                    for s2 = [-1 1]
+                        k = kq; k(1) = k(1) + s1; k(2) = k(2) + s2;
+                        p = sa_continuation('row', Q, k);
+                        if p > 0 && sa_continuation('n_roots', ctx, p) > 0, tf = true; end
+                    end
+                end
+            end
+        case 'secant'
+            for c = 1:nc
+                for sg = [1 -1]
+                    e1 = zeros(1, nc); e1(c) = sg;
+                    p1 = sa_continuation('row', Q, kq - e1);
+                    p2 = sa_continuation('row', Q, kq - 2 * e1);
+                    if p1 == 0 || p2 == 0, continue; end
+                    for j = 1:numel(Q.lin)
+                        if ~isempty(Q.lin(j).node_root{p1}) && ~isempty(Q.lin(j).node_root{p2}), tf = true; end
+                    end
+                end
+            end
+    end
+    if tf, return; end
+end
+end
+
+function tf = fenced(ctx)
+tf = isfield(ctx, 'fence') && iscell(ctx.fence) && ~isempty(ctx.fence);
+end
+
+function tf = in_fence(ctx, root)
+% a root is inside the fence when its representative call's observed family is
+key = regexprep(root, '/R\d+$', '');
+st = ctx.shards(key);
+r = st.roots(strcmp(arrayfun(@(x) sprintf('%s/%s', key, x.root_id), st.roots, 'UniformOutput', false), root));
+a = r.representative_attempt_id;
+k = sscanf(a, 'A%d');
+lab = '';
+if isscalar(k) && k >= 1 && k <= numel(ctx.attempts) && strcmp(ctx.attempts(k).attempt_id, a)
+    lab = ctx.attempts(k).observed_family;
+end
+tf = any(strcmp(lab, ctx.fence));
 end
 
 function fam = family_of(ctx, root)

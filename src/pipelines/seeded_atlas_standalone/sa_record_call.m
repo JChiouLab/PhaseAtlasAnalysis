@@ -5,7 +5,8 @@ function varargout = sa_record_call(varargin)
 %       Evaluates the validity boundary on R (or takes V, the re-derived
 %       record of a replayed attempt), classifies the outcome, adds a valid
 %       NODE return of any route (cold, continuation, rescue_*) to its node's
-%       root-store shard (refinement returns and substeps are never
+%       root-store shard (an import return too: route 'import', milestone
+%       10; refinement returns and substeps are never
 %       discoveries), and appends the attempt row. With write = true the
 %       attempt file attempts/A######.mat is written atomically (returned
 %       iterate x, y, yp, stats; options; warning; validity record; target;

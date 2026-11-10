@@ -43,6 +43,10 @@ M.shape_label_profile = @shape_label_profile;
 M.mode_families = mode_families();
 M.seed_shape = @sap_seed_shape;          % milestone 8: seed shapes, type order, mirror rule
 M.scale_counts = @scale_counts;          % milestone 8: point counts that grow with L
+% Milestone 10: the left/right half swap (sap_forced28 'swap', a pure block
+% swap; the permutation lives here, not in the hashed corrector copy) and the
+% permutation it induces on the 10 identity rows (L then R)
+M.reflection = struct('state_perm', [11:20 1:10 23 24 21 22 27 28 25 26], 'identity_perm', [6:10 1:5]);
 M.field_scale = @field_scale;
 M.comparison_mesh = @(theta, S) linspace(0, 0.5, S.identity.n_comparison_nodes);
 M.required_checks = {'seam_concentration','seam_flux','mass_accumulator', ...
