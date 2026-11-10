@@ -43,8 +43,10 @@ run_dir  = '';                             % '' = data/standalone_runs/<model>_<
                                            %   (grid: n51 = points_per_axis, step0p02 = a fixed step)
 run_mode = 'pilot';                        % 'smoke' | 'pilot' | 'production' | 'focus'
                                            %   focus: chosen roots of an earlier run (import_from, required) are the
-                                           %   only seeds, the search fenced to their families; budget required
-                                           %   (USER_GUIDE section 3, "Focus mode")
+                                           %   only seeds, the search fenced to their families; budget required;
+                                           %   no library is built or read (res, max_mode, library_dir and
+                                           %   seed_modes are ignored: the field scale and the family lookup
+                                           %   come from import_from) (USER_GUIDE section 3, "Focus mode")
 from_pilot = '';                           % production: a pilot run folder whose settings to keep
 import_from = '';                          % '' = none; a finished run folder whose roots seed this run
                                            %   (each re-solved once at the nearest node of this grid; same

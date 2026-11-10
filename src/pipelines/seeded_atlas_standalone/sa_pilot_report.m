@@ -950,6 +950,11 @@ function [out, P] = sec_projection(X, R, out)
 out{end+1} = ''; out{end+1} = '8. PRODUCTION PROJECTION (central / high / cap)';
 S = X.S; P = struct();
 cen = X.E.census;
+if isfield(cen, 'computed') && ~cen.computed
+    % focus: a focus run computes no census (no library)
+    out{end+1} = '  not computed: a focus run has no library census and no cold targets';
+    return
+end
 fam = X.E.targets.families;
 fi = find(ismember(cen.names, fam));
 if isfield(cen, 'seedable')

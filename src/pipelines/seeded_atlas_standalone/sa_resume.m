@@ -23,7 +23,13 @@ function varargout = sa_resume(action, varargin)
 %          then computed here) or current.import_stamp; for a killed source
 %          imported with import.source_stopped the stamp is recomputed over
 %          its planned attempt files, so resuming that source does not
-%          block this run); code hashes equal, unless
+%          block this run); for a focus run (when current
+%          carries focus_inputs or focus_error) the field scale and family
+%          lookup derived again from the source equal the stored
+%          focus_inputs (SA:RESUME:E_FOCUS; also when the source's
+%          settings_effective.mat cannot be read; a focus folder started
+%          with a library by an earlier build is refused E_FOCUS before
+%          E_SETTINGS and E_LIBRARY); code hashes equal, unless
 %          S.resume_code_override holds a reason, which is journaled with
 %          both hash sets. Otherwise SA:RESUME:E_* (a changed setting or a
 %          repair is a new run).
@@ -60,8 +66,9 @@ function varargout = sa_resume(action, varargin)
 %                           resumable; it still loads
 %         refused           a precondition differs (Z.id E_PARAMETERS,
 %                           E_SETTINGS, E_VERSION, E_MODEL, E_LIBRARY,
-%                           E_IMPORT, E_CODE, in that order; E_IMPORT
-%                           alone leaves a completed run completed, with a
+%                           E_IMPORT, E_FOCUS, E_CODE, in that order;
+%                           E_IMPORT and / or E_FOCUS alone leave a
+%                           completed run completed, with a
 %                           note; Z.items lists every
 %                           differing item), or a journal integrity note
 %                           follows the last end line (Z.id E_INTEGRITY),
@@ -81,7 +88,10 @@ function varargout = sa_resume(action, varargin)
 %       The current identities for 'status' (M, theta, provenance, code
 %       hashes, library files, model version, parameters; with S also
 %       import_check = true: status compares the import source's identity,
-%       computing only the stamp the stored plan needs); zero solves.
+%       computing only the stamp the stored plan needs); zero solves. With
+%       S.mode 'focus' no library is read: library_files is
+%       empty, seed_modes is the source's, and focus_inputs (sa_import
+%       'focus_inputs') or focus_error is carried for E_FOCUS.
 %   L = SA_RESUME('scientific_diff', A, B)   differing scientific leaves
 %   H = SA_RESUME('code_hashes', M)          SHA-256 of every sa_*.m, the
 %                                            entry point and module file;
@@ -241,11 +251,16 @@ if exist(fullfile(run_dir, 'compaction.mat'), 'file') == 2
 end
 E0 = load(f);
 % ---- 1. preconditions ----------------------------------------------------
+[legacy, item] = focus_legacy(E0, cur);
+if legacy                                        % first: its library files would be named otherwise
+    error([eid ':E_FOCUS'], 'resume refused: %s.', item);
+end
 if isfield(cur, 'parameters') && isfield(E0, 'parameters') && ~isequaln(E0.parameters, cur.parameters)
     error([eid ':E_PARAMETERS'], ['resume refused: the parameters differ from the stored run (%s); ' ...
         'other parameters are a new run: choose a new run_dir.'], ...
         strjoin(param_diff(E0.parameters, cur.parameters), ', '));
 end
+S = focus_seed_modes(S, E0, cur);
 d = scientific_diff(sa_settings('fill_focus_leaves', E0.settings), sa_settings('fill_focus_leaves', S));
 if ~isempty(d)
     error([eid ':E_SETTINGS'], ['resume refused: scientific setting(s) changed (%s); a ' ...
@@ -269,6 +284,10 @@ end
 [bad, item] = import_diff(E0, cur, S);
 if bad
     error([eid ':E_IMPORT'], 'resume refused: %s.', item);
+end
+[bad, item] = focus_diff(E0, cur);
+if bad
+    error([eid ':E_FOCUS'], 'resume refused: %s.', item);
 end
 override = '';
 if ~isequal(E0.code_hashes, cur.code_hashes)
@@ -371,6 +390,10 @@ function cur = current(M, parameters, manifest, S)
 % S (optional, milestone 8): the resolved settings; their seed_modes select
 % the library files (a mode-n file enters the list only when a shape needs it)
 theta = M.normalize(parameters);
+if nargin >= 4 && ~isempty(S) && isfield(S, 'mode') && strcmp(S.mode, 'focus')
+    cur = current_focus(M, theta, parameters, S);    % focus: no library
+    return
+end
 if nargin >= 4 && ~isempty(S)
     [M, Sa, A] = sa_seed_modes('activate', M, S, manifest);
     lib = sa_seed_modes('load', M, manifest, theta, parameters, A);
@@ -385,6 +408,68 @@ cur = struct('M', M, 'theta', theta, 'provenance', sa_settings('provenance'), ..
 if ~isempty(seed_modes), cur.seed_modes = seed_modes; end
 if nargin >= 4 && ~isempty(S)
     cur.import_check = true;          % the import stamp: computed by status / prepare when needed
+end
+end
+
+function cur = current_focus(M, theta, parameters, S)
+% A focus run reads no library: library_files is empty; the
+% source's stored field scale and family lookup are derived (zero solves)
+% for the E_FOCUS comparison, and seed_modes is the source's (as the run
+% stores it). An unreadable source is recorded (focus_error), not thrown:
+% status reports it.
+cur = struct('M', M, 'theta', theta, 'provenance', sa_settings('provenance'), ...
+    'code_hashes', code_hashes(M), 'library_files', struct('type', {}, 'path', {}, 'bytes', {}, 'sha256', {}), ...
+    'model_version', M.version, 'parameters', parameters);
+try
+    [FI, ~, Sf] = sa_import('focus_inputs', S, M);
+    cur.seed_modes = Sf.seed_modes;
+    cur.focus_inputs = FI;
+catch ME
+    cur.focus_error = sprintf('%s: %s', ME.identifier, ME.message);
+end
+cur.import_check = true;
+end
+
+function [tf, item] = focus_legacy(E0, cur)
+% a focus folder without focus_inputs (started with an uncoupled library by
+% an earlier build), checked for a focus caller before the other
+% preconditions: its library files and seed_modes would otherwise be named
+tf = false; item = '';
+if ~isfield(cur, 'focus_inputs') && ~isfield(cur, 'focus_error'), return; end
+if isfield(E0, 'focus_inputs'), return; end
+if ~(isfield(E0, 'settings') && isfield(E0.settings, 'mode') && strcmp(E0.settings.mode, 'focus')), return; end
+tf = true;
+item = ['focus: this folder was started with an uncoupled library (by an earlier build of this software); a focus ' ...
+    'run now runs without one'];
+end
+
+function S = focus_seed_modes(S, E0, cur)
+% a focus caller whose source cannot be read has not derived the source's
+% seed_modes: compare with the stored ones (E_FOCUS names the source)
+if isfield(cur, 'focus_error') && isfield(E0, 'settings') && isfield(E0.settings, 'seed_modes')
+    S.seed_modes = E0.settings.seed_modes;
+end
+end
+
+function [bad, item] = focus_diff(E0, cur)
+% E_FOCUS: a focus run's stored focus_inputs against the
+% current derivation from the source (cur.focus_inputs), or the reason it
+% failed (cur.focus_error). Checked only when the caller carries either.
+bad = false; item = '';
+if ~isfield(cur, 'focus_inputs') && ~isfield(cur, 'focus_error'), return; end
+if isfield(cur, 'focus_error')
+    bad = true;
+    item = sprintf('focus: the source''s stored field scale and family lookup cannot be read (%s)', cur.focus_error);
+    return
+end
+if ~isfield(E0, 'focus_inputs')
+    [bad, item] = focus_legacy(E0, cur);         % not a focus folder: E_SETTINGS names the mode
+    return
+end
+[bad, why] = sa_import('focus_compare', E0.focus_inputs, cur.focus_inputs);
+if bad
+    item = sprintf(['focus: the field scale and family lookup derived from the source differ from the stored ' ...
+        'ones (%s)'], strjoin(why, ', '));
 end
 end
 
@@ -419,7 +504,14 @@ end
 Z.compacted = exist(fullfile(D, 'compaction.mat'), 'file') == 2;
 % 4. preconditions, in prepare's order (E_PARAMETERS first)
 E0 = load(f);
+S = focus_seed_modes(S, E0, cur);
 items = {}; ids = {};
+[legacy, item] = focus_legacy(E0, cur);
+if legacy                                        % a focus folder started with a library: that reason alone
+    Z.state = 'refused'; Z.id = 'SA:RESUME:E_FOCUS'; Z.items = {item};
+    Z.message = sprintf('%s differs from the stored run: %s; choose a new run_dir.', top, item);
+    return
+end
 if isfield(cur, 'parameters') && isfield(E0, 'parameters') && ~isequaln(E0.parameters, cur.parameters)
     ids{end+1} = 'E_PARAMETERS';
     items{end+1} = ['parameters: ' strjoin(param_diff(E0.parameters, cur.parameters), ', ')];
@@ -443,6 +535,8 @@ if isfield(cur, 'library_files') && ~isequal({E0.library_files.sha256}, {cur.lib
 end
 [bad, imp_item] = import_diff(E0, cur, S);
 if bad, ids{end+1} = 'E_IMPORT'; items{end+1} = imp_item; end
+[bad, foc_item] = focus_diff(E0, cur);
+if bad, ids{end+1} = 'E_FOCUS'; items{end+1} = foc_item; end
 if isfield(cur, 'code_hashes') && ~isequal(E0.code_hashes, cur.code_hashes) && ...
         ~(isfield(S, 'resume_code_override') && ischar(S.resume_code_override))
     ids{end+1} = 'E_CODE'; items{end+1} = sprintf('code hashes (%s)', strjoin(hash_diff(E0.code_hashes, ...
@@ -453,6 +547,8 @@ end
 imp_note = '';
 if isequal(ids, {'E_IMPORT'}) && completed_now(D)
     imp_note = items{1}; ids = {}; items = {};
+elseif ~isempty(ids) && all(ismember(ids, {'E_IMPORT', 'E_FOCUS'})) && completed_now(D)
+    imp_note = strjoin(items, '; '); ids = {}; items = {};    % focus: a focus source moved or changed
 end
 if ~isempty(ids)
     Z.state = 'refused'; Z.id = ['SA:RESUME:' ids{1}]; Z.items = items;

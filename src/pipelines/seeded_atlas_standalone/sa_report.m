@@ -75,6 +75,11 @@ function varargout = sa_report(action, varargin)
 %   no_basis count and the per-root pass rounds.
 %   summary.txt of an import run (milestone 10) counts import returns in the
 %   all-routes line and adds the Import section (sa_import 'report_lines').
+%   summary.txt of a focus run (no library) replaces the
+%   seedability census and the targets table by an Inputs section (the
+%   source of the field scale and the family lookup: path, settings file
+%   SHA-256, import identity, field scale, library types) and its own
+%   MULTIPLICITY NOT TESTED line.
 %   summary.txt says "mesh proposals recorded
 %   for n of m calls", and the cut-by-cap line says whether its count is
 %   exact (every cold call's proposals recorded) or a lower bound.
@@ -540,15 +545,20 @@ end
 L{end+1} = sprintf('stop reason: %s   corrector calls: %d of %d   wall %.1f s', ...
     st.stop_reason, st.calls, S.budget.max_calls, wall);
 L{end+1} = '';
-L{end+1} = 'Seedability census (nodes per family):';
-for f = 1:numel(st.C.names)
-    L{end+1} = sprintf('  %-12s %6d', st.C.names{f}, st.C.counts(f)); %#ok<AGROW>
+foc = isfield(st, 'focus') && isstruct(st.focus);   % focus: a focus run (no library)
+if foc
+    L = [L, focus_lines(st.focus)];
+else
+    L{end+1} = 'Seedability census (nodes per family):';
+    for f = 1:numel(st.C.names)
+        L{end+1} = sprintf('  %-12s %6d', st.C.names{f}, st.C.counts(f)); %#ok<AGROW>
+    end
+    L{end+1} = sprintf('  nodes in native range %d, outside %d', sum(st.C.in_range), sum(~st.C.in_range));
+    L{end+1} = '';
+    L{end+1} = sprintf('Targets: %d declared (policy %s), %d policy-skipped', ...
+        numel(st.T.list), S.targets.policy, numel(st.T.skipped));
 end
-L{end+1} = sprintf('  nodes in native range %d, outside %d', sum(st.C.in_range), sum(~st.C.in_range));
-L{end+1} = '';
-L{end+1} = sprintf('Targets: %d declared (policy %s), %d policy-skipped', ...
-    numel(st.T.list), S.targets.policy, numel(st.T.skipped));
-if any(strcmp(S.targets.policy, {'per_seed', 'per_seed_centre'}))
+if ~foc && any(strcmp(S.targets.policy, {'per_seed', 'per_seed_centre'}))
     L{end+1} = sprintf(['  per_seed: %d library seeds, one cold call each; %d seedable (family, node) pairs ' ...
         'not called cold (settings_effective.mat targets.skipped)'], numel(st.T.list), ...
         sum(startsWith({st.T.skipped.reason}, 'per_seed:')));
@@ -556,7 +566,9 @@ end
 mnote = multiplicity_note(S);       % report-only
 if ~isempty(mnote), L{end+1} = ['  ' mnote]; end
 cold = A(strcmp({A.kind}, 'cold'));
-L{end+1} = sprintf('%-12s %8s %9s %8s %10s %11s', 'family', 'targets', 'accepted', 'invalid', 'no_return', 'unfinished');
+if ~foc
+    L{end+1} = sprintf('%-12s %8s %9s %8s %10s %11s', 'family', 'targets', 'accepted', 'invalid', 'no_return', 'unfinished');
+end
 for f = 1:numel(st.T.families)
     fam = st.T.families{f};
     nt = sum(strcmp({st.T.list.family}, fam));
@@ -713,8 +725,15 @@ function t = multiplicity_note(S)
 % Rule: multiplicity is tested only when the cold targets
 % are every seedable (family, node) pair (targets.policy 'all_seedable');
 % for any other policy the roots found are those connected to the cold-
-% seeded nodes, so a node's root count is a lower bound.
+% seeded nodes, so a node's root count is a lower bound. A focus run
+% has no cold targets: its own line.
 t = '';
+if isfield(S, 'mode') && strcmp(S.mode, 'focus')
+    t = ['MULTIPLICITY NOT TESTED: focus run (no cold targets). The roots found are the imported roots and ' ...
+        'those connected to them inside the family fence; coexisting roots elsewhere are not looked for, so ' ...
+        'nodes with >= 2 roots is a lower bound.'];
+    return
+end
 if strcmp(S.targets.policy, 'all_seedable')
     % The thinning lever tests multiplicity only
     % partially
@@ -743,6 +762,26 @@ end
 t = sprintf(['MULTIPLICITY NOT TESTED: cold targets = %s (not all_seedable). The roots found are the branch ' ...
     'connected to %s only; coexisting roots elsewhere are not looked for, so nodes with >= 2 roots is a ' ...
     'lower bound. Use all_seedable for a multiplicity census.'], S.targets.policy, what);
+end
+
+function L = focus_lines(F)
+% The summary's inputs section of a focus run, in place of
+% the seedability census and the cold targets
+L = {};
+L{end+1} = 'Inputs (focus run): no uncoupled library; no seedability census; no cold targets; no ring';
+L{end+1} = sprintf('  field scale and family lookup from the source run %s', F.source_dir);
+if isfield(F, 'recorded_source_dir')
+    L{end+1} = sprintf('  (recorded at the start as %s; moved since, same identity)', F.recorded_source_dir);
+end
+L{end+1} = sprintf('  source settings_effective.mat SHA-256 %s; source %s (mode %s); import identity %s (%s)', ...
+    F.source_settings_sha256, F.source_software, F.source_mode, tern(isempty(F.source_stamp), '-', F.source_stamp), ...
+    tern(isempty(F.source_stamp_kind), '-', F.source_stamp_kind));
+fsrc = '';
+if isfield(F.field_scale, 'source'), fsrc = F.field_scale.source; end
+L{end+1} = sprintf('  field scale %s (%s)', mat2str(F.field_scale.values(:).', 6), fsrc);
+L{end+1} = sprintf('  family lookup: library types {%s} from the source''s seed_modes {%s}', ...
+    strjoin(F.library_types, ', '), strjoin(F.seed_modes, ', '));
+L{end+1} = '';
 end
 
 function n = n_recorded(A)

@@ -48,6 +48,9 @@ M.scale_counts = @scale_counts;          % milestone 8: point counts that grow w
 % permutation it induces on the 10 identity rows (L then R)
 M.reflection = struct('state_perm', [11:20 1:10 23 24 21 22 27 28 25 26], 'identity_perm', [6:10 1:5]);
 M.field_scale = @field_scale;
+% the settings leaves field_scale reads besides the parameters (a focus run
+% takes the source's field scale only when they equal the source's)
+M.field_scale_settings = {'lattice.anchor', 'identity.field_scale_floor', 'model_options.hss_branch'};
 M.comparison_mesh = @(theta, S) linspace(0, 0.5, S.identity.n_comparison_nodes);
 M.required_checks = {'seam_concentration','seam_flux','mass_accumulator', ...
     'mass_dense','mass_dense_refinement','shift_antisymmetry','velocity_consistency'};

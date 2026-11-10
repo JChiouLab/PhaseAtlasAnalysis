@@ -38,6 +38,31 @@ Compatibility:
 - `model.version` is unchanged. Run folders record `seeded_atlas_standalone/1.0.0-rc2`; folders written by rc1 still
   load, plot, trace and serve as import sources, but cannot be resumed by rc2.
 
+### Update 2026-11-11: focus runs without an uncoupled library (development milestone 12)
+
+The version number stays 1.0.0-rc2. Details in `docs/USER_GUIDE.md` section 3 ("Focus mode") and section 7.
+
+- **Focus needs no library.** A `run_mode = 'focus'` run neither builds nor reads an uncoupled library: the selected
+  roots of the earlier run are its only seeds. `library_dir`, `res`, `max_mode` and `seed_modes` are ignored (the
+  wrapper prints `library none (mode focus)`). The two things a run used to take from the library come from the source
+  run instead: the identity field scale and the family lookup (mode name to library family; the source's
+  `seed_modes` replaces the run's own). No seedability census and no cold targets are computed; `routes.cold = true` in
+  focus is refused (`SA:IMPORT:E_FOCUS_COLD`).
+- **No ring in focus.** Without a library there is no library range, so every lattice node counts as interior:
+  `search.ring_last`, `rescue.ring` and `budget.ring_calls` have no effect in focus, and the outer band is searched
+  and rescued like the rest.
+- **Field-scale settings must match the source.** The settings the field-scale rule reads (`lattice.anchor`,
+  `identity.field_scale_floor`, `model_options.hss_branch`; declared by a model module in the new optional member
+  `field_scale_settings`) must equal the source's; a difference, or a source that lacks the stored items (written
+  before software 0.11), is refused before any folder is made (`SA:IMPORT:E_FOCUS_SOURCE`, naming the setting or the
+  missing items).
+- **Recorded and checked on resume.** The run stores where its field scale and family lookup came from (source path,
+  SHA-256 of the source's `settings_effective.mat`, the import identity); a resume derives them again and refuses on
+  any difference or an unreadable source (`SA:RESUME:E_FOCUS`). A focus folder started with a library by the first
+  1.0.0-rc2 build cannot be resumed by this one.
+- Other modes (smoke, pilot, production, import without focus) are unchanged.
+
+
 ## 1.0.0-rc1 (2026-10-31)
 
 The first export of the two pipelines as one standalone package, from the development repository's software 0.12

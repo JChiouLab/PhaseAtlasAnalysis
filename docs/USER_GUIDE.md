@@ -266,6 +266,27 @@ fenced to the families you care about.
   inside the fence (recorded `no_basis`, counted apart from genuine `no_basis` nodes).
 - **What the fence costs.** A branch that crosses into another family and back is not followed through the other
   family; roots beyond it are found only if some fenced root reaches them directly.
+- **No uncoupled library.** A focus run neither builds nor reads a library: the selected roots
+  are the only seeds. The wrapper prints `library none (mode focus)` and ignores `library_dir`, `res`, `max_mode` and
+  `seed_modes` (Guzzo_noXA also `library_confirmation`; its `res` parameter is taken from the source's parameters,
+  since the import requires them). Two things a run used to take from the library come from the source run's
+  `internal/settings_effective.mat` instead: the **identity field scale** (the source's stored `field_scale`; the
+  parameters and the settings the field-scale rule reads, `lattice.anchor`, `identity.field_scale_floor` and
+  `model_options.hss_branch`, must be the source's, so it is the value a library at those settings gives; a
+  difference is refused, `SA:IMPORT:E_FOCUS_SOURCE`, naming the setting) and the
+  **family lookup** (the mode name → library family map: the source's `seed_modes`, activated by the model module as
+  the source's run did; `seed_modes` in `settings_effective.txt` is the source's, source `derived`). No seedability
+  census and no cold targets are computed, `routes.cold = true` is refused (`SA:IMPORT:E_FOCUS_COLD`), and there is no
+  ring: the ring is the lattice band outside the library's range, so every node is interior (`search.ring_last`,
+  `rescue.ring` and `budget.ring_calls` change nothing in focus). The summary's first section says where the field
+  scale and the family lookup came from (source path, the SHA-256 of its `settings_effective.mat`, the import
+  identity), in place of the census and the target table. A source that lacks these stored items (written before
+  software 0.11, or missing `field_scale`, `store_settings.field_scale` or `model.library_types`) is refused before
+  any folder (`SA:IMPORT:E_FOCUS_SOURCE`, naming the missing items); a flat 0.5 folder is refused as for any import
+  (`SA:IMPORT:E_SOURCE`). A resume derives both again from the source and refuses on any difference or when the source
+  can no longer be read (`SA:RESUME:E_FOCUS`); a completed focus run whose source moved still plots and traces, with
+  a note. A focus folder started with a library by an earlier build of 1.0.0-rc2 is not resumable by this one
+  (`E_FOCUS`).
 
 Worked example: an earlier production run on 51 points per axis found a family `2-/1-` worth refining, and you want
 it on a grid twice as fine, without spending calls on the other families:
@@ -281,7 +302,8 @@ settings_overrides.import.families = {'2-/1-'};          % or import.root_ids = 
 ```
 
 The run plans the selected roots (zero solves), prints the selection and the fence, re-solves each root once at its
-nearest node of the 101-point grid, and continues only from roots labelled `2-/1-` or `1+/2-`.
+nearest node of the 101-point grid, and continues only from roots labelled `2-/1-` or `1+/2-`. No library is built
+for it, whatever `res` and `library_dir` say.
 
 ## 4. Modes and reading the reports
 
@@ -290,7 +312,7 @@ nearest node of the 101-point grid, and continues only from roots labelled `2-/1
 | smoke | the central nine (the node nearest equal halves and its 8 neighbours) | inside that 3 × 3 box | 100 calls, 1 h |
 | pilot | the central nine plus a 7 × 7 sample over the library's range | along the two lattice lines through the centre | 500 calls, 2 h |
 | production | one cold call per library seed (`per_seed`, below) | the whole lattice | none of its own: required (the wrapper's edit-block `budget` supplies it; raise it for a full atlas) |
-| focus | none: the selected roots of an earlier run are the seeds (`import_from` required; section 3) | the whole lattice, fenced to the selected families | required, as production |
+| focus | none: the selected roots of an earlier run are the seeds (`import_from` required; no library: section 3) | the whole lattice, fenced to the selected families (no ring) | required, as production |
 
 **Production cold targets (`per_seed`).** A library seed is a family and one library cell (its mirror cell follows).
 Several grid nodes can map to the same cell; the seed gets one cold call, at the seedable node nearest the cell
@@ -486,7 +508,7 @@ A changed scientific setting is a **new run** in a new folder. Set only what you
 | Coexisting roots missed, or the pass too expensive | `root_pass.enabled`; `root_pass.max_calls_per_round`, `root_pass.max_rounds` (default 10000 since 1.0.0-rc2, was 8: the pass runs until a round adds nothing) | Guzzo_noXA: opt in with `true`; `max_calls_per_round` ends the pass for the current search pass (a user cost cap) |
 | Lineages blocked or cut | `continuation.max_lineages`, `continuation.max_calls_per_lineage`, `multiseed.max_roots_per_node` (all default 10000 since 1.0.0-rc2; were 16, 100 and 4) | the old values cut the L = 30 run's lineages (16 of 16 slots, 10 at the call cap, 575 of 1,286 nodes closed to lineages); set the old values to reproduce a 1.0.0-rc1 run; a pilot's projection then prints the cap column as "unbounded" |
 | Start from an earlier run's roots | wrapper `import_from`; `import.mirror`, `import.guess_mesh`, `import.max_map_steps`, `import.source_edges` | section 3; `routes.cold = false` for import only |
-| Only some roots of the earlier run are wanted | `import.root_ids` (a cell row of root ids or a CSV path with a `root_id` column), `import.families` (labels); `run_mode = 'focus'` | section 3; an unknown id or label is refused, listing them |
+| Only some roots of the earlier run are wanted | `import.root_ids` (a cell row of root ids or a CSV path with a `root_id` column), `import.families` (labels); `run_mode = 'focus'` | section 3; an unknown id or label is refused, listing them; focus builds and reads no library (its field scale and family lookup are the source's) |
 | Calls spent on families you do not care about | `continuation.families` (the fence: a list of labels; focus default `'selected'`; `{}` = none) | roots outside the fence are kept and counted, never stepped from |
 | The earlier run was killed | `import.source_stopped = true` | only when it will not write again; its calls without an end line are ignored; a journal written in the last 10 minutes is refused |
 | Nodes next to reached ones stay empty | `rescue.rungs = {'diagonal', 'secant', 'deep'}` (that order); `rescue.ring = true` (rescue also outside the library's range) | default secant only, no ring rescue |
@@ -571,6 +593,14 @@ change the stamp.
 
 **A focus or import run from a killed source** (`import.source_stopped`) is identified by the SHA-256 of its
 planned attempt files instead of the stamp, so resuming the source does not block it.
+
+**A focus run** stores in `internal/settings_effective.mat` (`focus_inputs`) where its field
+scale and family lookup came from: the source path, the SHA-256 of the source's `settings_effective.mat` (written
+once per run, also not changed by resuming a killed source), the import identity and its kind (the folder stamp, or
+for a killed source its planned attempt files), the field scale, the source's `seed_modes`, library types and mode
+families. A resume (and the wrapper's status) derives them again from the source and refuses on any difference or
+when the source can no longer be read (`E_FOCUS`, after `E_IMPORT` and before `E_CODE`); like `E_IMPORT`, it leaves
+a `completed` focus run `completed`, with a note. Its `library_files` list is empty, so `E_LIBRARY` never applies.
 
 **The per-root pass and `root_pass_cap`.** With `root_pass.max_rounds` 10000 a `max_rounds` end is practically
 unreachable. `root_pass.max_calls_per_round` is a user cost cap: when reached, the pass ends for the current search

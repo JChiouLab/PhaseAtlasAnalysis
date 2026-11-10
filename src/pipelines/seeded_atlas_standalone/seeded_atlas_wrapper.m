@@ -25,7 +25,13 @@ function W = seeded_atlas_wrapper(cfg)
 %                         .import.root_ids / .import.families) and a family
 %                         fence (continuation.families, default the
 %                         selected roots' labels and their mirrors); budget
-%                         required as in production
+%                         required as in production. focus uses NO
+%                         uncoupled library: nothing is built
+%                         or read; library_dir, res, max_mode, seed_modes
+%                         (and library_confirmation) are ignored with a
+%                         printed line; the field scale and the family
+%                         lookup come from the source (Guzzo_noXA: also its
+%                         res parameter)
 %     points_per_axis     the coupled grid: an odd point count per pool axis
 %                         (scalar or one per pool), passed as
 %                         settings lattice.points_per_axis; [] = the fixed
@@ -97,7 +103,13 @@ function W = seeded_atlas_wrapper(cfg)
 %   seeded_atlas_trace(run_dir, entry) give the same files without the
 %   status check.
 %   W.build_opts: the options the library step passes to
-%   atlas_build_libraries (build_opts with max_mode when above 2).
+%   atlas_build_libraries (build_opts with max_mode when above 2; struct()
+%   in focus, which builds nothing).
+%   Focus: steps 1-4 as above without the library: the
+%   header prints 'library none (mode focus)', no folder is added to the
+%   path, step 2 is skipped, the status compares the focus inputs
+%   (sa_resume E_FOCUS) instead of library files, and seeded_atlas_run
+%   receives an empty manifest.
 %   W: the resolved paths, status (before the run), status_after, result
 %   (seeded_atlas_run's, when a run happened), plot, traces, path_at_run,
 %   lattice (the grid printed in the header: rule, steps, sizes, n_nodes).
@@ -106,6 +118,7 @@ function W = seeded_atlas_wrapper(cfg)
 %   build, the run's stages, the plot, each trace and the compaction.
 
 cfg = fill(cfg);
+focus = is_focus(cfg);                           % focus: focus uses no uncoupled library
 pkg = fileparts(mfilename('fullpath'));
 repo = fileparts(fileparts(fileparts(pkg)));
 deps = fullfile(repo, 'src', 'solvers', 'atlas_surface_pipeline_dependencies');
@@ -113,19 +126,26 @@ deps_noxa = fullfile(deps, 'models', 'guzzo_noxa');
 core = fullfile(repo, 'src', 'models', 'guzzo_noxa');
 W = struct('model', cfg.model, 'library_dir', '', 'run_dir', '', 'plot', '', 'trace_dirs', {{}}, ...
     'status', [], 'status_after', [], 'result', [], 'plot_out', [], 'traces', [], 'path_at_run', '', ...
-    'compaction', [], 'lattice', [], 'build_opts', build_options(cfg));
+    'compaction', [], 'lattice', [], 'build_opts', struct());
+if ~focus, W.build_opts = build_options(cfg); end   % focus builds nothing
 
 % ---- 1. resolve and print ---------------------------------------------------
 direct = ~isempty(cfg.library_manifest);
 added = {};
-if ~direct, added = add_paths(cfg.model, deps, deps_noxa, core); end
+if ~direct && ~focus, added = add_paths(cfg.model, deps, deps_noxa, core); end
 cleanup = onCleanup(@() remove_paths(added));
 par = cfg.par;
 if strcmp(cfg.model, 'guzzo_noxa'), par.res = cfg.res; end
+res_note = '';
+if focus && strcmp(cfg.model, 'guzzo_noxa')
+    [par, res_note] = source_res(par, cfg.import_from);   % res is a noxa parameter: the source's
+end
 lib_par = cfg.par;
 if strcmp(cfg.model, 'guzzo_noxa') && isfield(lib_par, 'res'), lib_par = rmfield(lib_par, 'res'); end
 library_dir = cfg.library_dir;
-if direct
+if focus
+    manifest = struct(); lib_ok = true; library_dir = '';   % no library: nothing is read or built
+elseif direct
     manifest = cfg.library_manifest; lib_ok = true;
     if isfield(manifest, 'directory'), library_dir = manifest.directory; end
 else
@@ -135,7 +155,7 @@ else
     lib_ok = atlas_build_libraries('present', cfg.model, library_dir);
     manifest = struct('directory', library_dir);
 end
-if strcmp(cfg.model, 'guzzo_noxa') && ~isempty(cfg.library_confirmation)
+if ~focus && strcmp(cfg.model, 'guzzo_noxa') && ~isempty(cfg.library_confirmation)
     manifest.confirmation = cfg.library_confirmation;
 end
 M = sa_model(cfg.model);
@@ -165,8 +185,14 @@ W.trace_dirs = arrayfun(@(t) fullfile(run_dir, 'traces', t.name), cfg.traces(:).
 fprintf('\n================ seeded coupled atlas (%s) ================\n', sa_settings('version'));
 fprintf(' model            %s   mode %s\n', cfg.model, cfg.mode);
 fprintf(' parameters       %s\n', param_text(par));
-fprintf(' library folder   %s   (%s)\n', library_dir, tern(lib_ok, 'exists', 'will be built'));
-if ~direct && cfg.max_mode > 2
+if focus
+    fprintf([' library          none (mode focus): the field scale and the family lookup come from the import ' ...
+        'source; library_dir, res, max_mode, seed_modes%s are ignored%s\n'], ...
+        tern(strcmp(cfg.model, 'guzzo_noxa'), ', library_confirmation', ''), res_note);
+else
+    fprintf(' library folder   %s   (%s)\n', library_dir, tern(lib_ok, 'exists', 'will be built'));
+end
+if ~direct && ~focus && cfg.max_mode > 2
     fprintf(' library modes    max_mode %d: mode-n files n = 3..%d built beside the base files (existing ones reused)\n', ...
         cfg.max_mode, cfg.max_mode);
 end
@@ -189,7 +215,7 @@ if any(strcmp(Z.state, {'legacy', 'refused'}))   % stop before the library step:
 end
 
 % ---- 2. library -----------------------------------------------------------------
-if ~direct
+if ~direct && ~focus
     if ~lib_ok, sa_progress('stage', 'library build (Stages 1-3 of the uncoupled pipeline)', struct()); end
     manifest = atlas_build_libraries(cfg.model, lib_par, cfg.res, library_dir, W.build_opts);
     if strcmp(cfg.model, 'guzzo_noxa') && ~isempty(cfg.library_confirmation)
@@ -255,6 +281,31 @@ for k = 1:numel(T), fprintf('  trace       %s\n', T(k).dir); end
 end
 
 % =========================================================================
+
+function tf = is_focus(cfg)
+% the mode the run resolves to (the edit block's, or settings_overrides.mode,
+% which wins as in user_settings)
+m = cfg.mode;
+if isstruct(cfg.settings_overrides) && isfield(cfg.settings_overrides, 'mode'), m = cfg.settings_overrides.mode; end
+tf = (ischar(m) || isStringScalar(m)) && strcmp(m, 'focus');
+end
+
+function [par, note] = source_res(par, src)
+% Guzzo_noXA in focus: res is one of the model's parameters (the library
+% grid); a focus run uses no library, and the import requires the source's
+% parameters, so res is the source's stored one (unchanged when the source
+% cannot be read: the run then refuses with the import's message)
+note = '';
+if isempty(src), return; end
+try
+    Z = load(fullfile(sa_layout('state', src), 'settings_effective.mat'), 'parameters');
+    if isfield(Z.parameters, 'res') && ~isequal(Z.parameters.res, par.res)
+        note = sprintf(' (res = %g taken from the source''s parameters, not %g)', Z.parameters.res, par.res);
+        par.res = Z.parameters.res;
+    end
+catch
+end
+end
 
 function cfg = fill(cfg)
 d = struct('model', 'original_polarity', 'par', struct(), 'res', 50, 'library_dir', '', ...

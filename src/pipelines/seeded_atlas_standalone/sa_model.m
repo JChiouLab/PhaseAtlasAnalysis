@@ -81,6 +81,13 @@ function varargout = sa_model(action, varargin)
 %     scale_counts              fh(theta, S, SRC) -> [S, SRC]: point counts
 %                               that grow with L above
 %                               scaling.reference_length (milestone 8)
+%     field_scale_settings      cellstr of dotted settings leaves (other than
+%                               the parameters) that field_scale reads, e.g.
+%                               'lattice.anchor': a focus run takes the
+%                               source's stored field scale only when these
+%                               leaves equal the source's (sa_import
+%                               'focus_inputs'); absent = lattice.anchor and
+%                               identity.field_scale_floor
 %     reflection                struct('state_perm', p, 'identity_perm', pi)
 %                               (milestone 10; sa_import's mirror images):
 %                               the left/right half swap as a state row
@@ -156,7 +163,7 @@ if ~isempty(missing)
         'worked around.'], strjoin(sort(missing)', ', '));
 end
 extra = setdiff(have, [need, {'setting_defaults', 'shape_label_profile', 'mode_families', ...
-    'seed_shape', 'scale_counts', 'reflection'}]);
+    'seed_shape', 'scale_counts', 'reflection', 'field_scale_settings'}]);
 if ~isempty(extra)
     error(id, ['Model module declares member(s) outside the boundary: %s. Add ' ...
         'them to sa_model only by an agreed boundary change.'], ...
@@ -204,6 +211,10 @@ for f = {'seed_shape', 'scale_counts'}
 end
 if isfield(M, 'reflection')
     check_reflection(M, id);
+end
+if isfield(M, 'field_scale_settings') && ~(iscellstr(M.field_scale_settings) && ...
+        all(cellfun(@(c) ~isempty(regexp(c, '^[a-z_]+(\.[a-z_]+)+$', 'once')), M.field_scale_settings)))
+    error(id, 'Optional member field_scale_settings must be a cellstr of dotted settings leaves.');
 end
 if isfield(M, 'shape_label_profile') && ~isa(M.shape_label_profile, 'function_handle')
     error(id, 'Optional member shape_label_profile must be a function handle.');

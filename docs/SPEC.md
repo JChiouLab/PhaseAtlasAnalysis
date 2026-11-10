@@ -65,7 +65,12 @@ milestone 11 (also 1.0.0-rc2) a fourth mode, `focus`, imports a declared selecti
 (by id or observed family label) as the only seeds and fences the search to the
 selected families: roots outside the fence are kept and reported but never
 stepped from; a killed source is accepted only on an explicit setting, with
-its calls lacking an end line ignored. Add an optional anchor-first strategy using a small,
+its calls lacking an end line ignored. Since milestone 12 of the development repository (also 1.0.0-rc2; owner
+ruling 2026-11-10) a `focus` run uses no uncoupled library: the mode itself is the
+explicit configuration; its identity field scale and family lookup are taken
+from the source run's stored effective settings (recorded with the source
+identity, checked on resume), and no census, cold targets or ring are
+computed. Add an optional anchor-first strategy using a small,
 declared set of direct anchors or library seeds. Direct anchors supplement the
 library route; library-free use must be explicitly configured, never silently
 triggered by a missing or malformed library. Report library seedability separately

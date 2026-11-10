@@ -100,6 +100,43 @@ function varargout = sa_import(action, varargin)
 %       session (T106: a resume does not list the source again)
 %   d = SA_IMPORT('distance', Pa, Pb, fs)  scaled_rms_v1 of two comparison
 %       profiles (identity rows on one comparison mesh)
+%   [FI, M, S, SRC] = SA_IMPORT('focus_inputs', S, M [, SRC])
+%       Focus without a library: a focus run uses no
+%       uncoupled library; it takes the identity field scale and the family
+%       lookup from the source run. Zero solves; reads only the source's
+%       internal/settings_effective.mat (written once per run, never
+%       rewritten, also not by a resume of a killed source).
+%       Field scale: the source's stored field_scale struct (its .values
+%       equal store_settings.field_scale, checked). Family lookup: the
+%       source's resolved seed_modes (settings.seed_modes) activated by
+%       this module's seed_modes rule exactly as the source's run did
+%       (sa_seed_modes 'activate'; a resolved list never reads a library
+%       folder), giving M.library_types and M.mode_families; the activated
+%       library_types must equal the source's stored model.library_types.
+%       S.seed_modes becomes the source's list (SRC 'derived'; a different
+%       user value is ignored with a printed note). FI: rule, source_dir,
+%       source_settings_file, source_settings_sha256, source_software,
+%       source_mode, field_scale, seed_modes, library_types, mode_families
+%       ([] when the module has none), source_library_manifest and
+%       source_library_files (information only, never read), source_stamp
+%       and source_stamp_kind ('' here; the run fills them from its plan).
+%       Refusals before any folder: the source checks of 'plan'
+%       (SA:IMPORT:E_SOURCE: not a folder, flat, no run, the run folder
+%       itself), another model (SA:IMPORT:E_MODEL), and
+%       SA:IMPORT:E_FOCUS_SOURCE when the source lacks a stored item
+%       (store_settings.field_scale, field_scale.values, model.library_types;
+%       field_scale.anchor_hss_values when the module's shape_label reads
+%       the field scale, i.e. a source written before software 0.11), when
+%       the stored items disagree, when a settings leaf the field-scale
+%       rule reads (module member field_scale_settings; default
+%       lattice.anchor and identity.field_scale_floor) differs between this
+%       run and the source (the message names it), or when its seed_modes
+%       cannot be activated to its stored library types.
+%   [bad, why] = SA_IMPORT('focus_compare', FI0, FI1)  the stored focus
+%       inputs against the current ones (resume, sa_resume E_FOCUS): the
+%       source settings file SHA-256, field scale, seed_modes, library types
+%       and mode families must be equal (the source path and stamp are not
+%       compared here: the stamp is E_IMPORT's)
 
 switch action
     case 'blank',          varargout{1} = blank_plan();
@@ -120,6 +157,9 @@ switch action
     case 'counter',        varargout{1} = counter(varargin{:});
     case 'distance',       varargout{1} = prof_distance(varargin{:});
     case 'box_mask',       varargout{1} = box_mask(varargin{:});
+    case 'focus_inputs'
+        [varargout{1}, varargout{2}, varargout{3}, varargout{4}] = focus_inputs(varargin{:});
+    case 'focus_compare',  [varargout{1}, varargout{2}] = focus_compare(varargin{:});
     otherwise, error('SA:IMPORT', 'Unknown sa_import action %s.', action);
 end
 end
@@ -897,6 +937,138 @@ function i = row_number(a)
 % the plan row of an import attempt: its unit key's target number
 t = regexp(a.unit_key, '^import\|import\|import\|p\d+\|t([0-9.eE+-]+)\|', 'tokens', 'once');
 if isempty(t), i = NaN; else, i = str2double(t{1}); end
+end
+
+% =========================================================================
+% focus inputs: field scale and family lookup from the source
+
+function [FI, M, S, SRC] = focus_inputs(S, M, SRC)
+if nargin < 3, SRC = struct(); end
+eid = 'SA:IMPORT:E_FOCUS_SOURCE';
+src = S.import.source_dir;
+D = source_state(src, S);                          % E_SOURCE, as the plan
+f = fullfile(D, 'settings_effective.mat');
+E0 = load(f);
+if ~isfield(E0, 'settings') || ~isfield(E0.settings, 'model') || ~strcmp(E0.settings.model, M.id)
+    m = '?';
+    if isfield(E0, 'settings') && isfield(E0.settings, 'model'), m = E0.settings.model; end
+    error('SA:IMPORT:E_MODEL', 'import refused: the source run is model %s, this run is %s.', m, M.id);
+end
+% ---- the stored items ------------------------------------------------------
+miss = {};
+if ~(isfield(E0, 'store_settings') && isstruct(E0.store_settings) && isfield(E0.store_settings, 'field_scale'))
+    miss{end+1} = 'store_settings.field_scale';
+end
+if ~(isfield(E0, 'field_scale') && isstruct(E0.field_scale) && isfield(E0.field_scale, 'values'))
+    miss{end+1} = 'field_scale (struct with values)';
+end
+if ~(isfield(E0, 'model') && isstruct(E0.model) && isfield(E0.model, 'library_types') && iscellstr(E0.model.library_types))
+    miss{end+1} = 'model.library_types';
+end
+uses_fs = abs(nargin(M.shape_label)) >= 4;      % the label's flatness reference is the field scale's
+if uses_fs && isfield(E0, 'field_scale') && isstruct(E0.field_scale) && ~isfield(E0.field_scale, 'anchor_hss_values')
+    miss{end+1} = 'field_scale.anchor_hss_values (written before software 0.11)';
+end
+if ~isempty(miss)
+    error(eid, ['focus refused: the source run %s lacks the stored item(s) a focus run takes instead of an ' ...
+        'uncoupled library: %s (internal/settings_effective.mat). Use a source written by a newer software, or ' ...
+        'run mode production with a library.'], src, strjoin(miss, ', '));
+end
+v = E0.field_scale.values(:);
+if ~(isa(v, 'double') && isreal(v) && numel(v) == numel(M.identity_fields) && all(isfinite(v)) && all(v > 0) && ...
+        isequal(v, double(E0.store_settings.field_scale(:))))
+    error(eid, ['focus refused: the source run %s stores a field scale that is not %d finite positive values ' ...
+        'equal in field_scale.values and store_settings.field_scale.'], src, numel(M.identity_fields));
+end
+% ---- the settings the field-scale rule reads must be the source's ---------------
+Es = sa_settings('legacy_fill', E0.settings);
+fl = {'lattice.anchor', 'identity.field_scale_floor'};
+if isfield(M, 'field_scale_settings'), fl = M.field_scale_settings; end
+dif = {};
+for k = 1:numel(fl)
+    [a, ha] = leaf_at(S, fl{k}); [b, hb] = leaf_at(Es, fl{k});
+    if ~ha || ~hb || ~isequaln(a, b)
+        dif{end+1} = sprintf('%s (this run %s, source %s)', fl{k}, leaf_text(a, ha), leaf_text(b, hb)); %#ok<AGROW>
+    end
+end
+if ~isempty(dif)
+    error(eid, ['focus refused: the source''s stored field scale was made with other settings than this run''s; ' ...
+        'the field scale reads %s. Differing: %s. Set them as the source''s, or run mode production with a ' ...
+        'library.'], strjoin(fl, ', '), strjoin(dif, '; '));
+end
+% ---- the family lookup: the source's seed types, activated as its run did -----
+sm = Es.seed_modes;
+if ischar(sm) || isequal(sm, {'all'})
+    error(eid, 'focus refused: the source run %s stores an unresolved seed_modes (''all'').', src);
+end
+Ss = S;
+Ss.seed_modes = sm;
+try
+    [M2, Ss] = sa_seed_modes('activate', M, Ss, struct('directory', ''));
+catch ME
+    error(eid, 'focus refused: the source run''s seed_modes {%s} cannot be activated by this module (%s: %s).', ...
+        strjoin(cellstr(sm), ', '), ME.identifier, ME.message);
+end
+if ~isequal(M2.library_types, reshape(E0.model.library_types, 1, []))
+    error(eid, ['focus refused: the source run''s seed_modes {%s} give the library types {%s} under this module, ' ...
+        'but the source stores {%s}.'], strjoin(cellstr(sm), ', '), strjoin(M2.library_types, ', '), ...
+        strjoin(E0.model.library_types, ', '));
+end
+map = [];
+if isfield(M2, 'mode_families'), map = M2.mode_families; end
+lm = struct(); if isfield(E0, 'library_manifest'), lm = E0.library_manifest; end
+lf = struct('type', {}, 'path', {}, 'bytes', {}, 'sha256', {});
+if isfield(E0, 'library_files'), lf = E0.library_files; end
+FI = struct('rule', ['focus without an uncoupled library; the field scale and the family lookup ' ...
+    'are the source run''s (internal/settings_effective.mat)'], ...
+    'source_dir', src, 'source_settings_file', f, 'source_settings_sha256', sa_sha256(f), ...
+    'source_software', Es.software_version, 'source_mode', Es.mode, ...
+    'field_scale', E0.field_scale, 'seed_modes', {Ss.seed_modes}, 'library_types', {M2.library_types}, ...
+    'mode_families', map, 'source_library_manifest', lm, 'source_library_files', lf, ...
+    'source_stamp', '', 'source_stamp_kind', '');
+% ---- the run's settings: seed_modes is the source's ----------------------------
+user_sm = isfield(SRC, 'seed_modes') && strcmp(SRC.seed_modes, 'user');
+if user_sm && ~isequal(S.seed_modes, Ss.seed_modes)
+    fprintf(['note: focus ignores seed_modes (%s): a focus run seeds no library shape; the family lookup uses the ' ...
+        'source''s seed_modes {%s}.\n'], value_text_(S.seed_modes), strjoin(Ss.seed_modes, ', '));
+end
+S.seed_modes = Ss.seed_modes;
+if isfield(SRC, 'seed_modes'), SRC.seed_modes = 'derived'; end
+M = M2;
+end
+
+function [v, has] = leaf_at(s, path)
+% the value of a dotted leaf of a settings struct (has = false when absent)
+v = []; has = true;
+for p = strsplit(path, '.')
+    if isstruct(s) && isscalar(s) && isfield(s, p{1}), s = s.(p{1}); else, has = false; return; end
+end
+v = s;
+end
+
+function t = leaf_text(v, has)
+if ~has, t = '(not stored)';
+elseif ischar(v), t = ['''' v ''''];
+else, t = mat2str(v, 6);
+end
+end
+
+function t = value_text_(v)
+if ischar(v), t = ['''' v '''']; else, t = ['{' strjoin(cellstr(v), ', ') '}']; end
+end
+
+function [bad, why] = focus_compare(F0, F1)
+why = {};
+names = {'source_settings_sha256', 'the source''s settings_effective.mat SHA-256'; ...
+    'field_scale', 'field scale'; 'seed_modes', 'seed_modes'; 'library_types', 'library types'; ...
+    'mode_families', 'mode families'};
+for k = 1:size(names, 1)
+    n = names{k, 1};
+    if ~isfield(F0, n) || ~isfield(F1, n) || ~isequaln(F0.(n), F1.(n))
+        why{end+1} = names{k, 2}; %#ok<AGROW>
+    end
+end
+bad = ~isempty(why);
 end
 
 % =========================================================================

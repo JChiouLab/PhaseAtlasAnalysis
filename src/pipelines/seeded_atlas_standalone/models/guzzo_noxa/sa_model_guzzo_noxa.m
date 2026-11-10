@@ -53,6 +53,9 @@ M.seed_shape = @sag_seed_shape;          % milestone 8: seed shapes, type order,
 M.reflection = struct('state_perm', [9:16 1:8 19 20 17 18 23 24 21 22], 'identity_perm', [5:8 1:4]);
 M.scale_counts = @scale_counts;          % milestone 8: point counts that grow with L
 M.field_scale = @field_scale;
+% the settings leaves field_scale reads besides the parameters (a focus run
+% takes the source's field scale only when they equal the source's)
+M.field_scale_settings = {'lattice.anchor', 'identity.field_scale_floor', 'model_options.hss_branch'};
 M.comparison_mesh = @(theta, S) linspace(0, theta.Lh, S.identity.n_comparison_nodes);
 M.required_checks = {'real_valued', 'positivity_exact', 'seam_concentration', 'seam_flux', ...
     'mass_accumulator', 'mass_dense', 'mass_dense_refinement', 'shift_antisymmetry', ...

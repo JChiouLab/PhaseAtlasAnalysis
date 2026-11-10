@@ -7,7 +7,8 @@ function result = seeded_atlas_run(parameters, library_manifest, settings, corre
 %
 %   parameters        the model's dimensional parameters (module 'normalize')
 %   library_manifest  where the uncoupled seed library lives (module 'load');
-%                     for the original model struct('directory', <outputs dir>)
+%                     for the original model struct('directory', <outputs dir>);
+%                     ignored in mode focus (no library; struct() will do)
 %   settings          see sa_settings; settings.model and settings.run_dir are
 %                     required
 %   corrector         OPTIONAL injected corrector with the copied corrector's
@@ -72,6 +73,23 @@ function result = seeded_atlas_run(parameters, library_manifest, settings, corre
 %   family fence in force (sa_import 'fence': continuation.families, or
 %   for 'selected' the plan's list) goes into ctx.fence, from the stored
 %   plan on resume, and is printed before the first call.
+%   Focus without a library: a
+%   focus run loads no uncoupled library (library_manifest is ignored),
+%   computes no seedability census and no cold targets (routes.cold true
+%   is refused, SA:IMPORT:E_FOCUS_COLD) and has no ring (every node is
+%   interior: the ring is defined by the library's native range). The
+%   identity field scale and the family lookup come from the source run
+%   (sa_import 'focus_inputs': its stored field_scale; its seed_modes
+%   activated to its library types and mode families; S.seed_modes is
+%   the source's, source 'derived'); a source lacking them is refused
+%   (SA:IMPORT:E_FOCUS_SOURCE) before any folder. settings_effective.mat
+%   then holds library_manifest struct(), library_files empty, census
+%   with computed = false and no rows, targets empty, and focus_inputs
+%   (source path, the source settings file and its SHA-256, the import
+%   stamp and its kind: folder stamp, or for a killed source the planned
+%   attempt files; field scale, seed_modes, library types, mode
+%   families). A resume derives them again and refuses on a change or an
+%   unreadable source (SA:RESUME:E_FOCUS).
 %   Screen: stage and status lines through sa_progress (interval
 %   report.progress_interval_s; display only).
 %   Memory: result.shards and result.store hold the LIGHT
@@ -95,7 +113,12 @@ M = sa_model(settings.model);
 theta = M.normalize(parameters);                 % writes nothing
 [S, SRC] = sa_lattice('derive_step', M, theta, S, SRC);
 [S, SRC] = sa_settings('scale_counts', M, theta, S, SRC);      % point counts above the reference L
-[M, S, A] = sa_seed_modes('activate', M, S, library_manifest); % seed_modes: active types (zero solves)
+focus = strcmp(S.mode, 'focus');                 % focus: no uncoupled library
+if focus
+    [M, S, SRC, FI, ferr] = focus_setup(M, S, SRC);   % field scale and family lookup from the source (zero solves)
+else
+    [M, S, A] = sa_seed_modes('activate', M, S, library_manifest); % seed_modes: active types (zero solves)
+end
 new_import = ~S.resume && ~isempty(S.import.source_dir);
 if ~new_import
     prepare_run_dir(S.run_dir, S.resume);
@@ -104,19 +127,41 @@ else
 end
 sa_progress('begin', S.report.progress_interval_s);
 progress_end = onCleanup(@() sa_progress('end')); %#ok<NASGU>
-sa_progress('stage', 'inputs (library, lattice, seedability census, targets)', ...
-    struct('calls', 0, 'max_calls', S.budget.max_calls, 'roots', 0));
+if focus
+    sa_progress('stage', 'inputs (lattice; focus: no library, census or targets)', ...
+        struct('calls', 0, 'max_calls', S.budget.max_calls, 'roots', 0));
+else
+    sa_progress('stage', 'inputs (library, lattice, seedability census, targets)', ...
+        struct('calls', 0, 'max_calls', S.budget.max_calls, 'roots', 0));
+end
 D = sa_layout('state', S.run_dir);               % the state folder, computed once (made below for an import)
 
 % ---- inputs ----------------------------------------------------------------
-lib = sa_seed_modes('load', M, library_manifest, theta, parameters, A);
-L = sa_modes('cap_lattice', sa_lattice('build', M, theta, S), S);   % lattice cap (Inf = none)
-C = sa_seedability(M, lib, theta, L);
-T = sa_targets(L, C, S);
-sa_seed_modes('print', M, C, T, S);              % the pre-run count, before the first call
-types = unique([{T.list.left_type}, {T.list.right_type}]);
-lib = M.library('profiles', lib, types);
-fs = M.field_scale(theta, lib, S);
+if focus
+    % focus: no library is loaded, no census or cold targets are
+    % computed (routes.cold is false); the field scale is the source's
+    lib = struct('files', no_library_files());
+    L = sa_modes('cap_lattice', sa_lattice('build', M, theta, S), S);   % lattice cap (Inf = none)
+    C = no_census(L);
+    T = no_targets();
+    if isempty(FI)
+        % resume with an unreadable source: prepare refuses (E_FOCUS, after
+        % the earlier preconditions); a placeholder until then
+        fs = struct('values', ones(numel(M.identity_fields), 1));
+    else
+        fs = FI.field_scale;
+        print_focus_inputs(FI);
+    end
+else
+    lib = sa_seed_modes('load', M, library_manifest, theta, parameters, A);
+    L = sa_modes('cap_lattice', sa_lattice('build', M, theta, S), S);   % lattice cap (Inf = none)
+    C = sa_seedability(M, lib, theta, L);
+    T = sa_targets(L, C, S);
+    sa_seed_modes('print', M, C, T, S);          % the pre-run count, before the first call
+    types = unique([{T.list.left_type}, {T.list.right_type}]);
+    lib = M.library('profiles', lib, types);
+    fs = M.field_scale(theta, lib, S);
+end
 K = sa_identity('store_settings', M, theta, S, fs);
 IMP = sa_import('blank');
 if new_import
@@ -124,6 +169,14 @@ if new_import
         struct('calls', 0, 'max_calls', S.budget.max_calls, 'roots', 0));
     IMP = sa_import('plan', S, M, theta, parameters, L, K.field_scale);
     print_plan(IMP);
+    if focus                                     % the source identity the inputs came with
+        FI.source_stamp = IMP.stamp;
+        if isfield(IMP, 'source_stopped')
+            FI.source_stamp_kind = 'planned attempt files (killed source)';
+        else
+            FI.source_stamp_kind = 'folder stamp';
+        end
+    end
     prepare_run_dir(S.run_dir, false);           % the plan is built: now the folder
     D = sa_layout('state', S.run_dir);
 end
@@ -138,6 +191,9 @@ if S.resume
     cur = struct('provenance', prov, 'code_hashes', hashes, 'library_files', lib.files, ...
         'model_version', M.version, 'parameters', parameters, ...
         'import_check', true);                   % the source identity, checked by prepare (E_IMPORT)
+    if focus                                     % checked by prepare (E_FOCUS, in its order)
+        if isempty(FI), cur.focus_error = ferr; else, cur.focus_inputs = FI; end
+    end
     replay = sa_resume('prepare', S.run_dir, S, cur);
     IMP = replay.import;                         % the stored plan, never rebuilt
     replay = rmfield(replay, 'import');
@@ -170,6 +226,14 @@ else
     effective.provenance = prov;
     effective.code_hashes = hashes;
     effective.import = IMP;                      % milestone 10 (inactive plan when no import)
+    if focus
+        % focus: no library, census or targets; where the field
+        % scale and the family lookup came from
+        effective.library_manifest = struct();
+        effective.census = rmfield(effective.census, {'n_in_range', 'n_outside', 'worst_offset', 'in_range'});
+        effective.census.computed = false;
+        effective.focus_inputs = FI;
+    end
     sa_write('mat', fullfile(D, 'settings_effective.mat'), effective);
     sa_write('mat', fullfile(D, 'settings_user.mat'), struct('settings', settings));
     sa_write('text', fullfile(S.run_dir, 'settings_effective.txt'), [strjoin([ ...
@@ -196,6 +260,20 @@ ctx = struct('S', S, 'M', M, 'theta', theta, 'K', K, 'T', T, 'C', C, 'L', L, ...
     't_reports', tic, 'rep', [], ...                                   % report interval, render cache
     'import', IMP, 'ik', [], ...                                       % the import plan; source-edge knowledge
     'fence', {sa_import('fence', S, IMP)});                            % the family fence ({} = none)
+if focus
+    if S.resume
+        % the stored inputs (equal to the current derivation: prepare,
+        % E_FOCUS), with the source's current place; a moved source keeps
+        % its recorded path beside it
+        Es = load(fullfile(D, 'settings_effective.mat'), 'focus_inputs');
+        Fs = Es.focus_inputs;
+        if ~strcmp(Fs.source_dir, FI.source_dir), Fs.recorded_source_dir = Fs.source_dir; end
+        Fs.source_dir = FI.source_dir;
+        Fs.source_settings_file = FI.source_settings_file;
+        FI = Fs;
+    end
+    ctx.focus = FI;                              % focus: the source of the field scale and the family lookup
+end
 if ~isempty(ctx.fence)
     fprintf('family fence (continuation.families): {%s}\n', strjoin(ctx.fence, ', '));
 elseif strcmp(S.mode, 'focus')
@@ -227,6 +305,64 @@ result = struct('run_dir', S.run_dir, 'stop_reason', ctx.stop_reason, ...
 end
 
 % =========================================================================
+
+function [M, S, SRC, FI, ferr] = focus_setup(M, S, SRC)
+% A focus run uses no uncoupled library. The field scale and
+% the family lookup come from the source run (sa_import 'focus_inputs');
+% S.seed_modes becomes the source's. Cold calls would need a library, so
+% routes.cold true is refused. On a resume an unreadable source is
+% recorded (FI = [], ferr) and refused by prepare (E_FOCUS) after the
+% earlier preconditions; prepare compares the inputs with the stored ones.
+ferr = '';
+if S.routes.cold
+    error('SA:IMPORT:E_FOCUS_COLD', ['mode focus runs without an uncoupled library: ' ...
+        'routes.cold must be false (the selected roots are the only seeds); for cold seeding use mode ' ...
+        'production with a library.']);
+end
+if S.resume
+    try
+        [FI, M, S, SRC] = sa_import('focus_inputs', S, M, SRC);
+    catch ME
+        FI = []; ferr = sprintf('%s: %s', ME.identifier, ME.message);
+    end
+else
+    [FI, M, S, SRC] = sa_import('focus_inputs', S, M, SRC);
+end
+end
+
+function f = no_library_files()
+f = struct('type', {}, 'path', {}, 'bytes', {}, 'sha256', {});
+end
+
+function C = no_census(L)
+% A focus run computes no seedability census. The continuation queue reads
+% the ring (nodes outside the library's native range) from in_range: with
+% no library there is no ring, so every node is interior.
+n = L.n_nodes;
+C = struct('names', {cell(1, 0)}, 'counts', zeros(1, 0), 'seedable', false(n, 0), 'in_range', true(n, 1), ...
+    'cell', nan(n, 2), 'mirror', nan(n, 2), 'offset', nan(n, 2), 'outside_reason', {repmat({''}, n, 1)}, ...
+    'worst_offset', [0 0], 'family_types', {cell(0, 2)}, ...
+    'rule', ['not computed: focus run without an uncoupled library; no ring: every node ' ...
+    'is interior']);
+end
+
+function T = no_targets()
+% no cold targets (focus: routes.cold false)
+T = struct('families', {cell(1, 0)}, ...
+    'list', struct('family', {}, 'left_type', {}, 'right_type', {}, 'node', {}, ...
+    'index', {}, 'coordinate', {}, 'key', {}, 'cell_left', {}, 'cell_right', {}), ...
+    'skipped', struct('family', {}, 'index', {}, 'reason', {}));
+end
+
+function print_focus_inputs(FI)
+% the pre-run line of a focus run (screen only)
+src = '';
+if isfield(FI.field_scale, 'source'), src = FI.field_scale.source; end
+fprintf(['focus: no uncoupled library (no census, no cold targets, no ring); field scale and family lookup from ' ...
+    'the source %s (settings_effective.mat SHA-256 %s): library types {%s} (source seed_modes {%s}); field ' ...
+    'scale %s\n'], FI.source_dir, FI.source_settings_sha256(1:8), strjoin(FI.library_types, ', '), ...
+    strjoin(FI.seed_modes, ', '), src);
+end
 
 function n = root_count(ctx)
 % The roots held now, for the progress lines (the result's n_roots at the end)
