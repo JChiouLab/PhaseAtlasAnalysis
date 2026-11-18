@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased (2026-11-18)
+
+- **Added `noisy_simulations/`** (Python): the code of the manuscript's Fig. 4 noisy simulations. It contains Clara
+  Hinds' solver and noise package `gef_pak_noise/` (unchanged), the run driver `noise_driver.py` with the
+  mass-conserving noise used for Fig. 4, the batch script, the run classifier and a reproduction test that matches the
+  stored production output bit for bit. Added directly to this repository, not exported from the development
+  repository; its files are listed in `EXPORT_MANIFEST.txt` with origin `direct-add`.
+
 ## 1.0.0-rc2 (2026-11-10)
 
 New features (development milestones 10 and 11; details in `docs/USER_GUIDE.md` section 3):

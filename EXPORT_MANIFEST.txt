@@ -4,10 +4,10 @@
 # columns: sha256  bytes  path  origin
 # 200 files (EXPORT_MANIFEST.txt itself not listed)
 705fd4d6451a31d36b3df7de96f83f30ac976c9b4a6d1e51671d8e2f33e2d0da  8  .gitattributes  export-only
-d48d97bb8fbd0556712853344b36e4e6799ce9422b10509d547acc9ad9ade7cb  236  .gitignore  export-only
-5c82ec1707aab1c2110d52456cbf10344dd4182e0336b3be104d8f771ded6780  6625  CHANGELOG.md  export-only
+e83168b890b3ad27143b29207c33a1007931b2174db5befe78d756fe0d860ddb  307  .gitignore  export-only, edited 2026-11-18 (direct-add)
+077b93a94a8486bc136c6570f5f5aab5e5c52a7dc0110ff4d6c76d0d8be9b772  7190  CHANGELOG.md  export-only, edited 2026-11-18 (direct-add)
 719784e14e8e08ddc55afbab2e7a4ee7c890ad3e6a0f1019e5caaf74d7580a87  317  LICENSE  export-only
-72fa8d3e9ea3afa6acf5ca93f29e7828cc36feecba718ddd3a901b17736c578c  10751  README.md  export-only
+38beb6398fc02fdb9aaf0f0c9595e11a00cf10da6aa4e5bb4d72e93553e765f6  10841  README.md  export-only, edited 2026-11-18 (direct-add)
 01c0f7d03b9babc6fef8d759c4202fdd1b0235a589c798e3b8e37accb06ad5ce  10  VERSION  export-only
 6de926c6c34d2be69bc98e28ba56c39ae6cb889a4fe868ce661433a43133aabd  7866  docs/MODELS.md  export-only
 b452c53f84733e8ce401cf76661e058f14f13d285d34dca61e13109c7cb63183  11659  docs/SPEC.md  export-only
@@ -203,3 +203,20 @@ f6e1cc1f846a5c8e3217e789c8afa341fb7c091aca45bc7f6fac7a27ee979f4c  4107  tests/se
 f1123ebe415efc8b03d237df7bfbfecef421e0765f01aee5943fab2ed2867941  3545  tests/seeded_atlas_standalone/sag_t22_classifiers.m  89d378e7
 1c923e1b052f9eb72dea0a3345ac19680448931afdeb7ae252c5e681b3251222  1975  tests/seeded_atlas_standalone/sag_test_env.m  89d378e7
 12b548325af19565235e36c5d151b94b21b3ed41c2d7e42a83dd13dc4d5b5a92  5339  tests/seeded_atlas_standalone/sag_test_fixture.m  89d378e7
+
+# direct-add 2026-11-18: noisy_simulations/ added directly to this repository (not exported from the
+# development repository); README.md, CHANGELOG.md and .gitignore edited for it (rows above updated).
+# 13 files
+42623720b0300f28ad592c8835e1bc6aabc05ac55494ad57ef090398a21bd2e4  3788  noisy_simulations/README.md  direct-add
+a3f86fb8afe796ce3897e175d9c2de0a7e5290aa65c429953660c0374fc7879e  6186  noisy_simulations/analyze_runs.py  direct-add
+236ca87b4e01e1441467be6e65f8eeb5642c1e8d4d479f7919580d467d11c159  87  noisy_simulations/gef_pak_noise/__init__.py  direct-add
+19b4e951d1b9a042bff8628652bf25d32576fd9ca555ea5b300845f968155a03  1667  noisy_simulations/gef_pak_noise/grid.py  direct-add
+022087dbde76fad584400c45352aa780469f7ce58efbe02b60a3af3641b10858  6540  noisy_simulations/gef_pak_noise/model.py  direct-add
+2775dc15857934fb1ecad63a2d88a1b6255358228e2cb92206c96edbb5438d85  2895  noisy_simulations/gef_pak_noise/noise.py  direct-add
+9f9b0f3b953f922d0f87973f83b2b92b0294a8abba15924f3ff26df2a5c86d3a  9514  noisy_simulations/gef_pak_noise/run_comparison.py  direct-add
+2e03fe8e9440afdec31390047704ce77218c044803e8b2dc09425e88878fcf46  6469  noisy_simulations/gef_pak_noise/solver.py  direct-add
+dd873cdc2e814ba51f5a881ea78b9a3e3e67b45e9d5f27d35aee690fffd196af  10458  noisy_simulations/noise_driver.py  direct-add
+e0b6511997d726600913903bc01caa6d3f81623568f910b39e16b37de229f2db  28  noisy_simulations/requirements.txt  direct-add
+8082166b77cb0d0e498b54d7155248c0ca6305e08c3dd1a47b815cd12154daeb  800  noisy_simulations/run_fig4_batch.sh  direct-add
+5bd0b3291d3cdff36fa7bd6796dbf436cccedca7e0e3a852a7483877cb85fc10  41835  noisy_simulations/tests/reference_first40s.npz  direct-add
+c033b68fcb8519e2119d0bdfe200e84364c0363d5bc490ff5837b4c2e6143710  1772  noisy_simulations/tests/test_reproduce.py  direct-add

@@ -78,6 +78,7 @@ src/solvers/atlas_surface_pipeline_dependencies/    the uncoupled pipeline (incl
 src/models/guzzo_noxa/                               the shared Guzzo_noXA core
 tests/seeded_atlas_standalone/   the portable tests: run_portable_tests
 docs/                            USER_GUIDE, UNCOUPLED_GUIDE, MODELS, SPEC
+noisy_simulations/               the Fig. 4 noisy simulations (Python; see its README.md)
 data/                            created by the first run; git-ignored; never shipped
 ```
 

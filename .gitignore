@@ -7,3 +7,7 @@ metadata_log.csv
 *.fig
 *.asv
 .DS_Store
+
+# noisy_simulations: run outputs
+noisy_simulations/runs/
+__pycache__/
