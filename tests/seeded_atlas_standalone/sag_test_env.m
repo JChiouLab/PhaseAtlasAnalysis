@@ -1,6 +1,9 @@
 function E = sag_test_env(scratch)
-%SAG_TEST_ENV  Paths and reference inputs of the milestone-2C zero-solve tests.
+%SAG_TEST_ENV  Paths and reference inputs of the Guzzo_noXA zero-solve tests.
 %   Read-only references only; every test output goes under E.scratch.
+%   E.myxo_code, E.myxo_sheets, E.libs, E.lib14 and E.sheet_dirs point to the authors'
+%   development data (reference M. xanthus sheets, uncoupled libraries and
+%   stored runs), which is not shipped. Tests that need it SKIP without it.
 here = fileparts(mfilename('fullpath'));
 E = struct();
 E.root = fileparts(fileparts(here));
@@ -17,7 +20,7 @@ E.libs = fullfile(E.root, 'data', 'experiments', 'standalone_seeded_atlas_202610
     'phaseB2_20261012_234352', 'libraries');
 E.lib14 = fullfile(E.root, 'data', ...
     'a0p5945_b0p1852_c75p785_d0p552_e0p8278_f1_Dm0p05_Dc5_L14_MBG28_MP6p89388_res95', 'outputs');
-E.model_version = '5d5cc282d4492314';             % libraries' model_version prefix
+E.model_version = '04a0838273bebf2a';             % model_version prefix of the shipped gnx_* code
 E.signals = [0 0.02 0.05 0.07 0.35 1];
 E.lib_dirs = {'guzzo_noxa_L6_s0p35_dba0_rR1_rB1_h1p8_res25_c07275cf', ...
     'guzzo_noxa_L6_s0p35_dba0p02_rR1_rB1_h1p8_res25_2903fe00', ...

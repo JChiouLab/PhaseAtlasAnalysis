@@ -1,49 +1,49 @@
 function report = classify_pde_to_atlas_sheets(opts)
-    % CLASSIFY_PDE_TO_ATLAS_SHEETS  Packet 5: classify every frame of a PDE
-    % trajectory by which atlas sheet best reconstructs its full SPATIAL profile.
+    % CLASSIFY_PDE_TO_ATLAS_SHEETS  Classify every frame of a pdepe trajectory by which sheet
+    % best reconstructs its full spatial profile.
     %
-    % Core rule (Invariant 7): classification uses a spatial-profile residual --
-    % the relative L2 norm between the PDE frame's 5-species profile and a sheet's
-    % reconstructed stitched profile -- NOT phase-plane coordinate distance. The
-    % (Delta n_PAK, Delta n_GEF) coordinate is used ONLY to snap the frame to the
-    % grid cell whose sheets share that frame's mass partition; the decision is
-    % then made on profile residuals.
+    % Note on the paper: this classifier belongs to the uncoupled approximation and is not used for
+    % any figure of the paper.
+    %
+    % Rule: classification uses a spatial-profile residual -- the relative L2 norm between the PDE
+    % frame's 5-species profile and a sheet's reconstructed stitched profile -- not a phase-plane
+    % coordinate distance. The (Delta n_PAK, Delta n_GEF) coordinate is used only to snap the frame
+    % to the grid cell whose sheets share that frame's mass partition; the decision is then made on
+    % profile residuals.
     %
     % For each saved frame:
     %   1. extract the full spatial profile y_pde(x, 1:5) on x_full;
-    %   2. compute its mass asymmetry (Delta n_PAK, Delta n_GEF) (same trapz
-    %      definition as get_pde_trace.m) and snap to the NEAREST grid cell (i,j);
-    %   3. for each of the nine sheets that EXISTS at (i,j) (sheet_exists true --
-    %      HSS+HSS always exists, so there is always >=1 candidate), reconstruct
+    %   2. compute its mass asymmetry (Delta n_PAK, Delta n_GEF) (trapz per half, as in
+    %      run_atlas_pde_trace.m) and snap to the nearest grid cell (i,j);
+    %   3. for each of the nine sheets that exists at (i,j) (sheet_exists true --
+    %      the no-peak/no-peak sheet always exists, so there is always >=1 candidate), reconstruct
     %      its stitched profile at (i,j) via reconstruct_stitched_sheet.m (the same
-    %      helper run_atlas_pde_trace.m uses to build ICs -> t=0 residual ~ 0) and
-    %      compute residuals;
+    %      helper run_atlas_pde_trace.m uses to build initial conditions, so the t=0 residual is ~ 0)
+    %      and compute residuals;
     %   4. best_sheet = argmin summed residual; flag AMBIGUOUS if the 2nd-best is
-    %      within a (provisional) relative gap of the best; flag OFF_ATLAS if even
-    %      the best residual exceeds a (provisional) threshold.
+    %      within a relative gap of the best; flag OFF_ATLAS if even
+    %      the best residual exceeds a threshold.
     %
-    % Masks respected (Invariant 2): only sheet_exists cells are candidates;
-    % reconstruction uses only the raw stored per-cell profiles (no cross-cell
-    % interpolation of flux fields, no fabrication of missing cells). Missing
+    % Only sheet_exists cells are candidates;
+    % reconstruction uses only the stored per-cell profiles (no cross-cell
+    % interpolation of flux fields, no filling of missing cells). Missing
     % sheets at a cell are NaN in residual_by_sheet.
     %
-    % NOTE ON THRESHOLDS (task_routing.md Packet 5): ambiguity_gap and off_atlas
-    % thresholds are PROVISIONAL convenience flags, NOT calibrated on/off-sheet
+    % Note on thresholds: ambiguity_gap and off_atlas
+    % thresholds are provisional convenience flags, not calibrated on/off-sheet
     % decisions. The continuous residual_by_sheet / residual_by_species arrays are
-    % the primary output; Packet 6 (or the user) should calibrate any hard
-    % threshold from them. Defaults are deliberately loose and clearly labelled.
+    % the primary output; any hard threshold should be calibrated from them.
+    % Defaults are deliberately loose.
     %
     % Options (struct, optional):
     %   trace_path  - PDE trace .mat (default data/outputs/atlas_pde_trace_latest.mat).
     %                 Must contain sol_pde (nt x nx x 5), x_full, t_span, par,
-    %                 L_total, M_BG, M_P. (Files from run_atlas_pde_trace.m
-    %                 qualify; a get_pde_trace.m file also works if it carries
-    %                 those fields.)
+    %                 L_total, M_BG, M_P (files from run_atlas_pde_trace.m have them).
     %   atlas_path  - default data/outputs/atlas_sheets_latest.mat
-    %   hss_path/hpss_path/mpss_path - branch files (defaults to *_latest.mat)
-    %   ambiguity_gap - PROVISIONAL: flag ambiguous if (r2 - r1)/r1 < this.
+    %   hss_path/hpss_path/mpss_path - library files (defaults to *_latest.mat)
+    %   ambiguity_gap - provisional: flag ambiguous if (r2 - r1)/r1 < this.
     %                   Default 0.10.
-    %   off_atlas_tol - PROVISIONAL: flag off-atlas if best residual > this.
+    %   off_atlas_tol - provisional: flag off-atlas if best residual > this.
     %                   Default 0.15.
     %   out_dir     - default data/outputs
     %   verbose     - print a per-frame line. Default false.
@@ -87,7 +87,7 @@ function report = classify_pde_to_atlas_sheets(opts)
     branches.HPSS = load(opts.hpss_path);
     branches.MPSS = load(opts.mpss_path);
 
-    % ---- compatibility (Invariant 11) ----
+    % ---- compatibility of trace and atlas ----
     if T.L_total ~= A.L_total || T.M_BG ~= A.M_BG || T.M_P ~= A.M_P
         error(['classify_pde_to_atlas_sheets: trace geometry (L=%.3f,M_BG=%.3f,M_P=%.3f) does not ', ...
                'match atlas (L=%.3f,M_BG=%.3f,M_P=%.3f).'], ...
@@ -127,7 +127,7 @@ function report = classify_pde_to_atlas_sheets(opts)
 
     for f = 1:nt
         y_pde = squeeze(T.sol_pde(f, :, :)).';           % 5 x nx
-        % mass asymmetry (same definition as get_pde_trace.m / run_atlas_pde_trace.m)
+        % mass asymmetry (same definition as run_atlas_pde_trace.m)
         gefL = trapz(xL, sum(y_pde(1:4, idx_L),1)); gefR = trapz(xR, sum(y_pde(1:4, idx_R),1));
         pakL = trapz(xL, y_pde(2,idx_L)+y_pde(5,idx_L)); pakR = trapz(xR, y_pde(2,idx_R)+y_pde(5,idx_R));
         dgef(f) = gefL - gefR; dpak(f) = pakL - pakR;

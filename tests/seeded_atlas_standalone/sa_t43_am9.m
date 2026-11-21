@@ -1,19 +1,19 @@
 function rows = sa_t43_am9(E)
-%SA_T43_AM9  Milestone-3 AM-9 (storage note; review R6 section 5): shard
+%SA_T43_AM9  Compact shard storage: shard
 %   serialization omits a discovery's returned_profile / comparison_profile
 %   that is bit-identical to its root's representative_profile, with a flag
 %   (format 'sa_store_io/shard-2'); every reader restores it.
 %   (a) a stub run ('comparison' mesh) writes shard-2 files; the raw form
 %       holds [] exactly where flagged; read_shard gives the final in-memory
-%       store (isequaln); load_run_shards (AM-1 re-derivation) equals it;
-%   (b) the same shards rewritten in the pre-AM-9 shard-1 form load
+%       store (isequaln); load_run_shards (with its re-derivation) equals it;
+%   (b) the same shards rewritten in the older shard-1 form load
 %       unchanged (read_shard and load_run_shards);
 %   (c) a flag that disagrees with the stored field is refused (E_DEDUP);
 %   (d) bit-strict: a profile isequal to the representative but differing
 %       in the sign of a zero is NOT omitted, and the round trip is exact
 %       in every IEEE bit.
-%   The checkpoint comparison on the decoded form is T29/T38-T39/T42's
-%   (sa_m3_equiv and the resume compare read through read_shard).
+%   The checkpoint comparison on the decoded form is that of sa_t29_resume,
+%   sa_t38_39_budget_checkpoint and sa_t42_am8 (sa_m3_equiv and the resume compare read through read_shard).
 T = 'T43 AM-9 shard dedup';
 rows = struct('test', {}, 'assertion', {}, 'pass', {}, 'detail', {});
 addpath(E.stub);
@@ -41,7 +41,7 @@ rows = sa_check(rows, T, '(a) every shard is shard-2; raw [] exactly where flagg
 L = sa_store_io('load_run_shards', sa_layout('state', run_dir), M);
 ok = L.Count == res.shards.Count;
 for k = keys, ok = ok && isequaln(L(k{1}), Fm(k{1})); end
-rows = sa_check(rows, T, '(a) load_run_shards (AM-1 re-derivation + kernel replay) of shard-2 files == in-memory stores', ok);
+rows = sa_check(rows, T, '(a) load_run_shards (re-derivation + kernel replay) of shard-2 files == in-memory stores', ok);
 % ---- (b) --------------------------------------------------------------------------
 old_dir = fullfile(d, 'old');
 copyfile(run_dir, old_dir);
@@ -56,7 +56,7 @@ ok = L1.Count == res.shards.Count;
 for k = keys, ok = ok && isequaln(L1(k{1}), Fm(k{1})); end
 S1 = sa_store_io('read_shard', fullfile(sa_layout('state', old_dir), 'roots', f(1).name));
 Z1 = load(fullfile(sa_layout('state', old_dir), 'roots', f(1).name));
-rows = sa_check(rows, T, '(b) pre-AM-9 shard-1 files load unchanged (load_run_shards; read_shard returns the file as stored)', ...
+rows = sa_check(rows, T, '(b) older shard-1 files load unchanged (load_run_shards; read_shard returns the file as stored)', ...
     ok && isequaln(S1, Z1) && ~isfield(Z1, 'profile_dedup'));
 % ---- (c) --------------------------------------------------------------------------
 fk = fullfile(sa_layout('state', run_dir), 'roots', f(1).name);

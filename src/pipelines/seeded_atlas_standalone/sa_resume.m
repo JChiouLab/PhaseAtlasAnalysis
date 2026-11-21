@@ -18,17 +18,17 @@ function varargout = sa_resume(action, varargin)
 %          version, MATLAB version, architecture and thread mode equal
 %          (never waived); model version (a toolbox change named as such)
 %          and library SHA-256 equal; the import source's stamp equals
-%          the stored one (SA:RESUME:E_IMPORT; milestone 10, when the
+%          the stored one (SA:RESUME:E_IMPORT; checked when the
 %          caller carries current.import_check = true (the stamp is
 %          then computed here) or current.import_stamp; for a killed source
 %          imported with import.source_stopped the stamp is recomputed over
 %          its planned attempt files, so resuming that source does not
 %          block this run); for a focus run (when current
-%          carries focus_inputs or focus_error) the field scale and family
-%          lookup derived again from the source equal the stored
+%          carries focus_inputs or focus_error) the field scale and sheet
+%          (family label) lookup derived again from the source equal the stored
 %          focus_inputs (SA:RESUME:E_FOCUS; also when the source's
 %          settings_effective.mat cannot be read; a focus folder started
-%          with a library by an earlier build is refused E_FOCUS before
+%          with a library by an older version is refused E_FOCUS before
 %          E_SETTINGS and E_LIBRARY); code hashes equal, unless
 %          S.resume_code_override holds a reason, which is journaled with
 %          both hash sets. Otherwise SA:RESUME:E_* (a changed setting or a
@@ -62,7 +62,7 @@ function varargout = sa_resume(action, varargin)
 %       sa_lattice('derive_step') (the run's own derivation). Exactly one
 %       state, the first that matches, in this order:
 %         new               run_dir missing or empty
-%         legacy            a flat folder (software 0.5 or earlier): not
+%         legacy            a flat folder written by an older version: not
 %                           resumable; it still loads
 %         refused           a precondition differs (Z.id E_PARAMETERS,
 %                           E_SETTINGS, E_VERSION, E_MODEL, E_LIBRARY,
@@ -186,7 +186,7 @@ end
 end
 
 function [bad, item] = import_diff(E0, cur, S)
-% E_IMPORT (milestone 10): the stored import (effective.import: plan,
+% E_IMPORT: the stored import (effective.import: plan,
 % stamp) against the current source. Checked only when the caller asks for
 % it: cur.import_check = true (the current stamp is computed here, once,
 % and only the kind the stored plan needs) or cur.import_stamp (a stamp the
@@ -297,7 +297,7 @@ if ~isequal(E0.code_hashes, cur.code_hashes)
             override, hash_text(E0.code_hashes), hash_text(cur.code_hashes)));
     else
         error([eid ':E_CODE'], ['resume refused: code hashes differ from the stored run ' ...
-            '(a repair is a new run; resume_code_override needs a lead-approved reason).']);
+            '(a repair is a new run; resume_code_override needs a written reason).']);
     end
 end
 % ---- 2. reconcile ----------------------------------------------------------
@@ -359,7 +359,7 @@ P = struct('active', ~isempty(names), ...
     'shard_stamp', containers.Map('KeyType', 'char', 'ValueType', 'double'), ...
     'shard_matched', containers.Map('KeyType', 'char', 'ValueType', 'logical'), ...
     'override', override, 'interrupted', interrupted, 'tmp', {tmpl});
-% the stored import plan (milestone 10): loaded, never rebuilt on resume
+% the stored import plan: loaded, never rebuilt on resume
 if isfield(E0, 'import'), P.import = E0.import; else, P.import = sa_import('blank'); end
 sh = sa_store_io('shard_files', run_dir);   % without the stray temporary files listed above
 for k = 1:numel(sh)
@@ -387,7 +387,7 @@ end
 % status (zero writes)
 
 function cur = current(M, parameters, manifest, S)
-% S (optional, milestone 8): the resolved settings; their seed_modes select
+% S (optional): the resolved settings; their seed_modes select
 % the library files (a mode-n file enters the list only when a shape needs it)
 theta = M.normalize(parameters);
 if nargin >= 4 && ~isempty(S) && isfield(S, 'mode') && strcmp(S.mode, 'focus')
@@ -413,7 +413,7 @@ end
 
 function cur = current_focus(M, theta, parameters, S)
 % A focus run reads no library: library_files is empty; the
-% source's stored field scale and family lookup are derived (zero solves)
+% source's stored field scale and sheet (family label) lookup are derived (zero solves)
 % for the E_FOCUS comparison, and seed_modes is the source's (as the run
 % stores it). An unreadable source is recorded (focus_error), not thrown:
 % status reports it.
@@ -431,8 +431,8 @@ cur.import_check = true;
 end
 
 function [tf, item] = focus_legacy(E0, cur)
-% a focus folder without focus_inputs (started with an uncoupled library by
-% an earlier build), checked for a focus caller before the other
+% a focus folder without focus_inputs (started with a half-cell library by
+% an older version), checked for a focus caller before the other
 % preconditions: its library files and seed_modes would otherwise be named
 tf = false; item = '';
 if ~isfield(cur, 'focus_inputs') && ~isfield(cur, 'focus_error'), return; end
@@ -489,7 +489,7 @@ end
 % 2. legacy
 if strcmp(Z.layout, 'flat')
     Z.state = 'legacy';
-    Z.message = sprintf(['%s was written by software 0.5 or earlier (flat layout); this software cannot resume it; ' ...
+    Z.message = sprintf(['%s was written by an early version of this package (flat layout); this software cannot resume it; ' ...
         'choose a new run_dir. It still loads: seeded_atlas_plot / seeded_atlas_trace with opts.out.'], top);
     return
 end
@@ -542,7 +542,7 @@ if isfield(cur, 'code_hashes') && ~isequal(E0.code_hashes, cur.code_hashes) && .
     ids{end+1} = 'E_CODE'; items{end+1} = sprintf('code hashes (%s)', strjoin(hash_diff(E0.code_hashes, ...
         cur.code_hashes), ', '));
 end
-% A-1: a changed source refuses only a run that would resume; a completed
+% a changed source refuses only a run that would resume; a completed
 % follow-up keeps its state (plot and traces), with a note
 imp_note = '';
 if isequal(ids, {'E_IMPORT'}) && completed_now(D)

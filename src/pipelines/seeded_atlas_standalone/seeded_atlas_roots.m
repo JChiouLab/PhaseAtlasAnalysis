@@ -1,6 +1,6 @@
 function R = seeded_atlas_roots(run_dir, opts)
-%SEEDED_ATLAS_ROOTS  The roots of a run folder, loaded the verified way
-%   (see the user guide).
+%SEEDED_ATLAS_ROOTS  The roots (quasi-steady states) of a run folder, loaded the
+%   verified way (see docs/USER_GUIDE.md).
 %
 %   R = SEEDED_ATLAS_ROOTS(run_dir)
 %   R = SEEDED_ATLAS_ROOTS(run_dir, struct('verify', false, 'sol', true))

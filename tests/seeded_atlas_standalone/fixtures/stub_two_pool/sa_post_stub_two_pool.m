@@ -1,5 +1,5 @@
 function P = sa_post_stub_two_pool()
-%SA_POST_STUB_TWO_POOL  Post module of the stub model (M7a tests T69-T73).
+%SA_POST_STUB_TWO_POOL  Post module of the stub model, used by the stub-model tests.
 %   Two half fields per side: R (c1 left, c2 right) and B (c3 left, c4
 %   right); the stub's half domain [0, Lh] maps to x = xi (left) and
 %   x = 2 Lh - xi (right). Coordinates: dn_R = (int_left R - int_right R)/Lh,

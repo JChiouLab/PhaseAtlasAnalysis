@@ -2,16 +2,17 @@ function O = sca_v_obs(eta, Y)
 %SCA_V_OBS  Reduced observables of a full-domain state on a UNIFORM mesh with a
 %   node at eta = 1/2.
 %
-%     d_G, d_P : left-minus-right half masses, C1 shared-node symmetric
-%                trapezoid split at eta = 1/2 -- the SAME convention
-%                cha_model('split') uses, so the trace is measured in the
+%     d_G, d_P : left-minus-right half masses, shared-node symmetric
+%                trapezoid split at eta = 1/2 -- the same convention
+%                as the atlas, so the trace is measured in the
 %                coordinates the atlas is drawn in.
 %     M_G, M_P : totals, composite trapezoid (the quantity the semidiscrete
 %                operator conserves exactly).
 %     dn2      : Delta-n_2 = int_0^1 cos(2*pi*eta) * (u + q) d(eta),
-%                the reduced coordinate of docs/research/
-%                reduced_coordinate_dn2_design.md section 2, written in the
-%                coupled dimensionless frame (x = L*eta).
+%                the shape coordinate, computed here on u + q (an older
+%                convention; the paper's Fig. 3 uses u alone). The paper's
+%                Delta n2 = M_BG * dn2 (total GEF = 1 in this frame),
+%                written in the coupled dimensionless frame (x = L*eta).
 
 nx = numel(eta);
 im = (nx+1)/2;
@@ -30,6 +31,6 @@ O.dn2 = trapz(eta, cos(2*pi*eta) .* (Y(1,:) + Y(2,:)));
 O.u_max = max(Y(1,:));  O.u_min = min(Y(1,:));
 O.minimum = min(Y, [], 'all');
 [~, ip] = max(Y(1,:));  O.u_peak_eta = eta(ip);
-O.convention = ['C1 shared-node symmetric trapezoid split at eta=1/2 ' ...
-                '(cha_model split convention); dn2 per reduced_coordinate_dn2_design section 2'];
+O.convention = ['shared-node symmetric trapezoid split at eta=1/2 ' ...
+                '(the atlas split convention); dn2 = int_0^1 cos(2 pi eta) (u + q) d eta'];
 end

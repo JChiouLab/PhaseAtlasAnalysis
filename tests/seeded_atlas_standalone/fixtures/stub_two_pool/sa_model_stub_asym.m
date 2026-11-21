@@ -1,5 +1,5 @@
 function M = sa_model_stub_asym()
-%SA_MODEL_STUB_ASYM  The stub model with asymmetric pool targets (M7a T68):
+%SA_MODEL_STUB_ASYM  The stub model with asymmetric pool targets:
 %   the R pool's right half target shrinks twice as fast, so the admissible
 %   half-widths of axis 1 differ in the two directions.
 M = sa_model_stub_two_pool();

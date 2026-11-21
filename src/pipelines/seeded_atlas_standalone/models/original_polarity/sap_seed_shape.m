@@ -1,10 +1,12 @@
 function varargout = sap_seed_shape(action, varargin)
-%SAP_SEED_SHAPE  The original model's seed shapes (milestone 8, packet section 4).
+%SAP_SEED_SHAPE  Seed shapes (starting half-cell profiles) of the S. pombe model.
 %
-%   A seed shape is a half's mode name in the LEFT half's drawn orientation,
-%   which is the stored pole-to-seam orientation (sa_mode_name): '0', '1+',
-%   '2-' are today's library types; '1-' and '2+' are new shapes made on load
-%   from the HPSS and MPSS files; 'n+' / 'n-' (n >= 3) come from the mode-n
+%   A seed shape is a half's mode name (shape label) in the LEFT half's drawn
+%   orientation, which is the stored pole-to-middle orientation (sa_mode_name):
+%   '0' (no-peak), '1+' (half-peak), '2-' (full-peak) are the library types;
+%   '1-' and '2+' are made on load
+%   from the HPSS and MPSS files; 'n+' / 'n-' (n >= 3; higher-mode half-cell
+%   states) come from the mode-n
 %   file branch_MODE<n>_latest.mat (build_mode_branch). The right half seeds
 %   the same stored shape; its drawn name is the mirror of the shape.
 %
@@ -24,14 +26,15 @@ function varargout = sap_seed_shape(action, varargin)
 %       MODE files whose run_status is 'empty' (path, status)
 %   f = SAP_SEED_SHAPE('mode_families', types)   the label -> type map built
 %       from the active types (left: shape -> type; right: mirror(shape) ->
-%       type); at the default types it equals the module's 0.11 map
+%       type); at the default types it equals the module's own map
 %   [x, y] = SAP_SEED_SHAPE('stitch', xq, yq, n, start)   n copies of a
 %       piece (peak at its left end) on [0, n*xq(end)]: start 'T' (n-, a
 %       trough at the pole) or 'P' (n+, a peak at the pole); a copy whose
 %       right end is a peak is the mirrored piece, x = (k+1) l - fliplr(xq);
 %       otherwise x = k l + xq; the duplicate join node (each copy's last)
-%       is dropped. At n = 2, 'T' is build_mpss_branch's reflect_stitch.
-%   r = SAP_SEED_SHAPE('cold_rate')  measured cold seconds per call (L = 7, n101)
+%       is dropped. At n = 2, 'T' is the peak-to-peak stitch of the full-peak (MPSS)
+%       library (build_mpss_branch's reflect_stitch).
+%   r = SAP_SEED_SHAPE('cold_rate')  measured cold seconds per call (L = 7, 101-point library)
 %   d = SAP_SEED_SHAPE('defaults')   the default seed_modes {'0','1+','2-'}
 
 switch action

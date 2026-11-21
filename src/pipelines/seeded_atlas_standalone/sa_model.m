@@ -14,15 +14,16 @@ function varargout = sa_model(action, varargin)
 %   REQUIRED MEMBERS
 %     id, version               char: module identity and version text
 %     unclipped                 logical true: the reaction/ODE applies no
-%                               clipping (source-scanned by a test)
+%                               clipping (checked by a portable test that scans the source)
 %     n_states                  double: rows of the solver state
 %     fields                    struct array (name, row): the concentration
 %                               rows the positivity rule scans
 %     identity_fields           struct array (name, row): root-identity rows
-%     pools                     struct array (name): one per conserved pool,
-%                               i.e. one per lattice coordinate
-%     library_types             cellstr: half types held by the seed library;
-%                               families are the ordered pairs 'A_B'
+%     pools                     struct array (name): one per conserved protein
+%                               (pool), i.e. one per lattice coordinate
+%     library_types             cellstr: half types held by the half-cell library
+%                               (starting profiles); families (sheets) are the
+%                               ordered pairs 'A_B'
 %     domain                    fh(theta) -> [a b] half-domain range
 %     normalize                 fh(parameters) -> theta
 %     pool_targets              fh(theta, d) -> .values (all half targets),
@@ -38,9 +39,9 @@ function varargout = sa_model(action, varargin)
 %                               .corrector_nodal_min)
 %     convergence               fh(sol, opts, wid, wmsg) -> classifier struct
 %     diagnostics               fh(sol, theta, target, mo) -> module checks
-%     shifts                    fh(sol) -> .names .values .max
+%     shifts                    fh(sol) -> .names .values .max (the uniform sources)
 %     shape_label               fh(sol, theta, mo, fs) -> [char, info]: the
-%                               family label, a mode name (sa_mode_name). It
+%                               shape (family) label, a mode name (sa_mode_name). It
 %                               sets the attempt's observed_family, the
 %                               per-root pass's unit family string (unit
 %                               keys, replay identity) and the child's
@@ -57,7 +58,7 @@ function varargout = sa_model(action, varargin)
 %     validate_model_options    fh(model_options) -> validated model_options
 %     copies                    struct array: verbatim-copied sources
 %
-%   OPTIONAL MEMBERS (agreed boundary changes)
+%   OPTIONAL MEMBERS
 %     setting_defaults          scalar struct: the model layer of the shared
 %                               settings (sa_settings resolves package ->
 %                               model -> mode -> user)
@@ -71,7 +72,7 @@ function varargout = sa_model(action, varargin)
 %                               (sa_mode_name 'library_family'; the per-root
 %                               pass's family lookup)
 %     seed_shape                fh(action, ...): the model's seed shapes
-%                               (milestone 8; sa_seed_modes): 'resolve'
+%                               (sa_seed_modes): 'resolve'
 %                               (shape -> type id, base file, transform),
 %                               'shape_of_type', 'order' (the type order),
 %                               'mirror' (the drawn name of a right half),
@@ -80,7 +81,7 @@ function varargout = sa_model(action, varargin)
 %                               'cold_rate', 'defaults'
 %     scale_counts              fh(theta, S, SRC) -> [S, SRC]: point counts
 %                               that grow with L above
-%                               scaling.reference_length (milestone 8)
+%                               scaling.reference_length
 %     field_scale_settings      cellstr of dotted settings leaves (other than
 %                               the parameters) that field_scale reads, e.g.
 %                               'lattice.anchor': a focus run takes the
@@ -89,7 +90,7 @@ function varargout = sa_model(action, varargin)
 %                               'focus_inputs'); absent = lattice.anchor and
 %                               identity.field_scale_floor
 %     reflection                struct('state_perm', p, 'identity_perm', pi)
-%                               (milestone 10; sa_import's mirror images):
+%                               (used for sa_import's mirror images):
 %                               the left/right half swap as a state row
 %                               permutation p (the mirror image of y is
 %                               y(p, :)) and the permutation pi it induces
@@ -166,7 +167,7 @@ extra = setdiff(have, [need, {'setting_defaults', 'shape_label_profile', 'mode_f
     'seed_shape', 'scale_counts', 'reflection', 'field_scale_settings'}]);
 if ~isempty(extra)
     error(id, ['Model module declares member(s) outside the boundary: %s. Add ' ...
-        'them to sa_model only by an agreed boundary change.'], ...
+        'them to sa_model only by extending the member list in sa_model.'], ...
         strjoin(sort(extra)', ', '));
 end
 
@@ -240,7 +241,7 @@ end
 end
 
 function check_reflection(M, id)
-% Optional member reflection (milestone 10): state_perm p a permutation row
+% Optional member reflection: state_perm p a permutation row
 % of 1..n_states, identity_perm pi one of 1..numel(identity_fields), each an
 % involution, and pi the permutation p induces on the identity rows: the
 % identity row k maps to identity row pi(k) iff p(row_k) = row_pi(k).

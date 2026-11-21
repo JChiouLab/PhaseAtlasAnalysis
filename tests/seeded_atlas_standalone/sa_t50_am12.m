@@ -1,5 +1,5 @@
 function rows = sa_t50_am12(E)
-%SA_T50_AM12  Milestone-4 T50 (packet v0.3 AM-12): the report-only
+%SA_T50_AM12  The report-only
 %   edge_large_change on planted distances (d > factor x the median of the
 %   completed 1-call interior continuation edges; a multi-call edge uses
 %   max(d(parent, child), max d_sub / s_sub); fewer than 30 basis edges ->
@@ -47,14 +47,14 @@ r1 = sa_m3_run(fullfile(d, 'small'), [1 1]);
 LCs = sa_pilot_report(fullfile(d, 'small'), 'large_change');
 rows = sa_check(rows, T, 'fewer than 30 basis edges -> not_computed (box [1 1])', strcmp(LCs.status, 'not_computed') && ...
     isempty(LCs.flagged_ids) && LCs.n_basis < 30, sprintf('basis %d', LCs.n_basis));
-% ---- recomputation from attempt files (milestone-3 folders) equals the stored d_sub -------------
+% ---- recomputation from attempt files equals the stored d_sub -------------
 Rm = fullfile(d, 'm3form'); copyfile(U, Rm);
 Z = load(fullfile(sa_layout('state', Rm), 'queue_final.mat'));
 Z.Q.edges = rmfield(Z.Q.edges, {'d_sub', 's_sub'});
 sa_write('mat', fullfile(sa_layout('state', Rm), 'queue_final.mat'), Z);
 LCa = sa_pilot_report(U, 'large_change'); LCb = sa_pilot_report(Rm, 'large_change');
 nmc = sum([LCa.edges.calls] > 1);
-rows = sa_check(rows, T, 'without d_sub (milestone-3 folders) the step distances are recomputed from the attempt files: same d per edge', ...
+rows = sa_check(rows, T, 'without d_sub (older run folders) the step distances are recomputed from the attempt files: same d per edge', ...
     nmc >= 2 && isequal([LCa.edges.d], [LCb.edges.d]) && isequal([LCa.edges.d_sub_norm], [LCb.edges.d_sub_norm]) && ...
     LCb.dmax_mismatch == 0, sprintf('%d multi-call edges', nmc));
 % ---- second difference: linear branch vs jump ----------------------------------------------

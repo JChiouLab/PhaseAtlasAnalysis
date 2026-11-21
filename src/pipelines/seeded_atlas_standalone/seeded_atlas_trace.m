@@ -1,5 +1,6 @@
 function out = seeded_atlas_trace(run_dir, entry, opts)
-%SEEDED_ATLAS_TRACE  A full-PDE trace started from one root of a run folder.
+%SEEDED_ATLAS_TRACE  A full-PDE trace (simulation of the full model) started from
+%   one root (quasi-steady state) of a run folder.
 %
 %   out = SEEDED_ATLAS_TRACE(run_dir, entry)
 %   out = SEEDED_ATLAS_TRACE(run_dir, entry, opts)
@@ -9,7 +10,7 @@ function out = seeded_atlas_trace(run_dir, entry, opts)
 %     root           a root_id of roots_index.csv, e.g. 'k:-1,4/R000001'
 %     at             instead of root: a position [x y z] in the plotted
 %                    coordinates of plots/roots_3d.fig (fission yeast dG, dP,
-%                    dn2; Guzzo_noXA dn_R, dn_B, dn2 of the main variable), for
+%                    dn2; M. xanthus dn_R, dn_B, dn2 of the main variable), for
 %                    example pasted from the figure's data tip. The trace
 %                    starts from the root closest on the figure: each axis
 %                    difference divided by that axis's plotted range (max -
@@ -25,15 +26,15 @@ function out = seeded_atlas_trace(run_dir, entry, opts)
 %                    'amplitude', a, 'mode', m), 0 < a < 1, m a positive
 %                    integer: for each mass-conserving field pair (a, b) of
 %                    the model, a is raised and b lowered pointwise by
-%                    a min(Y_a, Y_b) cos(m pi eta) (every pool unchanged at
-%                    each node, positivity kept)
+%                    a min(Y_a, Y_b) cos(m pi eta) (the total of every conserved
+%                    protein unchanged at each node, positivity kept)
 %     t_out          output times
-%     nx             uniform full-domain mesh (odd, a node on the seam)
+%     nx             uniform full-domain mesh (odd, a node on the cell middle)
 %     profile_every  full profiles every Nth frame (first and last always)
 %     reltol, abstol integrator tolerances
 %   opts
 %     out            folder that receives traces/<name>/; REQUIRED for a
-%                    flat (software 0.5) folder, which is never written into
+%                    run folder in the old flat layout, which is never written into
 %     integrator     test hook: a function with the signature of the post
 %                    module's integrate(theta, Y0, entry)
 %     plot           true (default): draw roots_3d_trace.fig
@@ -77,7 +78,7 @@ if strcmp(lay, 'none'), error('SA:TRACE:E_NO_RUN', '%s holds no run.', run_dir);
 base = getf(opts, 'out', '');
 if isempty(base)
     if strcmp(lay, 'flat')
-        error('SA:TRACE:E_LEGACY', ['%s is a flat (software 0.5 or earlier) run folder: it is evidence and ' ...
+        error('SA:TRACE:E_LEGACY', ['%s is a run folder in the early flat layout: it is kept as is and ' ...
             'is never written into; pass opts.out (another folder).'], run_dir);
     end
     base = run_dir;

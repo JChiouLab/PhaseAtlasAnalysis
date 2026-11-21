@@ -1,24 +1,24 @@
 function out = sag_preseed_classify(action, varargin)
-%SAG_PRESEED_CLASSIFY  Packet 2C section 5 pre-seeding classifier (zero-solve).
+%SAG_PRESEED_CLASSIFY  Pre-seeding classifier: a stored profile against its tight re-solve (zero-solve).
 %
 %   d = SAG_PRESEED_CLASSIFY('distance', Ystored, Ytight)
 %       max over the rows (fields) of max|Ytight - Ystored| / max|Ystored|
-%       (2M section 5.3 form); rows are fields, columns mesh points.
+%       ; rows are fields, columns mesh points.
 %   c = SAG_PRESEED_CLASSIFY('class', r)
-%       r: returned, converged, finite (logical), valid (the full v1.2 record
+%       r: returned, converged, finite (logical), valid (the full record
 %       verdict of the tight return, for quarters including the 'mpss'
 %       record), type_only (the tight return fails ONLY its type checks:
 %       morphology/orientation for hpss|quarter, or the mpss shape checks),
 %       d (the classifying distance; NaN when not computed).
-%       Classes (section 5 table), in this order:
+%       Classes, in this order:
 %         moved          converged and finite, and d >= 1e-2 (another
 %                        solution), or the tight return fails only its type
 %         confirmed      valid and d <= 1e-6
 %         band           valid and 1e-6 < d < 1e-2
 %         not_confirmed  anything else (tight solve failed or refused)
 %   t = SAG_PRESEED_CLASSIFY('thresholds')   [1e-6 1e-2]
-%   Seedable in 2C: confirmed and band (band flagged); moved stops C2 for a
-%   lead ruling; not_confirmed is excluded (fail closed, section 5 default).
+%   Seedable: confirmed and band (band flagged); moved stops the stage for a
+%   decision; not_confirmed is excluded (fail closed, the default).
 
 switch action
     case 'thresholds', out = [1e-6 1e-2];

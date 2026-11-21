@@ -1,5 +1,5 @@
 function rows = sa_t25_substeps_classes(E)
-%SA_T25_SUBSTEPS_CLASSES  Milestone-3 T25: substeps (non-lattice
+%SA_T25_SUBSTEPS_CLASSES  Substeps (non-lattice
 %   coordinates) are route records only: never stored, never parents of other
 %   edges, never coverage; node classes partition the box nodes.
 T = 'T25 substeps and node classes';

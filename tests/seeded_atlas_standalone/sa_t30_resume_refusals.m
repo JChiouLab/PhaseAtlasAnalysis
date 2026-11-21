@@ -1,10 +1,10 @@
 function rows = sa_t30_resume_refusals(E)
-%SA_T30_RESUME_REFUSALS  Milestone-3 T30 (RC-2, RC-5): resume is refused on a
+%SA_T30_RESUME_REFUSALS  Resume is refused on a
 %   changed scientific setting, software or MATLAB version, thread mode,
 %   library or code hash; a code-hash change passes only with a journaled
 %   override reason (both hash sets recorded); budget leaves may change and
-%   are recorded in resume_<n>.mat; a corrupt attempt file is refused; J7b (a
-%   stored check relabelled 'record') is an integrity stop on replay.
+%   are recorded in resume_<n>.mat; a corrupt attempt file is refused; a
+%   stored check relabelled 'record' is an integrity stop on replay.
 T = 'T30 resume refusals';
 rows = struct('test', {}, 'assertion', {}, 'pass', {}, 'detail', {});
 addpath(E.stub);
@@ -40,12 +40,12 @@ end
 % code-hash change with a journaled override reason
 K = fullfile(d, 'override'); copyfile(B, K); code(K);
 r = sa_m3_run(K, box, 'fail', fail, 'settings', struct('resume', true, ...
-    'resume_code_override', 'T30 lead-approved test override'));
+    'resume_code_override', 'T30 test override'));
 J = fileread(fullfile(sa_layout('state', K), 'journal.txt'));
 Z = load(fullfile(sa_layout('state', K), 'resume_1.mat'));
 rows = sa_check(rows, T, 'code-hash change with override: resumes; journal holds the reason and both hash sets', ...
-    strcmp(r.stop_reason, 'completed') && contains(J, 'override code-hash change; reason: T30 lead-approved') && ...
-    contains(J, 'stored: ') && contains(J, 'current: ') && strcmp(Z.override, 'T30 lead-approved test override'), '');
+    strcmp(r.stop_reason, 'completed') && contains(J, 'override code-hash change; reason: T30 test override') && ...
+    contains(J, 'stored: ') && contains(J, 'current: ') && strcmp(Z.override, 'T30 test override'), '');
 % budget leaves may change; recorded
 K = fullfile(d, 'budget'); copyfile(B, K);
 r = sa_m3_run(K, box, 'fail', fail, 'settings', struct('resume', true, 'budget', struct('max_calls', 777), ...
@@ -78,7 +78,7 @@ end
 
 function code(K)
 Z = load(fullfile(sa_layout('state', K), 'settings_effective.mat'));
-Z.code_hashes(1).sha256(1) = char('a' + ('0' == Z.code_hashes(1).sha256(1)));
+Z.code_hashes(1).sha256(1) = char('a' + ('a' == Z.code_hashes(1).sha256(1)));   % always a different hex digit
 save(fullfile(sa_layout('state', K), 'settings_effective.mat'), '-struct', 'Z');
 end
 

@@ -1,5 +1,5 @@
 function rows = sa_t47_pilot_report(E)
-%SA_T47_PILOT_REPORT  Milestone-4 T47 (packet v0.3 section 3): the pilot report
+%SA_T47_PILOT_REPORT  The pilot report
 %   is a pure function of the run folder (rebuilt twice and from a copy: the
 %   same text and tables, the live free-space reading masked); written at
 %   every stop reason (completed, budget_calls, budget_wall, disk_floor);
@@ -7,7 +7,7 @@ function rows = sa_t47_pilot_report(E)
 %   the attempt rows; the projection arithmetic; a planted repeated guess
 %   fingerprint is counted. Stub model, default pilot mode (pilot_sample
 %   targets, the cross region).
-%   H4 (K-32, report-only repair): f over the whole planned region; the
+%   Also: f over the whole planned region; the
 %   partial report after a budget stop (PARTIAL, pending nodes unreached, b
 %   bounded while no refused node is measured); the process/corrector factor
 %   on live calls with replay removed at report.replay_s_per_record; section
@@ -15,15 +15,15 @@ function rows = sa_t47_pilot_report(E)
 %   summed); all 11 tables and a NaN cap-hours at 0 calls; the replay rate
 %   is a model-layer leaf (fission yeast 3.6, noxa 0.65) used in the
 %   projection.
-%   D10 (R9 D-M4-1, D-M4-3, D-M4-4; report-only repair): MULTIPLICITY NOT
+%   Multiplicity: MULTIPLICITY NOT
 %   TESTED in the pilot report (section 7), on section 8's central_nine
 %   line and in summary.txt whenever targets.policy is not all_seedable,
 %   absent for all_seedable; the repeated-call count excludes the retry of
 %   an interrupted record (a stub pilot killed mid-call, then killed again
 %   in the retry, resumed: 0 repeats, 2 retries, equivalent to the
 %   uninterrupted run) while a planted genuine repeat with retry_of set
-%   still counts; noxa report.replay_s_per_record 0.05 (0.45 before D-M6-2), and the model-layer
-%   digest (model_version) includes report.* (documented, not excluded).
+%   still counts; noxa report.replay_s_per_record 0.05, and the model-layer
+%   digest (model_version) excludes report.*.
 T = 'T47 pilot report';
 rows = struct('test', {}, 'assertion', {}, 'pass', {}, 'detail', {});
 addpath(E.stub);
@@ -61,7 +61,7 @@ rW = run(W, fail, setf(base, 'budget', struct('max_wall_s', 1e-6)));
 F = fullfile(d, 'disk');
 rF = run(F, fail, setf(base, 'checkpoint', struct('every_calls', 5, 'min_free_gib', 1e9)));
 ex = @(x) exist(fullfile(x, 'pilot_report.txt'), 'file') == 2;
-% ---- K-32 item 2: the partial report of a pilot stopped mid-cross ----------------------
+% ---- the partial report of a pilot stopped mid-cross ----------------------
 % (B above stops inside the cold pass, before any scheduler state; B2 stops
 % 4 calls into the continuation, as the S5 control did)
 k1 = find(~ismember({rU.attempts.kind}, {'cold', 'refinement'}), 1);
@@ -69,13 +69,13 @@ B2 = fullfile(d, 'budget_midcross');
 rB2 = run(B2, fail, setf(base, 'budget', struct('max_calls', k1 + 3)));
 RB = sa_report('pilot', B2);
 PB = RB.projection; tB = fileread(fullfile(B2, 'pilot_report.txt'));
-% P2 amended (0.9): the projection's cold count is PB.cold (the per_seed seed count, the production
-% default); was PB.cold_all (all_seedable)
+% the projection's cold count is PB.cold (the per_seed seed count, the production
+% default), not PB.cold_all (all_seedable)
 cB = PB.cold + PB.N * PB.f * PB.a + PB.N * (1 - PB.f) * PB.b;
 pend = RB.reach.classes.unattempted + RB.reach.classes.policy_skipped + RB.reach.classes.unfinished;
 okb = (PB.n_refused_measured > 0 && strcmp(PB.b_source, 'measured')) || ...
     (PB.n_refused_measured == 0 && PB.b == PB.b_bound && startsWith(PB.b_source, 'bound'));
-rows = sa_check(rows, T, 'K-32.2 partial report: PARTIAL printed, f = reached / region with the pending nodes unreached, b measured or bounded, arithmetic', ...
+rows = sa_check(rows, T, 'partial report: PARTIAL printed, f = reached / region with the pending nodes unreached, b measured or bounded, arithmetic', ...
     strcmp(rB2.stop_reason, 'budget_calls') && PB.partial && contains(tB, 'PARTIAL: stop reason budget_calls') && pend > 0 && ...
     abs(PB.f - RB.reach.classes.reached / RB.reach.n_region) < 1e-12 && PB.unreached == RB.reach.n_region - ...
     RB.reach.classes.reached && okb && abs(PB.calls(1) - cB) < 1e-9 * cB, ...
@@ -90,22 +90,22 @@ D = sa_m3_equiv(U, B);
 tb = fileread(fullfile(B, 'pilot_report.txt'));
 rows = sa_check(rows, T, 'the budget-stopped pilot resumes to the uninterrupted run; the resumed report shows the replay cost', ...
     D.pass && strcmp(rR.stop_reason, 'completed') && contains(tb, 'replay s per record'), strjoin(D.diffs, ' | '));
-% ---- K-32 items 3, 4: live overhead after the resume; section 1 = this segment ---------
+% ---- live overhead after the resume; section 1 = this segment ---------
 RR = sa_report('pilot', B);
 ZA = load(fullfile(sa_layout('state', B), 'attempts.mat')); ZP = load(fullfile(sa_layout('state', B), 'process_time.mat'));
 wB = [ZA.attempts.wall_s]; wl = sum(wB(41:end), 'omitnan');
 rem = min(40 * 0.65, max(0, ZP.process_s - wl));
-rows = sa_check(rows, T, 'K-32.3 resumed: replay removed = 40 records x 0.65 s (package rate, stub), factor = (process - replay) / live corrector s', ...
+rows = sa_check(rows, T, 'resumed: replay removed = 40 records x 0.65 s (package rate, stub), factor = (process - replay) / live corrector s', ...
     abs(RR.cost.replay_removed_s - rem) < 1e-12 && abs(RR.cost.overhead - (ZP.process_s - rem) / wl) < 1e-9 && ...
     RR.projection.replay_rate == 0.65, sprintf('process %.2f s, replay removed %.2f s, live corrector %.3f s, factor %.3g', ...
     ZP.process_s, RR.cost.replay_removed_s, wl, RR.cost.overhead));
-rows = sa_check(rows, T, 'K-32.4 section 1 of the resumed run: this segment''s budget (5000), the first segment''s (40), leaf sourced resume_1', ...
+rows = sa_check(rows, T, 'section 1 of the resumed run: this segment''s budget (5000), the first segment''s (40), leaf sourced resume_1', ...
     contains(tb, 'budget 5000 this segment; segment 2 after resume 1; first segment''s budget 40') && ...
     ~isempty(regexp(tb, 'budget\.max_calls\s+5000\s+resume_1', 'once')), '');
-% ---- K-32 item 6: every table at 0 calls; cap hours not computed ------------------------
+% ---- every table at 0 calls; cap hours not computed ------------------------
 pj = rd(fullfile(sa_layout('state', F), 'pilot', 'projection.csv'));
 hasF = all(cellfun(@(c) exist(fullfile(sa_layout('state', F), 'pilot', [c '.csv']), 'file') == 2, csvs));
-rows = sa_check(rows, T, 'K-32.6 disk_floor at 0 calls: all 11 tables written; MATLAB-h cap NaN (not 0)', ...
+rows = sa_check(rows, T, 'disk_floor at 0 calls: all 11 tables written; MATLAB-h cap NaN (not 0)', ...
     hasF && rF.calls == 0 && strcmp(pj{strcmp(pj(:, 1), 'matlab_h'), 4}, 'NaN'), ...
     sprintf('matlab_h cap %s', pj{strcmp(pj(:, 1), 'matlab_h'), 4}));
 % ---- sums equal the attempt rows --------------------------------------------------------
@@ -128,7 +128,7 @@ rows = sa_check(rows, T, 'sums: cost classes = attempt rows; all-failing = faili
     && ec == sum([Q.edges(strcmp({Q.edges.status}, 'completed')).calls]), ...
     sprintf('rows %d; failing %d; first %d', numel(A), nf, nfirst));
 P = R.projection;
-% P2 amended (0.9): cold = P.cold, the per_seed seed count (production default), <= P.cold_all
+% cold = P.cold, the per_seed seed count (production default), <= P.cold_all
 c = P.cold + P.N * P.f * P.a + P.N * (1 - P.f) * P.b;
 h = P.cold + P.N * P.a + P.N * (1 - P.f) * P.b;
 rows = sa_check(rows, T, 'projection arithmetic: central = cold + N f a + N (1 - f) b, high = cold + N a + N (1 - f) b, cap >= high', ...
@@ -137,16 +137,16 @@ rows = sa_check(rows, T, 'projection arithmetic: central = cold + N f a + N (1 -
     sprintf('cold %d (all_seedable %d) N %d f %.3g a %.3g b %.3g -> %s', P.cold, P.cold_all, P.N, P.f, P.a, ...
     P.b, mat2str(round(P.calls))));
 rc = R.reach.classes;
-rows = sa_check(rows, T, 'K-32.1 f = reached / ALL region nodes (refused and unattempted nodes unreached), not reached / attempted', ...
+rows = sa_check(rows, T, 'f = reached / ALL region nodes (refused and unattempted nodes unreached), not reached / attempted', ...
     ~P.partial && abs(P.f - rc.reached / R.reach.n_region) < 1e-12 && R.reach.n_region == 25 && ...
     P.unreached == rc.refused + rc.unattempted + rc.policy_skipped + rc.unfinished, ...
     sprintf('reached %d refused %d unattempted %d of %d: f %.3g (attempted-only would be %.3g)', rc.reached, ...
     rc.refused, rc.unattempted, R.reach.n_region, P.f, rc.reached / max(1, rc.reached + rc.refused)));
-% ---- K-32 item 7: the replay rate is a model-layer leaf, used in the projection ---------
+% ---- the replay rate is a model-layer leaf, used in the projection ---------
 [Sf, Pf] = sa_settings('resolve', struct('model', 'original_polarity', 'run_dir', 'x'), sa_model('original_polarity'));
 [Sn, Pn] = sa_settings('resolve', struct('model', 'guzzo_noxa', 'run_dir', 'x'), sa_model('guzzo_noxa'));
 Sx = load(fullfile(sa_layout('state', U), 'settings_effective.mat'));
-rows = sa_check(rows, T, 'K-32.7 / D10 report.replay_s_per_record: model layer fission yeast 0.35, noxa 0.05 (D-M6-2); stub 0.65 from the package', ...
+rows = sa_check(rows, T, 'report.replay_s_per_record: model layer fission yeast 0.35, noxa 0.05; stub 0.65 from the package', ...
     Sf.report.replay_s_per_record == 0.35 && strcmp(Pf.report.replay_s_per_record, 'model') && ...
     Sn.report.replay_s_per_record == 0.05 && strcmp(Pn.report.replay_s_per_record, 'model') && ...
     Sx.settings.report.replay_s_per_record == 0.65 && strcmp(Sx.settings_sources.report.replay_s_per_record, 'package'), '');
@@ -156,13 +156,13 @@ Zw.settings.budget.wall_s = 1e-6; Zw.settings.report.replay_s_per_record = 2;
 sa_write('mat', fullfile(sa_layout('state', Wd), 'settings_effective.mat'), Zw);
 Pw = sa_report('pilot', Wd); Pw = Pw.projection;
 nres = floor(Pw.hours_live(1) * 3600 / 1e-6);
-fin = isfinite(Pw.calls);                         % M10 amended: the cap column may be unbounded (Inf)
-rows = sa_check(rows, T, 'K-32.7 projection: replay term = resumes (budget.wall_s) x rate x calls / 2 at the planted rate 2 s', ...
+fin = isfinite(Pw.calls);                         % the cap column may be unbounded (Inf)
+rows = sa_check(rows, T, 'projection: replay term = resumes (budget.wall_s) x rate x calls / 2 at the planted rate 2 s', ...
     nres > 0 && Pw.resumes == nres && all(abs(Pw.hours(fin) - (Pw.hours_live(fin) + nres * 2 * Pw.calls(fin) / 2 / 3600)) <= ...
     1e-9 * Pw.hours(fin)) && Pw.replay_rate == 2 && all(abs(Pw.hours_live(fin) - P.hours_live(fin)) <= 1e-12 * P.hours_live(fin)) && ...
-    isequal(~fin, isinf(Pw.calls)), ...   % M10 amended: the cap column is unbounded (Inf) at max_lineages 10000
+    isequal(~fin, isinf(Pw.calls)), ...   % the cap column is unbounded (Inf) at max_lineages 10000
     sprintf('resumes %d, hours %s', nres, mat2str(Pw.hours, 4)));
-% ---- K-32 item 5: one row per guard and error identifier, hits summed ------------------
+% ---- one row per guard and error identifier, hits summed ------------------
 Gd = fullfile(d, 'guard'); copyfile(U, Gd);
 Zg = load(fullfile(sa_layout('state', Gd), 'attempts.mat'));
 Zg.attempts(3).outcome = 'no_return'; Zg.attempts(5).outcome = 'no_return';
@@ -172,7 +172,7 @@ sa_write('mat', fullfile(sa_layout('state', Gd), 'attempts.mat'), Zg);
 sa_report('pilot', Gd);
 gg = rd(fullfile(sa_layout('state', Gd), 'pilot', 'no_return_by_guard.csv'));
 ig = find(strcmp(gg(:, 1), 'singularity_guard MATLAB:bvp4c:SingJac'));
-rows = sa_check(rows, T, 'K-32.5 no_return by guard: two planted guard calls with different hit counts are one row (calls 2, hits 1357)', ...
+rows = sa_check(rows, T, 'no_return by guard: two planted guard calls with different hit counts are one row (calls 2, hits 1357)', ...
     numel(ig) == 1 && str2double(gg{ig, 2}) == 2 && str2double(gg{ig, 3}) == 1357 && ...
     sum(contains(gg(:, 1), 'singularity_guard')) == 1, strjoin(gg(:, 1).', ' | '));
 % ---- planted repeat --------------------------------------------------------------------
@@ -184,7 +184,7 @@ Rp = sa_report('pilot', Pd);
 rows = sa_check(rows, T, 'repeated calls: 0 in the run; a planted repeated guess fingerprint counts 1', ...
     R.yield.repeated == 0 && Rp.yield.repeated == 1 && R.yield.fingerprinted == numel(A), ...
     sprintf('%d / %d of %d', R.yield.repeated, Rp.yield.repeated, R.yield.fingerprinted));
-% ---- D10 (D-M4-3): the retry of an interrupted record is not a repeat ------------------
+% ---- the retry of an interrupted record is not a repeat ------------------
 kk = k1 + 2;
 K = fullfile(d, 'killed');
 kill(K, fail, base, kk);                                   % kill mid-call (continuation)
@@ -195,7 +195,7 @@ RK = sa_report('pilot', K);
 tK = fileread(fullfile(K, 'pilot_report.txt'));
 ry = rd(fullfile(sa_layout('state', K), 'pilot', 'route_yield.csv'));
 nint = sum(strcmp({rK.attempts.outcome}, 'interrupted'));
-rows = sa_check(rows, T, ['D-M4-3 a pilot killed mid-call and again in the retry, resumed: equivalent to the ' ...
+rows = sa_check(rows, T, ['a pilot killed mid-call and again in the retry, resumed: equivalent to the ' ...
     'uninterrupted run; repeated calls 0, retries of interrupted records 2 (reported separately)'], ...
     DK.pass && nint == 2 && RK.yield.repeated == 0 && RK.yield.retries == 2 && ...
     contains(tK, 'repeated calls (equal guess fingerprint to an earlier call; the retry of an interrupted record excluded): 0 of') && ...
@@ -207,9 +207,9 @@ Z = load(fullfile(sa_layout('state', Kp), 'attempts.mat'));
 Z.guess_fingerprint{9} = Z.guess_fingerprint{6}; Z.attempts(9).retry_of = Z.attempts(6).attempt_id;
 sa_write('mat', fullfile(sa_layout('state', Kp), 'attempts.mat'), Z);
 Rq = sa_report('pilot', Kp);
-rows = sa_check(rows, T, 'D-M4-3 retry_of set but the earlier equal fingerprint is not an interrupted record: still a repeat', ...
+rows = sa_check(rows, T, 'retry_of set but the earlier equal fingerprint is not an interrupted record: still a repeat', ...
     Rq.yield.repeated == 1 && Rq.yield.retries == 0, sprintf('repeated %d retries %d', Rq.yield.repeated, Rq.yield.retries));
-% ---- D10 (D-M4-1): multiplicity warning unless the cold targets are all_seedable -------
+% ---- multiplicity warning unless the cold targets are all_seedable -------
 sU = fileread(fullfile(U, 'summary.txt'));
 idc = rd(fullfile(sa_layout('state', U), 'pilot', 'identity.csv'));
 txt = fileread(fullfile(U, 'pilot_report.txt'));
@@ -223,7 +223,7 @@ ta = fileread(fullfile(Ad, 'pilot_report.txt'));
 ida = rd(fullfile(sa_layout('state', Ad), 'pilot', 'identity.csv'));
 na = sa_report('multiplicity_note', struct('targets', struct('policy', 'all_seedable')));
 nc = sa_report('multiplicity_note', struct('targets', struct('policy', 'central_nine')));
-rows = sa_check(rows, T, ['D-M4-1 MULTIPLICITY NOT TESTED: pilot_sample run -> section 7, summary.txt, identity.csv 0; ' ...
+rows = sa_check(rows, T, ['MULTIPLICITY NOT TESTED: pilot_sample run -> section 7, summary.txt, identity.csv 0; ' ...
     'section 8 central_nine line carries the caveat; all_seedable -> no warning, identity.csv 1'], ...
     ~isempty(s7) && contains(s7{1}, 'MULTIPLICITY NOT TESTED: cold targets = pilot_sample') && ...
     contains(sU, 'MULTIPLICITY NOT TESTED: cold targets = pilot_sample') && ...
@@ -232,15 +232,14 @@ rows = sa_check(rows, T, ['D-M4-1 MULTIPLICITY NOT TESTED: pilot_sample run -> s
     ~contains(ta, 'MULTIPLICITY NOT TESTED') && Ra.identity.multiplicity_tested && ...
     strcmp(ida{strcmp(ida(:, 1), 'multiplicity_tested'), 2}, '1') && isempty(na) && ...
     contains(nc, 'connected to the central nine nodes only'), c9l);
-% ---- D10 (D-M4-4), amended by M5 (lead decision at the 0.4 bump, packet v0.2 section 10):
-% the model-layer digest EXCLUDES report.* -- a report-only recalibration no longer
-% changes model_version ---------------------------------------------------------------
+% ---- the model-layer digest EXCLUDES report.* -- a report-only recalibration does not
+% change model_version ---------------------------------------------------------------
 Mn = sa_model('guzzo_noxa');
-% M6 amended (packet v0.2 section 5): the solver: component now follows the setting_defaults tag
+% the solver: component follows the setting_defaults tag
 tag = regexp(Mn.version, 'setting_defaults:([0-9a-f]+)(?= solver:|$)', 'tokens', 'once');
 sd = Mn.setting_defaults; sd2 = rmfield(sd, 'report');
 sd3 = sd; sd3.report.replay_s_per_record = 0.65;
-rows = sa_check(rows, T, ['D-M4-4 (M5-amended) noxa model_version digest = SHA-256 of the model layer WITHOUT ' ...
+rows = sa_check(rows, T, ['noxa model_version digest = SHA-256 of the model layer WITHOUT ' ...
     'report.* (changing report.replay_s_per_record leaves model_version unchanged; USER_GUIDE section 7)'], ...
     ~isempty(tag) && strcmp(tag{1}, digest(sd2)) && ~strcmp(tag{1}, digest(sd)) && ...
     strcmp(digest(rmfield(sd3, 'report')), tag{1}), Mn.version(end-28:end));

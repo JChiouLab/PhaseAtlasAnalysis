@@ -23,7 +23,8 @@ function varargout = sa_modes(action, varargin)
 %     budget.wall_s   Inf              Inf                   Inf
 %     pilot           -                sample_per_axis 7     -
 %
-%   focus (selected roots of an earlier run as seeds, family fence): the
+%   focus (selected roots of an earlier run as starting profiles, restricted to
+%   selected families (sheets)): the
 %   production layer with routes.cold false (import only). The resolver
 %   (sa_settings) adds the focus rules that depend on the other settings:
 %   import.source_dir required (refused without), budgets required from

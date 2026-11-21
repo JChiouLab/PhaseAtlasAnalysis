@@ -1,5 +1,5 @@
 function rows = sa_t41_am7(E)
-%SA_T41_AM7  Milestone-3 AM-7 (owner-adopted): identity.candidate_mesh =
+%SA_T41_AM7  identity.candidate_mesh =
 %   'comparison' stores candidate profiles evaluated by deval on the
 %   comparison mesh (and computes pair distances there). Against the default
 %   'dense' run of the same stub search: identical memberships and outcomes;

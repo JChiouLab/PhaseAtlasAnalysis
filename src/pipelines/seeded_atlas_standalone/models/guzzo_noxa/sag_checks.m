@@ -1,11 +1,11 @@
 function C = sag_checks(sol, theta, target, mo)
-%SAG_CHECKS  Module-owned validity checks of Guzzo_noXA.
+%SAG_CHECKS  Validity checks of the M. xanthus coupled solution.
 %
 %   C = SAG_CHECKS(sol, theta, target, model_options) recomputes every value
 %   from the returned iterate (x, y, yp, the bvp4c interpolant) and returns
-%   the common check records  name, value, tolerance, comparison, gating, owner.
+%   the common check records  name, value, tolerance, comparison, gating, owner (the module that defines the check).
 %
-%   Gating (owner = module)
+%   Gating (all checks below are defined by this model module)
 %     real_valued            count of entries of y, yp, parameters with a
 %                            nonzero imaginary part == 0;
 %                            evaluated first, on the raw arrays
@@ -13,21 +13,21 @@ function C = sag_checks(sol, theta, target, mo)
 %                            concentration rows > 0 (sag_hermite_min)
 %     seam_concentration     max |Y_L - Y_R| at the seam over 4 fields < seam_tol
 %     seam_flux              max |D (Y_L' + Y_R')| at the seam < seam_tol
-%     mass_accumulator       max over the 4 half pools |I(Lh) - n| / n <= acc_tol
-%     mass_dense             exact Hermite integral of each half-pool density,
-%                            max |int - n| / n <= mass_dense_tol (a discrete-
-%                            identity consistency check)
+%     mass_accumulator       max over the 4 half masses |I(Lh) - n| / n <= acc_tol
+%     mass_dense             exact Hermite integral of each half-mass density,
+%                            max |int - n| / n <= mass_dense_tol (a consistency
+%                            check of the interpolant)
 %     mass_dense_refinement  the same integral on the bisected mesh (deval
 %                            values and slopes at midpoints), max relative
 %                            difference <= mass_refine_tol
 %     shift_antisymmetry     max(|s_RL + s_RR|, |s_BL + s_BR|)
 %                            < max(antisym_abs, antisym_rel * s_max)
-%     velocity_consistency   max over the four half pools h |J_h + Lh s_h|
+%     velocity_consistency   max over the four half masses h |J_h + Lh s_h|
 %                            < max(vel_abs, vel_rel * max |J_h|), J_h =
 %                            DM Rm_h'(Lh) + DC Rc_h'(Lh) (same for B); the
-%                            right-half terms make J6 (sigma_RR := sigma_RL)
-%                            refusable
-%   Recorded, not gating: s_max, the four shifts, accumulator start, the
+%                            right-half terms make a solution with s_RR forced
+%                            equal to s_RL refusable
+%   Recorded, not gating: s_max, the four sources, accumulator start, the
 %   positivity_exact row index, the two velocity readings.
 
 L = sag_coupled24('layout');

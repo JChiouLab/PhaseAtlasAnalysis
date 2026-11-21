@@ -1,5 +1,5 @@
 function rows = sa_t68_lattice_axes(E)
-%SA_T68_LATTICE_AXES  M7a packet v0.2 section 10 T68: lattice.points_per_axis.
+%SA_T68_LATTICE_AXES  lattice.points_per_axis.
 %   Zero solves (stub corrector on the stub model; the real modules are only
 %   resolved and their admissibility predicate evaluated).
 T = 'T68 per-axis lattice';
@@ -38,7 +38,7 @@ rows = sa_check(rows, T, 'fission yeast [25 99]: 25 x 99 nodes, outermost node h
 % ---- refusals ------------------------------------------------------------------
 e1 = errmsg(@() res(Ms, struct('lattice', struct('points_per_axis', 50))));
 rows = sa_check(rows, T, 'an even count is refused, naming the two nearest odd counts (50 -> 49 / 51)', ...
-    contains(e1, '50 is even') && contains(e1, 'use 49 or 51') && contains(e1, 'not the uncoupled res'), e1);
+    contains(e1, '50 is even') && contains(e1, 'use 49 or 51') && contains(e1, 'Unlike res, the half-cell library grid'), e1);
 e2 = errmsg(@() res(Ms, struct('lattice', struct('points_per_axis', [1 5]))));
 rows = sa_check(rows, T, 'n < 3 is refused', contains(e2, 'below 3'), e2);
 [e3, i3] = errmsg(@() res(Ms, struct('lattice', struct('points_per_axis', [7 9], 'step', 0.02))));

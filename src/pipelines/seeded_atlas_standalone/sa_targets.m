@@ -1,8 +1,10 @@
 function T = sa_targets(L, C, S, varargin)
-%SA_TARGETS  The declared target set: (family, lattice node) pairs.
+%SA_TARGETS  The declared target set: (sheet, lattice node) pairs. A sheet
+%   is named by its family label ('A_B'); a node is a grid point of
+%   the phase plane.
 %
 %   T = SA_TARGETS(L, C, S) from the lattice L, the seedability census C and
-%   the resolved settings S. Families: S.families, or every family with a
+%   the resolved settings S. Sheets: S.families, or every sheet with a
 %   nonzero seedable count. Unknown family names are rejected. Policies:
 %     central_nine    the node nearest the
 %                     symmetric point d = 0 (sa_modes 'central_node': ties by
@@ -23,7 +25,7 @@ function T = sa_targets(L, C, S, varargin)
 %                     follows from the cell). Its target is the anchor node
 %                     when the anchor is one of them (so the anchor node gets
 %                     the same cold calls as under all_seedable and the anchor
-%                     lineage starts as before); otherwise the node nearest
+%                     continuation chain starts as usual); otherwise the node nearest
 %                     the cell's own coordinate (Euclidean, in native
 %                     spacings per axis, C.offset; distances within 1e-9
 %                     spacings are ties, broken by lattice order). The other
@@ -34,7 +36,7 @@ function T = sa_targets(L, C, S, varargin)
 %                     'targets'), not T.list
 %     per_seed_centre per_seed's targets with the cold calls ordered
 %                     nearest d = 0 first (ties: per_seed order); a run
-%                     option (milestone 8), never a default
+%                     option, never a default
 %     nearest_anchor  per family, the S.targets.per_family.(family) seedable
 %                     nodes nearest the anchor (Euclidean index distance;
 %                     ties by lattice order); families absent from per_family
@@ -169,7 +171,7 @@ for k = 1:numel(fam)
     end
 end
 if strcmp(S.targets.policy, 'per_seed_centre') && ~isempty(list)
-    % milestone 8 run option: per_seed's targets, the cold calls ordered
+    % run option: per_seed's targets, the cold calls ordered
     % nearest d = 0 first (Euclidean in lattice coordinates); ties keep the
     % per_seed order (family, then lattice order)
     d = sqrt(sum(vertcat(list.coordinate).^2, 2));

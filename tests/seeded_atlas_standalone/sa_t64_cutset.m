@@ -1,6 +1,5 @@
 function rows = sa_t64_cutset(E)
-%SA_T64_CUTSET  Milestone-6 T64 (packet v0.2 sections 2.1, 2.3, 6; RC-6.1(iv)):
-%   the exact cut recount sa_report('cutset'). Zero solves; planted attempt
+%SA_T64_CUTSET  The exact cut recount sa_report('cutset'). Zero solves; planted attempt
 %   files in a scratch folder.
 %   At c = 10,000 with the call's own NMax 20,000: P > c -> cut; m >= c ->
 %   cut; P = c with m < c -> not_cut; P = c = m -> cut; N0 > c with every
@@ -9,11 +8,11 @@ function rows = sa_t64_cutset(E)
 %   NMax (3,000): a mesh-bound (over_nmax) call with P > c -> cut; over_nmax
 %   with P <= c -> unknown_above_nmax; a non-mesh-bound call -> not_cut. An
 %   interrupted row is excluded; refinement and continuation are excluded
-%   unless asked; a folder without traces prints the RC-5.1 classes labelled
-%   "RC-5.1 prediction (lower bound, K-37)" and is never exact; the cap-loss
-%   curve at 3,601 / 5,000 / 10,000; the csv and summary files. When the B1
-%   recall fixture fixtures/m6/recall_A000125.mat exists: A000125 (V2a's
-%   unpredicted cut) is cut at 10,000 by its recorded P.
+%   unless asked; a folder without traces prints the predicted classes labelled
+%   as a lower bound and is never exact; the cap-loss
+%   curve at 3,601 / 5,000 / 10,000; the csv and summary files. When the recall
+%   fixture fixtures/m6/recall_A000125.mat exists (it is not shipped; the check
+%   is skipped without it): A000125, a cut the prediction missed, is cut at 10,000 by its recorded P.
 T = 'T64 exact recount';
 rows = struct('test', {}, 'assertion', {}, 'pass', {}, 'detail', {});
 d = sa_m3_testdir(E, 't64');
@@ -72,17 +71,17 @@ rows = sa_check(rows, T, ['cap-loss curve at 3,601 / 5,000 / 10,000 (cut calls; 
     'histogram of P and the curve'], okc && numel(cs) == size(Pe, 1) + 1 && contains(sm, 'EXACT') && ...
     contains(sm, 'histogram of P') && contains(sm, 'cap-loss curve') && contains(cs{1}, 'max_proposed_mesh,over_nmax,class'), ...
     sprintf('n_cut %s accepted %s exact %d', mat2str([cv.n_cut]), mat2str([cv.n_cut_accepted]), Xe.exact));
-% a folder without traces: the RC-5.1 fallback, labelled a lower bound
+% a folder without traces: the prediction fallback, labelled a lower bound
 H = fullfile(d, 'legacy');
 Pl = P([1 2 6 7], :);
 plant(H, Pl, true);
 Xl = sa_report('cutset', H, 10000, {}, struct('out_dir', fullfile(d, 'out_legacy'), 'cut_time_s', 5));
-rows = sa_check(rows, T, ['a folder without traces: every call unknown_not_recorded, NOT exact, and the RC-5.1 classes ' ...
+rows = sa_check(rows, T, ['a folder without traces: every call unknown_not_recorded, NOT exact, and the call classes ' ...
     'printed as "RC-5.1 prediction (lower bound, K-37)" (certain: NMax-bound or returned mesh >= c; possible: ' ...
     'no-returns above the cut time; A000001, which proposed 12,000 but returned 3,000, is missed: K-37)'], ~Xl.exact && Xl.n_unknown_not_recorded == 4 && ...
-    any(contains(Xl.lines, 'Prediction (lower bound) for the')) && isequal(Xl.rc51.certain, {'A000002'}) && ...   % M7b amended (D-M7a-1)
+    any(contains(Xl.lines, 'Prediction (lower bound) for the')) && isequal(Xl.rc51.certain, {'A000002'}) && ...
     isequal(Xl.rc51.possible, {'A000006', 'A000007'}), strjoin(Xl.lines(end), ''));
-% the B1 recall fixture (A000125)
+% the recall fixture (A000125)
 fx = fullfile(E.tests, 'fixtures', 'm6', 'recall_A000125.mat');
 if exist(fx, 'file') == 2
     Z = load(fx);

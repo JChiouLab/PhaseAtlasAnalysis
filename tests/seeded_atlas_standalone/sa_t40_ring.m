@@ -1,5 +1,5 @@
 function rows = sa_t40_ring(E)
-%SA_T40_RING  Milestone-3 T40 (packet 2h, K-20): with search.ring_last the
+%SA_T40_RING  With search.ring_last the
 %   ring (lattice nodes outside the library's native range; |k| = 6 on the
 %   stub's 13 x 13 lattice) runs after the interior: interior outcomes are
 %   identical with budget.ring_calls 0, a cap, or Inf; ring-phase calls

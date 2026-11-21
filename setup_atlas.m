@@ -1,5 +1,5 @@
 function out = setup_atlas(mode)
-%SETUP_ATLAS  One command for a fresh copy of the package (milestone 9, E7).
+%SETUP_ATLAS  One command for a fresh copy of the package.
 %
 %   SETUP_ATLAS            puts the seeded-atlas package folder
 %                          (src/pipelines/seeded_atlas_standalone) on the
@@ -18,8 +18,8 @@ function out = setup_atlas(mode)
 %                          the line to report when testing another MATLAB.
 %   out = SETUP_ATLAS(...) also returns .ok, .line and .record.
 %
-%   toolbox=reference: the R2025b Update 4 files the package was commissioned
-%   on; toolbox=self-checked: another bvp4c.m, accepted because the traced
+%   toolbox=reference: the R2025b Update 4 files the package was developed
+%   and checked on; toolbox=self-checked: another bvp4c.m, accepted because the traced
 %   copy passed the self-check on it (tested only on R2025b Update 4, macOS
 %   arm64). deval=replica: the package's fast deval replica (only on the
 %   reference deval.m); deval=toolbox: your own deval. A setup or generation

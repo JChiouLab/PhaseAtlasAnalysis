@@ -1,10 +1,10 @@
 function rows = sa_t42_am8(E)
-%SA_T42_AM8  Milestone-3 amendment AM-8 (DRAFT, prospective review):
+%SA_T42_AM8  The starting-profile mesh rules
 %   continuation.guess_mesh / continuation.guess_nodes (sa_guess_mesh).
 %   On the stub search with the wall rule (continuation edges, substeps, R1
 %   diagonal edges and R2 secant calls all occur), every guess the corrector
 %   receives is logged and checked bit for bit against the rule:
-%     default 'parent' = packet v0.3 exactly (parent iterate on its own mesh;
+%     default 'parent' (parent iterate on its own mesh;
 %       secant 2*deval(P1, P1.x) - deval(P2, P1.x)); guess_source unchanged;
 %     'uniform' N: x = linspace(P.x(1), P.x(end), N), y = deval(P, x);
 %     'subsample' N: at most N of the parent's own nodes, y = P.y at them;
@@ -13,7 +13,7 @@ function rows = sa_t42_am8(E)
 %   size; resume equivalence (kill mid-call + resume == uninterrupted) with
 %   each new rule on; the leaf is scientific (resume with a changed rule is
 %   refused); multipoint iterates refused under the new rules. Zero solves.
-%   Review R6 (RC-8.1, RC-8.3, R-8.2) adds: myxo_restart under 'subsample'
+%   Also: myxo_restart under 'subsample'
 %   and 'uniform' (each level's first guess = the rule on the parent, each
 %   within-level guess = the rule on the last valid substep, bit for bit);
 %   the R3 deep rung occurs and its guesses follow the rule; boundary sizes
@@ -43,7 +43,7 @@ end
 rows = sa_check(rows, T, 'defaults guess_mesh = ''parent'', guess_nodes = 1000; unknown rule / N < 3 / non-integer N refused', ...
     ok && nref == 3, sprintf('%d of 3 refused', nref));
 
-% ---- default = packet v0.3, bit for bit ---------------------------------------
+% ---- default 'parent' rule, bit for bit ---------------------------------------
 [r0, st0] = sa_m3_run(fullfile(d, 'parent'), box, 'fail', fail, 'log', {});
 [okp, info] = check_guesses(r0, st0('log'), 'parent', Inf);
 rows = sa_check(rows, T, ['default: every non-cold guess = v0.3 (struct(x = P.x, y = P.y); secant ' ...
@@ -67,7 +67,7 @@ ob = struct('continuation', struct('guess_mesh', 'subsample', 'guess_nodes', 500
 [okb, info] = check_guesses(rb, stb('log'), 'parent_mesh_tagged', 500);
 rows = sa_check(rows, T, 'subsample N = 500 >= parent nodes (201): guess = the parent mesh and values, bitwise', ...
     okb, info);
-% ---- RC-8.1(c): boundary sizes of sa_guess_mesh('mesh') ---------------------------
+% ---- boundary sizes of sa_guess_mesh('mesh') ---------------------------
 okz = true; det = {};
 for n = [N - 1, N, N + 1, 2 * N - 1, 2 * N]
     P = boundary_sol(n);
@@ -86,7 +86,7 @@ rows = sa_check(rows, T, sprintf(['boundary sizes (N = %d): subsample gives exac
     'increasing parent nodes with both ends kept for n in {N-1, N, N+1, 2N-1, 2N}; uniform gives N ' ...
     '(ENLARGES n = N-1 to N), subsample never enlarges'], N), okz, strjoin(det, '; '));
 
-% ---- R-8.2: report-only guess node count ------------------------------------------------
+% ---- report-only guess node count ------------------------------------------------
 okg = true; det = {};
 for c = {{r0, st0, 'parent'}, {rs, sts, 'subsample'}, {ru, stu, 'uniform'}}
     rr = c{1}{1}; G = c{1}{2}('log');
@@ -153,7 +153,7 @@ end
 rows = sa_check(rows, T, 'resume of a uniform run with guess_mesh = subsample is refused (scientific leaf)', ...
     strcmp(code, 'SA:RESUME:E_SETTINGS'), code);
 
-% ---- RC-8.3(ii): guess_nodes is inert under 'parent' but scientific --------------------------
+% ---- guess_nodes is inert under 'parent' but scientific --------------------------
 C = fullfile(d, 'copy_parent');
 copyfile(fullfile(d, 'parent'), C);
 o = struct('continuation', struct('guess_nodes', 500), 'resume', true);
@@ -167,7 +167,7 @@ rows = sa_check(rows, T, ['resume of a parent run with only guess_nodes changed 
     '''parent'') is refused (scientific leaf)'], strcmp(code, 'SA:RESUME:E_SETTINGS') && ...
     contains(msg, 'guess_nodes'), code);
 
-% ---- RC-8.1(a,b): myxo_restart levels and the R3 deep rung under the new rules -----------------
+% ---- myxo_restart levels and the R3 deep rung under the new rules -----------------
 for rule = {'subsample', 'uniform'}
     o = struct('continuation', struct('step_rule', 'myxo_restart', 'guess_mesh', rule{1}, 'guess_nodes', N), ...
         'rescue', struct('rungs', {{'diagonal', 'deep'}}));
@@ -248,7 +248,7 @@ function [ok, info] = check_myxo_levels(res)
 % Every myxo_restart edge: the first call and every call after a refused one
 % (a level restart) are built from the edge parent; every call after a valid
 % substep (within a level) from that substep. Together with check_guesses
-% (guess == rule applied to the attempt named parent_attempt) this pins RC-8.1(a).
+% (guess == rule applied to the attempt named parent_attempt) this fixes the rule.
 A = res.attempts; ids = {A.attempt_id};
 E = res.Q.edges(strcmp({res.Q.edges.rule}, 'myxo_restart'));
 ok = ~isempty(E); nlev = 0; nin = 0; bad = {};
@@ -283,7 +283,7 @@ end
 function g = csv_guess_nodes(f)
 L = strsplit(strtrim(fileread(f)), newline);
 h = strsplit(L{1}, ',');
-% M7a amended (packet v0.2 section 6.3): a quoted plain-words reason column follows guess_nodes
+% a quoted plain-words reason column follows guess_nodes
 assert(strcmp(h{end}, 'reason') && strcmp(h{end-1}, 'guess_nodes'), 'attempts.csv: guess_nodes is not the column before reason');
 L(2:end) = regexprep(L(2:end), ',"(?:[^"]|"")*"$', '');
 g = cellfun(@(r) str2double(r(find(r == ',', 1, 'last') + 1:end)), L(2:end));

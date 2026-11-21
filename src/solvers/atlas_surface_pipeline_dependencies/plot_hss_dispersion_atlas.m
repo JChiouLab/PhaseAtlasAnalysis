@@ -1,18 +1,20 @@
 function report = plot_hss_dispersion_atlas(opts)
-% plot_hss_dispersion_atlas  --  HSS linear-stability atlas by dispersion relation.
+% plot_hss_dispersion_atlas  --  no-peak (homogeneous) state linear-stability atlas by dispersion relation.
+%
+% Part of the uncoupled half-cell workflow (fission yeast model); not used for a figure of the paper.
 %
 % Linearizes the 5-species RD reaction about the per-cell homogeneous steady
 % state, forms the dispersion relation lambda(k_n) = max Re eig(J - k_n^2 D)
 % over the discrete no-flux modes k_n = n*pi/ell (n>=1), and maps, across the
-% (Dn_PAK, Dn_GEF) grid, WHERE the HSS is linearly unstable and the ONSET
+% (Dn_PAK, Dn_GEF) grid, WHERE the no-peak state is linearly unstable and the ONSET
 % (fastest-growing) mode number n*.
 %
 % Plot opacity encodes the onset as SPATIAL PERIODS on the half-domain = n*/2
-% (convention 2, user-chosen 2026-07-17): 0.5 period = one half-peak (HPSS
-% morphology at x=0), 1.0 = one full period, 1.5, 2.0, ...  The mode wavelength
+% (onset mode number n*/2): 0.5 period = one half-peak (HPSS
+% shape at x=0), 1.0 = one full period, 1.5, 2.0, ...  The mode wavelength
 % is Lambda = L/n*; on the reflected FULL domain the same onset is n* full peaks.
 %
-% IMPORTANT (Invariant-9-adjacent): this is the LINEAR ONSET — the pattern that
+% Note: this is the LINEAR ONSET — the pattern that
 % first emerges from the uniform state — NOT the final coarsened peak count.
 % Mass-conserved systems coarsen; do not read n*/2 as the attractor's peak number.
 %
@@ -22,11 +24,12 @@ function report = plot_hss_dispersion_atlas(opts)
 % the pattern-forming perturbations and sidesteps the k=0 marginal modes.
 %
 % opts fields:
-%   hss_path   (required) branch_HSS_latest.mat (has *_hss_branches, grids, par)
+%   hss_path   (required) branch_HSS_latest.mat (no-peak library has *_hss_branches, grids, par)
 %   save_dir   (required) folder for the PDF + .mat
 %   domain     'half' (default, ell=L/2) or 'full' (ell=L)
 %   n_max      max mode index scanned (default 80; asserts the argmax is interior)
-%   tol        growth-rate instability threshold (default 1e-6)
+%   tol        growth-rate instability threshold (default 1e-6; the half-peak stability check of
+%              run_hybrid_sweeper_pdefb.m uses 1e-4)
 %   visible    'off' (default) | 'on'
 %
 % Output: HSS_Dispersion_Stability.pdf + hss_dispersion_atlas.mat in save_dir,
@@ -51,11 +54,11 @@ function report = plot_hss_dispersion_atlas(opts)
     Ddiag = diag([par.Dm par.Dm par.Dc par.Dc par.Dc]);
     kn = (1:n_max) * pi / ell;
 
-    % The branch-library SOL cell is the authoritative representative HSS.
-    % Legacy tracked arrays can omit a discovered unique root after branch-ID
+    % The library's SOL cell is the authoritative representative no-peak state.
+    % Older tracked arrays can omit a discovered unique root after branch-ID
     % pruning; build_branch_library recovers those roots into SOL with
     % representative_branch_index=-1. Prefer SOL so dispersion coverage exactly
-    % follows existence_mask. Fall back to the old arrays for older libraries.
+    % follows existence_mask. Fall back to the old arrays for older library files.
     has_sol = isfield(d,'SOL') && isequal(size(d.SOL),[res res]);
     if ~has_sol
         rbi = d.representative_branch_index;
@@ -114,9 +117,9 @@ function report = plot_hss_dispersion_atlas(opts)
     end
     fprintf('\n');
 
-    % Convention 2 (user-chosen 2026-07-17): report the onset as the number of
+    % Report the onset as the number of
     % SPATIAL PERIODS across the half-domain [0, L/2] = n*/2. So 0.5 period = one
-    % half-peak (HPSS morphology), 1.0 = one full period, 1.5, 2.0, ...  (The
+    % half-peak (HPSS shape), 1.0 = one full period, 1.5, 2.0, ...  (The
     % underlying integer mode index n* is kept too; periods = n*/2.)
     report.onset_periods = nstar / 2;
     save(fullfile(opts.save_dir,'hss_dispersion_atlas.mat'), '-struct', 'report');
@@ -169,8 +172,8 @@ end
 
 function J = hss_jacobian(uu, par)
     % Analytic reaction Jacobian of pde_eq_v7's source term at state uu.
-    % Verified to satisfy the two mass-conservation null-vectors [1 1 1 1 0]
-    % and [0 1 0 0 1] exactly (2026-07-17).
+    % It satisfies the two mass-conservation null-vectors [1 1 1 1 0]
+    % and [0 1 0 0 1] exactly.
     u=uu(1); v=uu(3); p=uu(5);
     a=par.a; b=par.b; c=par.c; dd=par.d; e=par.e; f=par.f;
     J = [ 2*a*u*v-b-c*p,   0,        a*u^2+f,     0,   -c*u;

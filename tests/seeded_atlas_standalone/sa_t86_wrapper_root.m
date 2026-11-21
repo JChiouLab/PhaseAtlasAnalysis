@@ -1,7 +1,7 @@
 function rows = sa_t86_wrapper_root(E)
 %SA_T86_WRAPPER_ROOT  The wrapper runs seeded_atlas_run with the repository
 %   root as the current folder. Zero bvp4c calls (stub model and corrector,
-%   the T73 base configuration). The wrapper is launched from a folder under
+%   the base stub-run configuration). The wrapper is launched from a folder under
 %   data/experiments/ (runtime.clean's 'pwd' rule would flag it):
 %   (1) an absolute run_dir: the run's recorded runtime.pwd is the
 %       repository root, no 'pwd' reason, and the caller's folder is current
@@ -19,7 +19,7 @@ function rows = sa_t86_wrapper_root(E)
 %       caller's folder is current again;
 %   (5) launched from the package folder with the package not on the path
 %       (found only as the current folder): the wrapper keeps the current
-%       folder, says so, and the run completes (P1 review finding 1).
+%       folder, says so, and the run completes.
 T = 'T86 wrapper runs from the repository root';
 rows = struct('test', {}, 'assertion', {}, 'pass', {}, 'detail', {});
 addpath(E.stub);

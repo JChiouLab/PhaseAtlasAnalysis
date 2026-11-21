@@ -1,20 +1,20 @@
 function solinit = gnx_guess(mode, varargin)
-%GNX_GUESS  Initial guesses for the 12-state Guzzo_noXA BVP.
+%GNX_GUESS  Starting guesses for the 12-state M. xanthus (Guzzo_noXA) half-cell BVP.
 %
 %   solinit = GNX_GUESS('profile', x, g4)
-%       g4 is 4 x n (rows Rm Rc Bm Bc) on the increasing mesh x. Replicates
-%       bvp10_noxa.m:47-57 (R5): derivative rows by gradient(g, x), shifts
+%       g4 is 4 x n (rows Rm Rc Bm Bc) on the increasing mesh x. The convention of the reference M. xanthus code:
+%       derivative rows by gradient(g, x), shifts
 %       zero, accumulators cumsum(g_R)*dx and cumsum(g_B)*dx with
 %       dx = x(2) - x(1). On a non-uniform mesh (only the orientation
-%       re-solve uses one) the accumulators are cumtrapz instead (E1 choice:
-%       cumsum*dx assumes a uniform mesh; the BCs fix the accumulators anyway).
+%       re-solve uses one) the accumulators are cumtrapz instead (cumsum*dx assumes a uniform mesh;
+%       the boundary conditions fix the accumulators anyway).
 %   solinit = GNX_GUESS('reverse', sol)
-%       Orientation re-solve guess (packet §4d, RC-7): on the reversed mesh
+%       Orientation re-solve guess: on the reversed mesh
 %       ell - fliplr(sol.x), concentration rows reversed, derivative rows
 %       reversed and negated, shifts reversed (constants), accumulators
 %       rebuilt as above from the reversed concentrations.
 %   solinit = GNX_GUESS('constructed', x, nR, nB, amp_frac, w, par)
-%       Myxo's constructed half-peak guess (run_stage3_noxa.m:292-302) as a
+%       Constructed half-peak guess of the reference M. xanthus code, as a
 %       'profile' guess.
 
 switch mode
@@ -59,14 +59,14 @@ dx = x(2) - x(1);
 gR = g4(1, :) + g4(2, :);
 gB = g4(3, :) + g4(4, :);
 if max(abs(diff(x) - dx)) <= 1e-12 * x(end)
-    A = [cumsum(gR) * dx; cumsum(gB) * dx];        % bvp10_noxa.m:55-56
+    A = [cumsum(gR) * dx; cumsum(gB) * dx];        % accumulators
 else
     A = [cumtrapz(x, gR); cumtrapz(x, gB)];
 end
 end
 
 function g4 = constructed(xg, nR, nB, amp_frac, w, par)
-% run_stage3_noxa.m:292-302 (Lh = xg(end))
+% constructed half-peak guess (Lh = xg(end))
 Lh = xg(end);
 bump = exp(-(xg / w).^2);
 bump = bump / trapz(xg, bump);

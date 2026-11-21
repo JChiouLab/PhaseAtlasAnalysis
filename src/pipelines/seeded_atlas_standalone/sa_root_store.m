@@ -1,5 +1,7 @@
 function varargout = sa_root_store(action, varargin)
-%SA_ROOT_STORE Validated complete-link identity within one atlas run.
+%SA_ROOT_STORE Store of the distinct quasi-steady states (roots) of one atlas
+%   run; two solutions are the same root when their profiles agree within the
+%   identity tolerance (complete-link comparison).
 %   Arithmetic and interpolation only; no solver or accounting calls.
 
 switch action

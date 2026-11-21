@@ -1,13 +1,13 @@
 function varargout = sa_m3_stub(action, varargin)
-%SA_M3_STUB  Scripted stub corrector for the milestone-3 zero-solve tests
-%   (T24-T40). Runs on the stub_two_pool fixture model (4 fields, 2 pools,
+%SA_M3_STUB  Scripted stub corrector for the zero-solve tests of the search
+%   (sa_t24 to sa_t40). Runs on the stub_two_pool fixture model (4 fields, 2 pools,
 %   shifts as bvp4c parameters, half domain [0, 1.5]); never calls bvp4c.
 %
 %   p = SA_M3_STUB('params')                 R = B = 4, Lh = 1.5
 %   s = SA_M3_STUB('settings', run_dir, box) lattice step 0.65 (13 x 13
 %       nodes, |k| = 6 is the ring: outside the stub library's native range),
 %       cold at the anchor only (X_X), refinement off, continuation + rescue
-%       on, checkpoints every 5 calls, no disk floor; M5: the explicit M4
+%       on, checkpoints every 5 calls, no disk floor; the explicit
 %       rescue ladder (diagonal, secant, deep; ring true)
 %   st = SA_M3_STUB('state', ...)            handle state; name/value pairs:
 %       'fail'   fn(d, branch, exact) -> 'S' (valid) | 'R' (returned, maxres
@@ -16,7 +16,7 @@ function varargout = sa_m3_stub(action, varargin)
 %       'kill_at' call number at which the corrector throws SA:TEST:KILL
 %                (a kill mid-call: journal start written, no attempt file)
 %       'force'  fn(d, branch) -> branch actually returned ('' = keep)
-%       'log'    {}: every guess the corrector receives is appended (T42)
+%       'log'    {}: every guess the corrector receives is appended (sa_t42_am8)
 %   c = SA_M3_STUB('corrector', st)          the injected corrector
 %   n = SA_M3_STUB('calls', st)
 %   b = SA_M3_STUB('branch_of', guess)       'A' or 'B'
@@ -54,8 +54,8 @@ s.targets = struct('policy', 'explicit', 'list', [0 0]);
 s.validity = struct('refine_enabled', false);
 s.routes = struct('cold', true, 'continuation', true, 'rescue', true);
 s.continuation = struct('box', box);
-% M5 (packet v0.2 section 7, T56): the explicit M4 ladder, so the M3/M4
-% stub tests keep their meaning under the M5 mode layer (secant only, no
+% The explicit original rescue ladder, so the earlier stub tests keep their
+% meaning under the mode-layer defaults (secant only, no
 % ring rescue)
 s.rescue = struct('rungs', {{'diagonal', 'secant', 'deep'}}, 'ring', true);
 s.budget = struct('max_calls', 5000);
@@ -101,7 +101,7 @@ end
 
 function [sol, info] = stub_call(th, g, t, o, st) %#ok<INUSD>
 n = st('n') + 1; st('n') = n;
-if isKey(st, 'log')                 % AM-8 tests: every guess received, in call order
+if isKey(st, 'log')                 % guess-mesh tests: every guess received, in call order
     st('log') = [st('log'), {g}];
 end
 if n == st('kill_at')

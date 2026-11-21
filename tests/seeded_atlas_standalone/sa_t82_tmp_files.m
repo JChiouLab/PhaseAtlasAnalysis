@@ -1,14 +1,14 @@
 function rows = sa_t82_tmp_files(E)
 %SA_T82_TMP_FILES  sa_write's temporary files in the shard listings, and
-%   the repair's intent note. Zero bvp4c calls (stub model, the T28
-%   multi-seed run).
+%   the repair's intent note. Zero bvp4c calls (stub model, the
+%   multi-seed run of sa_t28_lineages).
 %   A kill inside sa_write leaves a temporary sibling beside the file it was
 %   replacing. On MATLAB R2025b save keeps the name as given, so the file is
 %   <name>.mat.tmp_<pid>, which *.mat does not match (case sa_write below).
 %   The hand-planted cases use <name>.mat.tmp_<pid>.mat, the name a save
 %   that appends .mat would give (sa_write's fallback branch), which *.mat
 %   does match: they are a GUARD for the listings' '.tmp_' filter, not a
-%   name this MATLAB produces. The stale folder is built as in T81 (a stop
+%   name this MATLAB produces. The stale folder is built as in sa_t81_shard_repair (a stop
 %   between an accepted call k's attempt file and its shard write, at a node
 %   with an earlier discovery and no later one), then:
 %     complete   (guard) a complete planted temporary sibling of the stale
@@ -98,7 +98,7 @@ for c = 1:numel(cases)
 end
 
 % ---- the temporary file made by sa_write itself ----------------------------------------------------
-% M9 amended (RC-9.4 iv): chflags is macOS/BSD only; elsewhere this case is skipped with a printed reason
+% chflags is macOS/BSD only; elsewhere this case is skipped with a printed reason
 if ~ismac
     fprintf('T82: the sa_write case is skipped on this platform (it locks a file with chflags, macOS/BSD only)\n');
 else
@@ -230,7 +230,7 @@ end
 % =========================================================================
 
 function make_stale(run, K, k)
-% as T81: stop after call k - 1, copy, make call k live, then put the copy
+% as in sa_t81_shard_repair: stop after call k - 1, copy, make call k live, then put the copy
 % back except call k's attempt file and the journal up to its 'start'
 run(K, struct('budget', struct('max_calls', k - 1)));
 snap = [K '_snap'];

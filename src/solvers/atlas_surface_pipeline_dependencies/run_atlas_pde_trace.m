@@ -1,18 +1,20 @@
 function report = run_atlas_pde_trace(opts)
-    % RUN_ATLAS_PDE_TRACE  Run a full PDE simulation whose INITIAL CONDITION is an
-    % exact atlas-sheet stitched steady state, so the trajectory is directly
-    % comparable to the atlas by classify_pde_to_atlas_sheets.m (Packet 5).
+    % RUN_ATLAS_PDE_TRACE  Run a full-PDE simulation of the fission yeast model whose initial
+    % condition is a stitched sheet state (two library half-cell states glued at the middle), so
+    % the trajectory is directly comparable to the sheets by classify_pde_to_atlas_sheets.m.
     %
-    % Analogous to get_pde_trace.m, but (a) the IC is built from the atlas branch
-    % libraries via the SHARED reconstruct_stitched_sheet.m -- so at t=0 the PDE
-    % frame equals the classifier's reconstruction of the same sheet cell to
-    % machine precision -- and (b) it can stitch ANY of the nine sheet types
-    % (HSS/HPSS/MPSS on either half), not just the old HPSS-only bvp file.
+    % Note on the paper: the sheets, the pdepe traces and their classification are an earlier
+    % approximation and are not used for any figure of the paper. This function integrates with
+    % MATLAB pdepe, not with the second-order central differences + ode15s solver used for the
+    % paper's fission yeast simulations.
     %
-    % The PDE model, mesh convention, no-flux BCs, and mass-asymmetry definition
-    % are identical to get_pde_trace.m. It does NOT modify get_pde_trace.m and
-    % writes to its own namespaced files (atlas_pde_trace_*.mat), never touching
-    % pde_trace_latest.mat.
+    % The initial condition is built from the half-cell libraries via reconstruct_stitched_sheet.m,
+    % so at t=0 the PDE frame equals the classifier's reconstruction of the same sheet cell to
+    % machine precision, and any of the nine sheet types can be stitched (no-peak, half-peak,
+    % full-peak on either half).
+    %
+    % The PDE model, mesh convention, no-flux boundary conditions and mass-asymmetry definition
+    % are given in this file. Output goes to its own files (atlas_pde_trace_*.mat).
     %
     % Options (struct, all optional):
     %   sheet_name  - which sheet to build the IC from. Default 'HPSS_HPSS'.
@@ -29,7 +31,7 @@ function report = run_atlas_pde_trace(opts)
     %                 (overrides T_end/n_frames/frame_spacing).
     %   N_mesh      - spatial mesh points over [0, L_total]. Default 200.
     %   atlas_path  - default data/outputs/atlas_sheets_latest.mat
-    %   hss_path/hpss_path/mpss_path - branch files (defaults to *_latest.mat)
+    %   hss_path/hpss_path/mpss_path - library files (defaults to *_latest.mat)
     %   out_dir     - default data/outputs
     %   save_plot   - write a summary PNG. Default true.
     %   visible     - 'on'|'off' figure visibility. Default 'off'.
@@ -37,12 +39,12 @@ function report = run_atlas_pde_trace(opts)
     %                 field `run_config`. This function never interprets it; it
     %                 is a staleness key a driver can compare against on the next
     %                 run to decide whether the trace needs regenerating (see
-    %                 run_atlas_surface_pipeline.m Stage 8). Default struct().
+    %                 run_atlas_surface_pipeline.m, trace stage). Default struct().
     %
     % Output: data/outputs/atlas_pde_trace_<id>.mat (+ atlas_pde_trace_latest.mat).
     % Saved fields: sol_pde (nt x nx x 5), x_full, t_span, nPAK_trace, nGEF_trace
     % (per-frame mass asymmetry), u0_stitched, par, L_total, M_BG, M_P, and IC/
-    % provenance (ic_sheet, ic_cell, ic_mirror_cell, atlas_id, branch ids,
+    % provenance (ic_sheet, ic_cell, ic_mirror_cell, atlas_id, library ids,
     % N_mesh, n_frames, frame_spacing, computation_id, run_config).
 
     if nargin < 1, opts = struct(); end
@@ -65,11 +67,11 @@ function report = run_atlas_pde_trace(opts)
     opts = def(opts, 'run_config', struct());   % opaque caller-supplied staleness key,
                                                  % saved verbatim into the output .mat so a
                                                  % driver can detect when its inputs changed
-                                                 % (see run_atlas_surface_pipeline.m Stage 8).
+                                                 % (see run_atlas_surface_pipeline.m, trace stage).
 
     computation_id = datestr(now, 'yyyymmdd_HHMMSS');
 
-    % ---- load atlas + branches (read-only) ----
+    % ---- load atlas + libraries (read-only) ----
     A = load(opts.atlas_path);
     branches.HSS  = load(opts.hss_path);
     branches.HPSS = load(opts.hpss_path);
@@ -110,7 +112,7 @@ function report = run_atlas_pde_trace(opts)
     fprintf('  IC sheet=%s  cell=(%d,%d)  mirror=(%d,%d)  dPAK=%.3f dGEF=%.3f\n', ...
         opts.sheet_name, i0, j0, mi, mj, A.PAK_DIFF(i0,j0), A.GEF_DIFF(i0,j0));
 
-    % ---- build IC via the shared reconstruction (bit-identical to classifier) ----
+    % ---- build the initial condition via reconstruct_stitched_sheet (identical to the classifier's) ----
     x_full = linspace(0, L_total, opts.N_mesh);
     u0_stitched = reconstruct_stitched_sheet(A, branches, opts.sheet_name, i0, j0, x_full);
     if isempty(u0_stitched)
@@ -144,7 +146,7 @@ function report = run_atlas_pde_trace(opts)
                        @(xi) interp1(x_full, u0_stitched', xi)', ...
                        @bcfun_local, x_full, t_span);
 
-    % ---- per-frame mass asymmetry (same definition as get_pde_trace.m) ----
+    % ---- per-frame mass asymmetry (trapz per half) ----
     idx_L = x_full <= L_half; idx_R = ~idx_L;
     xL = x_full(idx_L); xR = x_full(idx_R);
     nPAK_trace = zeros(nt, 1); nGEF_trace = zeros(nt, 1);
@@ -186,7 +188,7 @@ function report = run_atlas_pde_trace(opts)
 end
 
 
-% ---- PDE model (identical to get_pde_trace.m) ----
+% ---- PDE model (fission yeast, pdepe) ----
 function [c, f, s] = pdefun_local(~, ~, u, dudx, p)
     c = ones(5,1);
     if isfield(p, 'D'), f = p.D .* dudx; else, f = [p.Dm; p.Dm; p.Dc; p.Dc; p.Dc] .* dudx; end
@@ -217,9 +219,8 @@ function summary_plot(x_full, t_span, sol_pde, u0, nPAK, nGEF, sheet_name, id, v
     plot(nPAK, nGEF, 'b-', 'LineWidth', 2); hold on;
     plot(nPAK(1), nGEF(1), 'go', 'MarkerFaceColor','g');
     xlabel('\Delta n_{PAK}'); ylabel('\Delta n_{GEF}'); title('mass asymmetry'); grid on;
-    % Diagnostic PNG: goes into the trace's own out_dir (the caller's IC-specific
-    % folder), not a hardcoded flat data/plots. (Still wrapped in try/catch --
-    % this install's PNG raster export is separately broken; see the movie tool.)
+    % Diagnostic PNG: goes into the trace's own out_dir (the caller's folder for this initial
+    % condition). Wrapped in try/catch because raster export can fail on some installations.
     if ~exist(out_dir,'dir'), mkdir(out_dir); end
     try, exportgraphics(fig, fullfile(out_dir, sprintf('Atlas_PDE_Trace_%s.png', id))); catch, end
     if strcmp(vis,'off'), close(fig); end

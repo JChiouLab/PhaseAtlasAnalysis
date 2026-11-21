@@ -1,34 +1,21 @@
 function report = build_branch_library(hpss_path, hss_path, out_dir)
-    % BUILD_BRANCH_LIBRARY  Packet 2 adapter: HPSS/HSS -> branch-library schema.
+    % BUILD_BRANCH_LIBRARY  Adapter: half-peak (HPSS) and no-peak (HSS) sweep results -> half-cell library files.
     %
-    % Additive, READ-ONLY adapter (docs/ai_handoff/atlas_plan.md, "Half-Domain
-    % Branch Library Schema"). Reads the existing canonical HPSS and HSS .mat
-    % files and writes NEW branch_HPSS_<id>.mat / branch_HSS_<id>.mat files
-    % (plus branch_<TYPE>_latest.mat canonical copies, matching the project's
-    % timestamped-then-copyfile convention). NEVER writes to, or modifies, the
-    % source files. MPSS is explicitly out of scope (Packet 1).
+    % Read-only adapter. Reads the existing HPSS and HSS .mat files and writes NEW
+    % branch_HPSS_<id>.mat / branch_HSS_<id>.mat files (plus branch_<TYPE>_latest.mat copies).
+    % It never writes to or modifies the source files. The full-peak (MPSS) library is built by
+    % build_mpss_branch.m.
     %
-    % ---- PACKET 2 REPAIR (2026-07-09, user-directed, on Opus) ---------------
-    % This version supersedes the first Packet 2 pass, which set the HPSS
-    % existence_mask to ~failure_mask alone. That was unsafe for Packet 3:
-    % on the real source file 1000/1595 (62.7%) of "solved" HPSS cells are in
-    % fact flat / HSS-collapsed profiles (amp < 0.5), which are NOT boundary
-    % peaks and would silently contaminate an "HPSS+HPSS" sheet. The repair
-    % makes HPSS existence MORPHOLOGY-FIRST: a cell counts as HPSS only if the
-    % solver converged AND the returned profile is actually a boundary half-peak.
+    % Half-peak existence is decided by shape first: a cell counts as half-peak only if the solver
+    % converged AND the returned profile is actually a half-peak at the boundary. Cells that the
+    % solver returned but whose profile is flat (no-peak, amplitude < 0.5) are not half-peak states
+    % and must not enter a half-peak/half-peak sheet.
     %
-    % Two schema notes this repair deliberately changes vs. atlas_plan.md:
-    %  * atlas_plan.md's "Minimum vs extended schema" note said to DEFER
-    %    flux_values / flux_source_location to Packets 3-4. The user explicitly
-    %    directed adding branch-level flux provenance here (task item 2), so
-    %    those fields ARE emitted now. (Follow-up: sync that note in
-    %    atlas_plan.md; not edited here to keep this pass adapter-only.)
-    %  * Stability fields now include stability_source and are documented as
-    %    ANNOTATION ONLY -- they never enter any existence mask (Invariant 3).
+    % Per-cell flux provenance (flux_values, flux_source_location) is stored with each library.
+    % Stability fields are annotation only: they never enter any existence mask.
     %
-    % Returns a report struct with per-type provenance, counts, and the
-    % assertion results (Level 1/2 of validation_protocol.md), so it can be
-    % driven from a smoke test, not just read off the console.
+    % Returns a report struct with per-type provenance, counts, and the results of the
+    % consistency checks, so it can be driven from a test, not just read off the console.
     %
     % ========================================================================
     % FIELD-MAPPING TABLE
@@ -48,27 +35,27 @@ function report = build_branch_library(hpss_path, hss_path, out_dir)
     %                             (polarized but non-boundary / ill-formed);
     %                             'FAILED' where the solver did not converge.
     %                             Classified from the profile u(x), never from
-    %                             which solver produced it (Invariant 1).
+    %                             which solver produced it.
     %   existence_mask         <- solver_existence_mask & branch_class=='HPSS'
-    %                             (MORPHOLOGY-FIRST; excludes amp<0.5 by design)
+    %                             (shape first; excludes amp<0.5 by design)
     %   mask_hss_collapsed / mask_mpss_like / mask_multipeak / mask_unknown /
     %   mask_failed            <- res x res logical diagnostics; together with
     %                             existence_mask they PARTITION the grid.
     %   SOL                    <- SOL_grid bvp4c struct at HPSS cells; [] elsewhere
-    %                             (Invariant 2: empty where not this branch type)
+    %                             (empty where not this branch type)
     %   peak_x                 <- sol.x(argmax(u)) at HPSS cells; NaN elsewhere
     %   amp                    <- max(u)-min(u) at HPSS cells; NaN elsewhere
     %                             (recomputed from the profile, not copied)
     %   mass_residual          <- max(|trapz(u+q+v+w)-nG|,|trapz(p+q)-nP|) at HPSS
-    %                             cells (recomputed per Invariant 4); NaN elsewhere
+    %                             cells (recomputed from the profile); NaN elsewhere
     %   flux_values            <- res x res x 5, [u,q,v,w,p] at the TROUGH
     %                             (x=L_half, sol.y(:,end)) at HPSS cells; NaN elsewhere
     %   flux_source_location   <- res x res string: 'trough' at HPSS cells; '' elsewhere
     %   is_stable              <- is_stable_grid copied (ANNOTATION ONLY)
-    %   is_stable_computed     <- solver_existence_mask if Phase 5 ran; else false
+    %   is_stable_computed     <- solver_existence_mask if the stability phase ran; else false
     %   stability_source       <- 'bvp_jacobian_eig_500mesh' or 'not_computed'
     %   par, p, L_total, M_BG, M_P, computation_id
-    %                          <- copied unchanged (Invariant 5)
+    %                          <- copied unchanged
     %   res, source_path, source_computation_id, adapter_run_id  <- added provenance
     %
     % HSS  (source: hss_sweep_multibranch_results.mat style)
@@ -79,7 +66,7 @@ function report = build_branch_library(hpss_path, hss_path, out_dir)
     %                             recovered raw unique root (HSS is uniform by
     %                             definition -- no morphology class needed)
     %   SOL                    <- {[u,q,v,w,p]} 1x5 at the representative branch;
-    %                             [] where absent (uniform 5-vector per atlas_plan)
+    %                             [] where absent (uniform 5-vector)
     %   peak_x                 <- NaN where existent (uniform: no peak location)
     %   amp                    <- 0 where existent (uniform: zero spatial amplitude)
     %   mass_residual          <- max(|L_half*(u+q+v+w)-nG|,|L_half*(p+q)-nP|)
@@ -88,19 +75,19 @@ function report = build_branch_library(hpss_path, hss_path, out_dir)
     %                             branch where existent; NaN elsewhere
     %   flux_source_location   <- 'uniform' where existent; '' elsewhere
     %   is_stable              <- existence_mask (solved-defaults-stable, ANNOTATION)
-    %   is_stable_computed     <- false(res,res) (no HSS stability check exists)
+    %   is_stable_computed     <- false(res,res) (no stability check is computed for the no-peak state)
     %   stability_source       <- 'not_computed'
     %   hss_multibranch_preserved       <- true (full branch arrays carried over)
     %   representative_branch_index     <- res x res, first non-NaN k;
     %                             -1 for a recovered raw unique root, 0 absent
     %   representative_source  <- stored_tracked_branch or
     %                             recovered_raw_unique_root
-    %   raw_unique_recovery_mask <- legacy cells recovered only because
+    %   raw_unique_recovery_mask <- cells of older files recovered only because
     %                             roots_cell contains exactly one accepted root
     %   n_hss_branches_available        <- source tracked n_branches_grid
     %   U/Q/V/W/P_hss_branches, n_branches_grid, branch_id_grid
     %                          <- FULL multibranch arrays copied unchanged so no
-    %                             coexisting HSS root is lost (Packet 3/bistable use)
+    %                             coexisting no-peak root is lost
     %   par, L_total, M_BG, M_P, computation_id  <- copied unchanged
     %   res, source_path, source_computation_id, adapter_run_id  <- added provenance
 
@@ -119,7 +106,7 @@ function report = build_branch_library(hpss_path, hss_path, out_dir)
     report = struct();
     report.adapter_run_id = adapter_run_id;
 
-    fprintf('=== build_branch_library (Packet 2 adapter, morphology-first) ===\n');
+    fprintf('=== build_branch_library (morphology-first) ===\n');
     fprintf('adapter_run_id = %s\n', adapter_run_id);
 
     % ------------------------------------------------------------------ HPSS
@@ -172,7 +159,7 @@ function report = build_branch_library(hpss_path, hss_path, out_dir)
         fprintf('  PAK_DIFF/GEF_DIFF identical between branch_HPSS and branch_HSS: %d\n', grids_match);
         if ~grids_match
             warning(['build_branch_library: HPSS and HSS grids do NOT match. Sheet ', ...
-                     'stitching (Packet 3) is invalid until sources share (res,M_BG,M_P,L).']);
+                     'stitching is invalid until sources share (res,M_BG,M_P,L).']);
         end
     end
 
@@ -181,7 +168,7 @@ end
 
 
 %% ========================================================================
-%  HPSS ADAPTER  (morphology-first)
+%  HPSS ADAPTER  (shape first)
 %  ========================================================================
 
 function [out, checks] = adapt_hpss(src, source_path, adapter_run_id)
@@ -220,7 +207,7 @@ function [out, checks] = adapt_hpss(src, source_path, adapter_run_id)
     out.branch_class = branch_class;
     out.morphology_reason = morphology_reason;
 
-    % morphology-first existence + diagnostic masks (these PARTITION the grid)
+    % shape-first existence + diagnostic masks (these PARTITION the grid)
     out.existence_mask    = solver_existence_mask & (branch_class == "HPSS");
     out.mask_hss_collapsed = branch_class == "HSS";
     out.mask_mpss_like     = branch_class == "MPSS_LIKE";
@@ -260,14 +247,14 @@ function [out, checks] = adapt_hpss(src, source_path, adapter_run_id)
         end
     end
 
-    % --- stability (ANNOTATION ONLY; never gates any existence mask) ---
+    % --- stability (annotation only; never gates any existence mask) ---
     skip_stability = isfield(src, 'p') && isfield(src.p, 'skip_stability') && src.p.skip_stability;
     out.is_stable = src.is_stable_grid;
     if skip_stability
         out.is_stable_computed = false(res, res);
         out.stability_source = 'not_computed';
     else
-        out.is_stable_computed = solver_existence_mask;   % Phase 5 runs on all solved cells
+        out.is_stable_computed = solver_existence_mask;   % the stability phase runs on all solved cells
         out.stability_source = 'bvp_jacobian_eig_500mesh';
     end
 
@@ -279,7 +266,7 @@ function [out, checks] = adapt_hpss(src, source_path, adapter_run_id)
     out.res = res;  out.source_path = source_path;
     out.source_computation_id = src.computation_id;  out.adapter_run_id = adapter_run_id;
 
-    % ---- Level 1 / Level 2 checks ----
+    % ---- consistency checks ----
     ex = out.existence_mask;
     checks = struct();
     checks.grid_partitioned_by_classes = ...
@@ -331,7 +318,7 @@ function [out, checks] = adapt_hss(src, source_path, adapter_run_id)
     out.PAK_DIFF = src.PAK_DIFF;
     out.GEF_DIFF = src.GEF_DIFF;
 
-    % Legacy tracked-HSS files can contain a raw, accepted unique root that was
+    % Older tracked no-peak files can contain a raw, accepted unique root that was
     % omitted from U_hss_branches only because its artificial tracked ID fell
     % below max_branches during coverage pruning. Recover such a cell only when
     % roots_cell proves there is exactly ONE raw root, so no branch choice is
@@ -392,7 +379,7 @@ function [out, checks] = adapt_hss(src, source_path, adapter_run_id)
 
     % --- stability (ANNOTATION ONLY) ---
     out.is_stable = out.existence_mask;        % solved-defaults-stable convention
-    out.is_stable_computed = false(res, res);  % no HSS stability check exists anywhere
+    out.is_stable_computed = false(res, res);  % no stability check is computed for the no-peak state
     out.stability_source = 'not_computed';
 
     % --- preserve ALL HSS branches (practical: small file) ---
@@ -415,7 +402,7 @@ function [out, checks] = adapt_hss(src, source_path, adapter_run_id)
     out.res = res;  out.source_path = source_path;
     out.source_computation_id = src.computation_id;  out.adapter_run_id = adapter_run_id;
 
-    % ---- Level 1 / Level 2 checks ----
+    % ---- consistency checks ----
     ex = out.existence_mask;
     checks = struct();
     checks.existence_equals_stored_or_raw_unique = isequal(ex, stored_mask | raw_unique_mask);

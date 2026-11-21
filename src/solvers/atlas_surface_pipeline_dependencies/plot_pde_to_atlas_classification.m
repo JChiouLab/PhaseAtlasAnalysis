@@ -1,6 +1,7 @@
 function report = plot_pde_to_atlas_classification(opts)
-    % PLOT_PDE_TO_ATLAS_CLASSIFICATION  Packet 5 plotting helper for the output of
-    % classify_pde_to_atlas_sheets.m.
+    % PLOT_PDE_TO_ATLAS_CLASSIFICATION  Plotting helper for the output of
+    % classify_pde_to_atlas_sheets.m. Part of the uncoupled approximation (not used for any
+    % figure of the paper).
     %
     % Produces (one figure, saved to data/plots/):
     %   (1) best sheet over time (step plot, one lane per sheet), with ambiguous
@@ -10,14 +11,14 @@ function report = plot_pde_to_atlas_classification(opts)
     % and, optionally, a SEPARATE figure:
     %   (3) PDE-frame-vs-best-atlas-profile overlays (all 5 species) at selected
     %       times -- reconstructs the best sheet's profile the same way the
-    %       classifier did (shared reconstruct_stitched_sheet.m), never fabricated.
+    %       classifier did (shared reconstruct_stitched_sheet.m).
     %
     % Options (struct, optional):
     %   class_path  - classification .mat (default
     %                 data/outputs/pde_atlas_classification_latest.mat).
     %   trace_path  - PDE trace .mat, needed only for the profile-overlay figure
     %                 (default data/outputs/atlas_pde_trace_latest.mat).
-    %   atlas_path/hss_path/hpss_path/mpss_path - for the overlay reconstruction.
+    %   atlas_path/hss_path/hpss_path/mpss_path - for the overlay reconstruction (library files).
     %   overlay_times - vector of times at which to draw frame-vs-atlas overlays,
     %                 or [] to skip the overlay figure. Default: [] unless the
     %                 trace is available, then 4 log-spaced-ish sample frames.
@@ -84,10 +85,9 @@ function report = plot_pde_to_atlas_classification(opts)
     % --- (2) residual traces over time ---
     % By default show ALL sheets (opts.n_top >= nS or Inf); otherwise the top
     % n_top by median residual. Each sheet is drawn in its canonical atlas colour
-    % (consistent with plot_atlas_sheets.m / the combined nullcline plot) with a
+    % (consistent with plot_atlas_sheets.m and the combined nullcline plot) with a
     % '.'-marker so isolated existing frames of a sparse sheet still show; NaN
-    % (sheet absent at that frame's cell) breaks the line -- existence-aware, no
-    % fabrication.
+    % (sheet absent at that frame's cell) breaks the line -- existence-aware.
     subplot(2,1,2); hold on; box on;
     med = zeros(nS,1);
     for s = 1:nS, med(s) = median(C.residual_by_sheet(~isnan(C.residual_by_sheet(:,s)), s)); end

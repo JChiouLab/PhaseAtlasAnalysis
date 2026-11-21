@@ -1,15 +1,16 @@
 function varargout = build_mode_branch(varargin)
-%BUILD_MODE_BRANCH  Mode-n seed library (milestone 8, packet section 3; fission yeast).
+%BUILD_MODE_BRANCH  Higher-mode half-cell library, mode n (n monotone runs; fission yeast).
+%   The paper uses only no-peak, half-peak and full-peak states; modes n >= 3 are an extension.
 %
 %   R = BUILD_MODE_BRANCH(p, out_dir, n)
 %   R = BUILD_MODE_BRANCH(p, out_dir, n, opts)
 %       Mode n (n >= 3) at every cell of the library in out_dir: a half-peak
 %       PIECE on [0, l], l = L_half/n, at the cell's half masses / n (the same
-%       densities), searched by run_quarter_hpss_sweeper_for_mpss UNCHANGED
+%       densities), searched by run_quarter_hpss_sweeper_for_mpss (unchanged)
 %       with the transformed parameters p_n (L = 2L/n, M_BG = 2 M_BG/n,
 %       M_P = 2 M_P/n, quarter_mass_tol = mass_tol/n; at n = 2 p_n equals p);
 %       then the T-start stitch (n copies, a trough at the pole: drawn n-)
-%       and the acceptance of packet section 3.1. p is the struct that
+%       and the acceptance rules listed below. p is the struct that
 %       atlas_build_libraries passes to build_mpss_branch (the script's p
 %       plus out_dir); build_mpss_branch's default fill is applied here
 %       verbatim, so the base parameters are the stored MPSS par's field set.
@@ -29,19 +30,18 @@ function varargout = build_mode_branch(varargin)
 %   C = BUILD_MODE_BRANCH('construct', sol_q, n, nG_half, nP_half, p, branch)
 %       One cell's stitch and acceptance from a stored piece (zero solves):
 %       branch 'legacy' (n = 2 only: build_mpss_branch's reflect_stitch and
-%       classify_mpss_profile verbatim) or 'general' (the n-general code).
+%       classify_mpss_profile, copied unchanged) or 'general' (the code for any n).
 %       C: ok, why, x, y, amp, peak_x (the stitch's argmax position, as the
 %       MPSS file stores it), xstar_frac (the piece's argmax position / l),
 %       mass_res, seam_slope, trough_slope, sym_res, n_dense.
 %   [x, y] = BUILD_MODE_BRANCH('stitch', xq, yq5, n, start)   start 'T' | 'P'
 %
-%   The acceptance, in the legacy order: negativity; mesh monotonicity; the
-%   piece's argmax position x*/l < 0.2 (the legacy peak-fraction test at
-%   n = 2: pk_frac = (l - x*)/2l in (0.4, 0.6)); amplitude >= 0.5; seam
-%   slope at the piece's peak end <= slope_tol (as legacy); n >= 3 only: the
+%   The acceptance rules, in the order used for n = 2: negativity; mesh monotonicity; the
+%   piece's argmax position x*/l < 0.2 (the n = 2 peak-fraction test: pk_frac = (l - x*)/2l in (0.4, 0.6)); amplitude >= 0.5; seam
+%   slope at the piece's peak end <= slope_tol (as for n = 2); n >= 3 only: the
 %   trough-end slope <= slope_tol (an interior join); stitched mass within
-%   mass_tol, densified to n x 2,000 points (legacy 4,000 at n = 2);
-%   symmetry: even n reflection about the half's centre (legacy), odd n the
+%   mass_tol, densified to n x 2,000 points (4,000 at n = 2);
+%   symmetry: even n reflection about the half's centre, odd n the
 %   T-start stitch against the reflected P-start stitch of the same piece.
 %   The piece mass gate inside the sweeper is mass_tol/n.
 
@@ -160,14 +160,14 @@ R = struct('path', latest, 'id_path', out_path, 'n', n, 'n_valid', nnz(existence
 end
 
 function p = mpss_defaults(p)
-% build_mpss_branch.m:60-79 verbatim (the default fill before its sweep call)
+% the default fill of build_mpss_branch.m, copied unchanged (applied before its sweep call)
 if ~isfield(p, 'res'),            p.res = 3;      end
 if ~isfield(p, 'pde_T_end'),      p.pde_T_end   = 2e6;  end
 if ~isfield(p, 'pde_T_chunk'),    p.pde_T_chunk = 1e6;  end
 if ~isfield(p, 'pde_max_chunks'), p.pde_max_chunks = 12; end
-if ~isfield(p, 'slope_tol'),      p.slope_tol = 1e-2;   end  % C1 seam-slope tol
+if ~isfield(p, 'slope_tol'),      p.slope_tol = 1e-2;   end  % seam-slope tol
 if ~isfield(p, 'sym_tol'),        p.sym_tol   = 1e-6;   end  % symmetry tol
-if ~isfield(p, 'mass_tol'),       p.mass_tol  = 1e-4;   end  % mass-doubling tol
+if ~isfield(p, 'mass_tol'),       p.mass_tol  = 1e-4;   end  % mass tol of the reflected profile
 if ~isfield(p, 'max_res_warn'),   p.max_res_warn = 8;   end  % serial-mode guideline
 if ~isfield(p, 'use_parallel'),      p.use_parallel = true;  end
 if ~isfield(p, 'checkpoint_every'),  p.checkpoint_every = 5; end  % cells per checkpoint
@@ -180,7 +180,7 @@ if ~isfield(p, 'quarter_resume_from'), p.quarter_resume_from = '';       end
 end
 
 function p_n = transform(p, n)
-% The spec's factor-of-2 route with 2 replaced by n: the sweeper solves on
+% The factor-of-2 route of the full-peak construction with 2 replaced by n: the sweeper solves on
 % p_n.L/4 = L/(2n) at (p_n.M/2 + diff/2)/2 = (half masses)/n. At n = 2 the
 % arithmetic is exact (x2 then /2) and the sweeper's own default
 % quarter_mass_tol = mass_tol/2 is the same double, so p_n is p itself.
@@ -230,7 +230,7 @@ C.peak_x = xm(ipk);
 C.amp = max(u) - min(u);
 [~, k] = max(yq5(1, :));
 C.xstar_frac = x_q(k) / ell;
-% seam slope at the piece's peak end (legacy rule), trough end (n >= 3)
+% seam slope at the piece's peak end (n = 2 rule), trough end (n >= 3)
 has_d = size(sol_q.y, 1) >= 2 && any(sol_q.y(2, :) ~= 0);
 if has_d
     C.seam_slope = abs(sol_q.y(2, 1));
@@ -239,7 +239,7 @@ else
     C.seam_slope = abs((yq5(1, 2) - yq5(1, 1)) / (x_q(2) - x_q(1)));
     C.trough_slope = abs((yq5(1, end) - yq5(1, end-1)) / (x_q(end) - x_q(end-1)));
 end
-% stitched mass, densified to n x 2,000 points (legacy 4,000 at n = 2)
+% stitched mass, densified to n x 2,000 points (4,000 at n = 2)
 xf = linspace(xm(1), xm(end), C.n_dense);
 uf_ = interp1(xm, ym(1,:), xf, 'pchip');   qf_ = interp1(xm, ym(2,:), xf, 'pchip');
 vf_ = interp1(xm, ym(3,:), xf, 'pchip');   wf_ = interp1(xm, ym(4,:), xf, 'pchip');
@@ -249,13 +249,13 @@ pak_mass = trapz(xf, pf_ + qf_);
 C.mass_res = max(abs(gef_mass - nG_half), abs(pak_mass - nP_half));
 % symmetry
 if mod(n, 2) == 0
-    uf = interp1(xm, u, xm(end) - xm, 'pchip');            % about the half's centre (legacy)
+    uf = interp1(xm, u, xm(end) - xm, 'pchip');            % about the half's centre
 else
     [xP, yP] = stitch(x_q, yq5, n, 'P');                   % odd n: T-start vs reflected P-start
     uf = interp1(xP, yP(1, :), xm(end) - xm, 'pchip');
 end
 C.sym_res = max(abs(u - uf));
-% acceptance, in the legacy order (the trough-end gate after the seam gate)
+% acceptance, in the n = 2 order (the trough-end gate after the seam gate)
 if any(ym < -1e-9, 'all')
     C.why = "negative_conc";
 elseif ~all(diff(xm) > 0)
@@ -301,18 +301,18 @@ for k = 0:n-1
 end
 end
 
-% ---- build_mpss_branch.m:625-711, verbatim (the n = 2 legacy branch) -------
+% ---- copied unchanged from build_mpss_branch.m (the n = 2 branch) -------
 
 function [x_mpss, y_mpss, seam_du] = reflect_stitch(sol_q)
     % Pure peak-to-peak reflection of a quarter-domain HPSS (peak at x=0).
     % Returns the stitched MPSS on [0, 2*L_quarter] = [0, L_half] as a 5-row
     % species profile y_mpss = [u;q;v;w;p], and the |du/dx| at the seam (from the
-    % quarter's peak-end derivative) for the C1 check.
+    % quarter's peak-end derivative) for the slope-continuity check at the seam.
     x_q  = sol_q.x(:).';                 % 1 x N, [0 .. L_q], peak at column 1
     yq5  = sol_q.y([1,3,5,7,9], :);      % 5 x N
     L_q  = x_q(end);
 
-    % C1 seam slope: du/dx at the quarter peak end (x_q=0). Prefer the BVP's own
+    % Seam slope (should be about 0 for a smooth join): du/dx at the quarter peak end (x_q=0). Prefer the BVP's own
     % derivative channel if present (row 2); else finite-difference.
     if size(sol_q.y,1) >= 2 && any(sol_q.y(2,:) ~= 0)
         seam_du = abs(sol_q.y(2,1));

@@ -1,10 +1,9 @@
 function out = sa_mesh_trace(action, varargin)
-%SA_MESH_TRACE  Per-call recorder of the mesh sizes bvp4c proposes (M6 packet
-%   v0.2 section 2.3; RC-6.1, RC-6.2).
+%SA_MESH_TRACE  Per-call recorder of the mesh sizes bvp4c proposes.
 %
 %   t = SA_MESH_TRACE('reset')
 %       A new call token and an empty, armed store. The adapters (sap_solve,
-%       sag_solve) call it right before the corrector.
+%       sag_solve) call it right before the coupled-BVP solve.
 %   SA_MESH_TRACE('initial', N)
 %       Record the initial mesh N0 (sa_bvp4c_traced, after N = length(x)).
 %   SA_MESH_TRACE('note', N)
@@ -22,8 +21,7 @@ function out = sa_mesh_trace(action, varargin)
 %         proposals    row of the proposals, in order
 %         n_proposals  number of proposals
 %         max_proposed P = max(proposals); 0 when n_proposals = 0 and N0 was
-%                      recorded (no proposal made); NaN when nothing was
-%                      recorded (stub corrector, or a throw before N0)
+%                      recorded (stub solver, or a throw before N0)
 %         over_nmax    the last proposal > nmax (the call stopped on a
 %                      proposal above its own NMax)
 %         n_initial    how many 'initial' notes arrived (1 for one bvp4c run)
@@ -35,13 +33,12 @@ function out = sa_mesh_trace(action, varargin)
 %                      toolbox 'sa_bvp4c_traced/1 (bvp4c R2025b 597839cef613)'
 %         token        t
 %       A stale or mismatched token, or a take without a reset, is
-%       SA:TRACE:E_STALE (raised by the adapter, outside the corrector's own
+%       SA:TRACE:E_STALE (raised by the adapter, outside the solver's own
 %       try/catch, so it is never turned into a no-return).
 %   tr = SA_MESH_TRACE('blank')    the "not recorded" trace (NaN), e.g. for
 %       a record written without a trace
 %   P = SA_MESH_TRACE('max_of', tr)   P recomputed from a stored trace's
-%       proposals (max; 0 when empty with N0 recorded; NaN when nothing
-%       recorded or tr is not a trace). Replay uses it (RC-6.4).
+%       recorded or tr is not a trace). Replay uses it.
 
 persistent S
 if isempty(S)

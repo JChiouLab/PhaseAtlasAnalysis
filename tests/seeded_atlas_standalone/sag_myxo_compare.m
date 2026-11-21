@@ -1,6 +1,6 @@
 function out = sag_myxo_compare(action, varargin)
-%SAG_MYXO_COMPARE  Packet 2C section 6c comparison with myxo's coupled sheets
-%   (post-run, zero solves).
+%SAG_MYXO_COMPARE  Comparison with the reference M. xanthus coupled sheets ("myxo";
+%   post-run, zero solves).
 %
 %   [i, j] = SAG_MYXO_COMPARE('cell', index)        lattice index [kR kB] at
 %       step 0.15 -> myxo sheet cell (row i = 13 + kB indexes dn_B, column
@@ -14,13 +14,13 @@ function out = sag_myxo_compare(action, varargin)
 %   c = SAG_MYXO_COMPARE('class', d)  'agree' (d <= 1e-6) | 'band' |
 %       'different' (d >= 1e-2) | 'not_computed' (NaN)
 %   c = SAG_MYXO_COMPARE('band_decision', d_ours_tight, d_myxo_tight)
-%       RC-3: 'same_solution_myxo_accuracy' if d(ours, ours_tight) <= 1e-6
+%       'same_solution_myxo_accuracy' if d(ours, ours_tight) <= 1e-6
 %       and d(myxo, ours_tight) < 1e-2; 'same_solution_our_accuracy' if
 %       d(ours, ours_tight) > 1e-6 and d(myxo, ours_tight) <= 1e-6;
 %       'different' otherwise
 %   r = SAG_MYXO_COMPARE('reference', prof_ij, ok_ij)
 %       myxo reference usable: ok_grid and nodal min > 0 (negative cells
-%       solve the clamped problem, F80)
+%       solve the clamped problem)
 
 switch action
     case 'cell'

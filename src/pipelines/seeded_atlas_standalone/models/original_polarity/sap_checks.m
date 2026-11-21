@@ -1,14 +1,14 @@
 function C = sap_checks(sol, theta, target, mo)
-%SAP_CHECKS  Module-owned validity checks of the original model.
+%SAP_CHECKS  Validity checks of the S. pombe coupled solution.
 %
-%   C = SAP_CHECKS(sol, theta, target, model_options) recomputes the copied
-%   corrector's diagnostics from the returned solution (never trusting the
-%   corrector's own flags) and returns the common check records
-%       name, value, tolerance, comparison, gating, owner
-%   Gating: seam concentration, seam flux, accumulator mass,
-%   dense mass and its 20001/40001 refinement, shift antisymmetry
-%   and flux-vs-shift velocity consistency. Recorded, not gating: s_max
-%   and the four shifts (forced constrained states).
+%   C = SAP_CHECKS(sol, theta, target, model_options) recomputes the
+%   diagnostics of the coupled solve from the returned solution (never trusting
+%   the solver's own flags) and returns the common check records
+%       name, value, tolerance, comparison, gating, owner (the defining module)
+%   Gating: middle concentration, middle flux, accumulator mass,
+%   dense mass and its 20001/40001 refinement, source antisymmetry
+%   and flux-vs-source velocity consistency. Recorded, not gating: s_max
+%   and the four sources (forced constrained states).
 %   The sap_forced28 diagnostics evaluate the dense masses with deval, so sol
 %   must carry its bvp4c interpolant data (x, y, yp).
 

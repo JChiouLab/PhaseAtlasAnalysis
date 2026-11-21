@@ -1,18 +1,18 @@
 function R = sap_solve(theta, guess, target, solver, mo, corrector)
-%SAP_SOLVE  One corrector call, returned in the pipeline's common form.
+%SAP_SOLVE  One coupled-BVP solver call, returned in the pipeline's common form.
 %
 %   R = SAP_SOLVE(theta, guess, target, solver, model_options, corrector)
-%   builds the corrector options from the shared solver settings and the
+%   builds the solver options from the shared solver settings and the
 %   model options, makes exactly ONE call
 %       [sol, info] = corrector(theta, guess, target, opts)
 %   and returns
-%       R.sol          the returned iterate: sol, or the corrector's retained
+%       R.sol          the returned iterate: sol, or the solver's retained
 %                      rejected iterate (mesh blow-up / non-finite), or []
 %       R.opts         the options actually passed (reltol, abstol, nmax, ...)
 %       R.warning_id   bvp4c warning identifier ('' if none; NaN-free text)
 %       R.warning_msg
 %       R.corrector_class, R.corrector_reason, R.wall_s
-%       R.corrector_nodal_min   the corrector's own nodal minimum (mesh nodes)
+%       R.corrector_nodal_min   the solver's own nodal minimum (mesh nodes)
 %       R.mesh_trace   the mesh trace of the call
 %                      (sa_mesh_trace 'take': initial mesh, every proposal,
 %                      max_proposed, over_nmax); NaN fields when nothing was
@@ -21,9 +21,9 @@ function R = sap_solve(theta, guess, target, solver, mo, corrector)
 %   `corrector` defaults to the copied sap_p28_solve. Tests inject a stub with
 %   the same signature; this is the only place a solver is called. The
 %   copy's bvp4c resolves to models/original_polarity/private/bvp4c.m, the
-%   forwarder to the traced copy (no byte change to sap_p28_solve.m); the
-%   recorder is reset before the corrector and taken after it on every path
-%   (a stale token is SA:TRACE:E_STALE, raised here, outside the corrector's
+%   forwarder to the traced copy; the
+%   recorder is reset before the solver call and taken after it on every path
+%   (a stale token is SA:TRACE:E_STALE, raised here, outside the solver's
 %   own try/catch).
 
 if nargin < 6 || isempty(corrector), corrector = @sap_p28_solve; end

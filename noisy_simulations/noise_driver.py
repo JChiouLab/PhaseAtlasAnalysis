@@ -4,20 +4,21 @@ One call runs one replicate (noise amplitude A, replicate index rep) of the five
 (u, q, v, w, p) with Ornstein-Uhlenbeck noise on the two membrane species u and q, and writes
 <out>/A<A>_rep<rep>.npz. An existing output file is skipped unless --force is given.
 
-The solver and the noise model are Clara Hinds' package `gef_pak_noise` (in this folder, unchanged).
+The solver and the noise model are the package `gef_pak_noise` (in this folder; see README.md).
 This driver adds:
   - the parameter set of the manuscript (L = 7; below), the grid, the initial condition and the seeds;
   - `MassFixSolver` (mode 'massfix', the default and the mode used for Fig. 4): the same noise fields,
     but the spatial mean of each noise increment is removed before it is added, so total GEF and total
-    PAK are conserved exactly in every realization. Mode 'clara' runs her solver exactly as written; there
-    the noise is zero-mean only in expectation and the total masses drift;
+    PAK are conserved exactly in every realization. The uncorrected mode (`--mode uncorrected`) runs the
+    package solver exactly as written; there the noise is zero-mean only in expectation and the total
+    masses drift;
   - the observables used in the manuscript (half-mass differences dG, dP, the shape coordinate dn2_u,
     the maximum of u in each half).
 
 Defaults are the values used for Fig. 4: mode massfix, T = 4000 s, dt = 0.0025 s, A = 0.001
 (the control run uses A = 0), output every 0.5 s, u snapshots every 2 s.
 
-Grid. Her Neumann grid puts N nodes at x_i = i * L_grid / N with mirror ghosts, so the no-flux domain
+Grid. The package's Neumann grid puts N nodes at x_i = i * L_grid / N with mirror ghosts, so the no-flux domain
 spans L_grid * (N - 1) / N. The driver passes L_grid = L * N / (N - 1), so the span is exactly L
 (node-based, dx = L / (N - 1)).
 
@@ -50,8 +51,8 @@ PARAMS = ReactionParams(a=0.595, b=0.185, c=75.8, d=0.552, e=0.828, f=1.0)
 DM, DC = 0.05, 5.0
 DIFFUSION = {"u": DM, "q": DM, "v": DC, "w": DC, "p": DC}
 M_BG = 14.0                 # total GEF  = integral of u + q + v + w over [0, L]
-M_P = 3.444                 # total PAK  = integral of p + q over [0, L]
-N_GEF = M_BG / L            # her parameters are mean concentrations: 2.0
+M_P = 3.444                 # total PAK  = integral of p + q over [0, L]; rho = M_P/M_BG = 0.246 (Table 2 rounds to 0.25)
+N_GEF = M_BG / L            # the package takes mean concentrations: 2.0
 N_PAK = M_P / L             # 0.492
 TAU_C = 1.0                 # noise correlation time
 N_GRID = 200
@@ -101,7 +102,7 @@ def initial_condition(rep, n=N_GRID):
 
 
 class MassFixSolver(MCRDSolver):
-    """Her Crank-Nicolson scheme (MCRDSolver._step) with one change: the trapezoid-weighted spatial
+    """The package's Crank-Nicolson scheme (MCRDSolver._step) with one change: the trapezoid-weighted spatial
     mean of each noise increment (u and q separately) is subtracted before injection."""
 
     def run(self, u0, n_steps, *, save_every=1, noisy=False, noise_A=None,
@@ -141,7 +142,7 @@ def observables(times, snaps):
     """GEF = u + q + v + w, PAK = p + q; left half = [0, L/2].
     dG, dP: (left - right) half masses divided by M_BG.
     dn2_u = int_0^L cos(2 pi x / L) u dx (the shape axis of Figs. 3 and 4).
-    dn2   = int_0^L cos(2 pi x / L) (u + q) dx / M_BG (an older normalisation, kept for reference)."""
+    dn2   = int_0^L cos(2 pi x / L) (u + q) dx / M_BG (a variant normalisation; not used in the manuscript)."""
     n = snaps.shape[2]
     x = np.linspace(0.0, L, n)
     g = snaps[:, 0] + snaps[:, 1] + snaps[:, 2] + snaps[:, 3]
@@ -181,8 +182,8 @@ def main(argv=None):
     ap.add_argument("--dt", type=float, default=0.0025, help="time step (s); 0.01 and 0.005 fail to converge")
     ap.add_argument("--save_dt", type=float, default=0.5, help="interval of the saved observables (s)")
     ap.add_argument("--snap_dt", type=float, default=2.0, help="interval of the saved u profiles (s)")
-    ap.add_argument("--mode", choices=["massfix", "clara"], default="massfix",
-                    help="massfix: noise mean removed (Fig. 4); clara: her noise as written")
+    ap.add_argument("--mode", choices=["massfix", "uncorrected"], default="massfix",
+                    help="massfix: spatial mean of each noise increment removed, totals conserved (Fig. 4); uncorrected: noise added as generated, totals conserved only on average")
     ap.add_argument("--force", action="store_true", help="overwrite an existing output file")
     a = ap.parse_args(argv)
 

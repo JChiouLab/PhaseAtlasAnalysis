@@ -1,13 +1,13 @@
 function rows = sa_t57_cold_cap(E)
-%SA_T57_COLD_CAP  Milestone-5 T57 (packet v0.2 sections 4, 7; RC-5.1): the
+%SA_T57_COLD_CAP  The
 %   cold-only mesh cap. (1) solver_for: cold capped (nmax = mesh_reject =
-%   cap), refinement and continuation unchanged; cap Inf and a legacy struct
+%   cap), refinement and continuation unchanged; cap Inf and a struct without a cap
 %   leave S.solver. (2) The cut_by_cap rule on planted returns through the
 %   real record path (stub model, cold pass under cap 10,000 with
 %   solver.nmax = mesh_reject = 20,000): proposed mesh > nmax; returned mesh
 %   >= reject; a coarsened 3,601-point RelTolNotMet return (proposed 10,801);
 %   the 9,695 case (proposed > nmax, returned mesh below the cap): cut; the
-%   A000100 case (a positivity refusal at a returned mesh above the cap):
+%   case of a positivity refusal at a returned mesh above the cap:
 %   cut, outcome unchanged; a positivity-only refusal and a plain no-return:
 %   not cut; an accepted return: not cut; the same calls without the cap: no
 %   cut at all. The rule on its own: a cap set through mesh_reject alone; a

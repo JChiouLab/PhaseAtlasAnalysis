@@ -1,7 +1,7 @@
-"""1D finite-difference grid and Laplacian, matching Appendix A's discretization.
+"""1D finite-difference grid and Laplacian, matching the discretization of Appendix A of Dao et al. (2026).
 
-The paper uses a periodic domain (Eq. A3): l_i = i*a, a = L/N. Boundary condition
-for your system was NOT specified, so this module defaults to periodic (flagged in
+Dao et al. (2026) use a periodic domain (Eq. A3): l_i = i*a, a = L/N. The boundary condition
+of the Gef/Pak1 system was not specified there, so this module defaults to periodic (flagged in
 run_comparison.py's output) but also offers a no-flux (Neumann) option -- switching
 is a one-line change (`bc="neumann"`), since both conserve total mass under diagonal
 diffusion and the rest of the solver doesn't care which one is in use.

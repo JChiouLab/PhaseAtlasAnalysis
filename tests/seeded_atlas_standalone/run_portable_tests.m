@@ -1,7 +1,7 @@
 function rows = run_portable_tests(which_tests)
 %RUN_PORTABLE_TESTS  The tests that need only the package code and the stub
-%   fixtures (milestone 9 packet v0.2 section 7.1): they run from a fresh copy
-%   of the package with no development data.
+%   fixtures: they run from a fresh copy of the package, with none of the
+%   authors' development data.
 %
 %   rows = RUN_PORTABLE_TESTS                   all of them
 %   rows = RUN_PORTABLE_TESTS({'sa_t01_settings', ...})   a subset
@@ -9,13 +9,13 @@ function rows = run_portable_tests(which_tests)
 %   First runs setup_atlas('quiet') (the traced bvp4c copy, made when missing
 %   or stale). Every test output goes under
 %   <package>/data/experiments/portable_tests_<stamp>/ (git-ignored; the
-%   wrapper test T86 needs its launch folder inside the package's
-%   data/experiments). E.am14_real = false (T52 skips the parts that read
-%   development run folders). T62 (the deval replica) runs only when this
-%   MATLAB's deval mode is 'replica'; T82 skips its chflags case off macOS.
+%   wrapper test sa_t86_wrapper_root needs its launch folder inside the package's
+%   data/experiments). E.am14_real = false (sa_t52_am14 skips the parts that read
+%   the authors' development run folders). sa_t62_deval (the deval replica) runs only when this
+%   MATLAB's deval mode is 'replica'; sa_t82_tmp_files skips its chflags case off macOS.
 %   No test calls the real corrector on a coupled problem: pipeline runs use
-%   the stub model and corrector; T61p and T102 make tiny bvp4c calls in the
-%   self-checks of scratch copies (about 140 in all). Prints PASS, FAIL or
+%   the stub model and corrector; sa_t61p_traced_solver and sa_t102_release_selfcheck make tiny
+%   bvp4c calls in the self-checks of scratch copies (about 140 in all). Prints PASS, FAIL or
 %   SKIP per test and a summary line; the rows also go to a results file in
 %   the scratch folder. Do not run it while a run is in flight in the same
 %   package folder.
@@ -29,8 +29,8 @@ E.scratch = fullfile(E.root, 'data', 'experiments', ['portable_tests_' char(date
 E.am14_real = false;
 if exist(E.scratch, 'dir') ~= 7, mkdir(E.scratch); end
 Eg = sag_test_env(E.scratch);
-% sa_t53_extent and sag_t23_regression_comparator need development files (a Guzzo_noXA library under
-% data/experiments, the dev-only sag_t21_stub_run): development-only (milestone 9, G21b S1).
+% Tests that need the authors' development data (for example a Guzzo_noXA library under
+% data/experiments) are not part of this list.
 all_tests = {'sa_t01_settings', 'sa_t04_source_scan', 'sa_t11_stub_model', ...
     'sa_t24_determinism', 'sa_t25_substeps_classes', 'sa_t26_step_rule', 'sa_t27_rescue', 'sa_t28_lineages', ...
     'sa_t29_resume', 'sa_t30_resume_refusals', 'sa_t31_am1', 'sa_t38_39_budget_checkpoint', ...

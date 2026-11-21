@@ -1,26 +1,27 @@
 function varargout = sa_record_call(varargin)
-%SA_RECORD_CALL  Validity, root store and per-call record for one corrector call.
+%SA_RECORD_CALL  Validity, quasi-steady-state store and per-call record for
+%   one coupled bvp4c call.
 %
 %   [ctx, A] = SA_RECORD_CALL(ctx, R, unit, tg, target, V, write)
 %       Evaluates the validity boundary on R (or takes V, the re-derived
 %       record of a replayed attempt), classifies the outcome, adds a valid
 %       NODE return of any route (cold, continuation, rescue_*) to its node's
-%       root-store shard (an import return too: route 'import', milestone
-%       10; refinement returns and substeps are never
+%       root-store shard (an import return too: route 'import';
+%       refinement returns and substeps are never
 %       discoveries), and appends the attempt row. With write = true the
 %       attempt file attempts/A######.mat is written atomically (returned
 %       iterate x, y, yp, stats; options; warning; validity record; target;
 %       work unit; provenance). Replayed attempts are never rewritten.
 %   [ok, why] = SA_RECORD_CALL('budget', st)
-%       Call and wall budget check (kept for older callers); the
-%       executor uses sa_search('budget').
+%       Call and wall budget check; the search driver uses
+%       sa_search('budget').
 %   tf = SA_RECORD_CALL('cut_by_cap', kind, opts, solver, failing, reason, returned)
 %       The "cut by cap" label of one
 %       call. True iff kind is 'cold', the call ran tighter than the run's
 %       solver (opts.nmax < solver.nmax or opts.mesh_reject <
 %       solver.mesh_reject), and it was refused on a mesh bound: a RETURNED
 %       call whose failing checks include convergence_proposed_mesh or mesh,
-%       or a call whose corrector reason is the module's mesh blow-up (the
+%       or a call whose solver reason is the module's mesh blow-up (the
 %       only test for a call that returned nothing, whose every check is
 %       NaN and therefore listed as failing). Independent of the returned
 %       mesh; a positivity-only refusal is not a cut; a SUPERSET of the
@@ -32,7 +33,7 @@ function varargout = sa_record_call(varargin)
 %   Row field max_proposed_mesh
 %   = P, the largest mesh bvp4c proposed in the call (R.max_proposed_mesh: 0
 %   when no proposal was made, NaN when nothing was recorded -- a stub
-%   corrector, a legacy record, an interrupted call); the attempt file gains
+%   solver, an old record without a trace, an interrupted call); the attempt file gains
 %   mesh_trace (R.mesh_trace without the volatile per-process call token).
 %   On every call (live and replay) a recorded
 %   trace must be consistent, else SA:INTEGRITY "mesh trace inconsistent":
@@ -48,7 +49,7 @@ function varargout = sa_record_call(varargin)
 %   light (sa_store_io 'light': no n_dense returned mesh / profile); before
 %   the kernel add the node's store is made full again from its
 %   discoveries' attempt files (sa_store_io 'full'), and after the add it
-%   stays full until the executor's shard flush (write, or the replay
+%   stays full until the search driver's shard flush (write, or the replay
 %   compare), which makes it light again. ctx.nroots(node) (the
 %   node root-count vector, ctx.node_of: key -> node) is set here, the
 %   only place a store gains a root.
@@ -172,7 +173,7 @@ elseif node_return
     cand = sa_identity('candidate', M, R.sol, tg, id, ...
         nonempty(A.observed_family, 'unlabelled'), V, S, unit.route, ctx.K);
     [store, out] = sa_root_store('add', store, cand);
-    ctx.shards(tg.key) = store;              % full until the executor's flush, then light
+    ctx.shards(tg.key) = store;              % full until the driver's flush, then light
     ctx.dirty{end+1} = tg.key;
     if isfield(ctx, 'nroots') && isfield(ctx, 'node_of') && isKey(ctx.node_of, tg.key)
         ctx.nroots(ctx.node_of(tg.key)) = numel(store.roots);   % the node root-count vector
@@ -271,7 +272,7 @@ if strcmp(unit.kind, 'refinement'), o = node_outcome; else, o = 'substep_invalid
 end
 
 function store = shard(ctx, key)
-% The node's store in full form: the executor keeps shards light between
+% The node's store in full form: the search driver keeps shards light between
 % calls (sa_store_io 'light'); the kernel needs every discovery's returned
 % mesh and profile, recomputed here from each discovery's attempt file.
 % The function handle captures only the state folder (all that get_sol
@@ -295,10 +296,10 @@ if isempty(s), s = d; end
 end
 
 function lab = shape_label(M, sol, ctx)
-% The module's family label. A module whose shape_label takes a fourth
-% argument gets the run's field scale (ctx.field_scale: the anchor HSS
-% values, the mode names' uniform-state reference); a three-argument one
-% (a test stub) does not.
+% The module's sheet label (family label). A module whose shape_label takes
+% a fourth argument gets the run's field scale (ctx.field_scale: the values
+% of the homogeneous steady state at the lattice anchor, the mode names'
+% uniform-state reference); a three-argument one (a test stub) does not.
 if abs(nargin(M.shape_label)) >= 4
     lab = M.shape_label(sol, ctx.theta, ctx.S.model_options, ctx.field_scale);
 else

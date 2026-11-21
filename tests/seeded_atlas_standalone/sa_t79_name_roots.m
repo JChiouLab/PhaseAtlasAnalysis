@@ -1,5 +1,5 @@
 function rows = sa_t79_name_roots(E)
-%SA_T79_NAME_ROOTS  Milestone 7c follow-up: the default run-folder name shows
+%SA_T79_NAME_ROOTS  The default run-folder name shows
 %   the grid the run uses (n<count> or step<step>, after the parameters, before
 %   the hash; the hash over the parameters only, unchanged), the wrapper takes
 %   it from the resolved settings (points_per_axis, or a grid set in
@@ -92,7 +92,7 @@ rows = sa_check(rows, T, ['the final reports line gives the run''s calls and roo
     ~isnan(was) && was < rC.n_roots, sprintf('stop %s, %d roots; final: %s; before: %s', rC.stop_reason, ...
     rC.n_roots, fr, prev));
 sP = sa_m3_stub('settings', fullfile(d0, 'P'), []); sP.report = struct('progress_interval_s', Inf);
-sP.mode = 'pilot'; sP.targets = struct('policy', 'pilot_sample', 'list', zeros(0, 2));   % as T47's pilot
+sP.mode = 'pilot'; sP.targets = struct('policy', 'pilot_sample', 'list', zeros(0, 2));   % as in sa_t47_pilot_report
 sP.continuation.region = 'cross'; sP.budget.max_calls = 30;
 stP = sa_m3_stub('state');
 oP = evalc('rP = seeded_atlas_run(sa_m3_stub(''params''), struct(), sP, sa_m3_stub(''corrector'', stP));');

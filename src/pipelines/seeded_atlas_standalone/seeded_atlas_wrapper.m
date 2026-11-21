@@ -1,15 +1,17 @@
 function W = seeded_atlas_wrapper(cfg)
-%SEEDED_ATLAS_WRAPPER  From the uncoupled library to coupled results, in one call.
+%SEEDED_ATLAS_WRAPPER  From the half-cell (uncoupled) library to the coupled phase
+%   atlas, in one call.
 %
 %   W = SEEDED_ATLAS_WRAPPER(cfg) is what run_seeded_atlas.m (repository
 %   root) runs after its edit block. cfg fields (see run_seeded_atlas.m and
-%   the user guide):
-%     model               'original_polarity' | 'guzzo_noxa'
+%   docs/USER_GUIDE.md):
+%     model               'original_polarity' (fission yeast model, Table 2) |
+%                         'guzzo_noxa' (M. xanthus model, Table 1)
 %     par                 the dimensional parameters (both pipelines)
-%     res                 the uncoupled seed library grid (noxa: also par.res)
+%     res                 the half-cell library grid (M. xanthus model: also par.res)
 %     library_dir         '' = the uncoupled pipeline's own folder
 %                         data/<uncoupled run name>/outputs; built if missing
-%     library_confirmation  noxa only: a pre-seeding confirmation file ('')
+%     library_confirmation  M. xanthus model only: a confirmation file for the library ('')
 %     run_dir             '' = data/standalone_runs/<sa_run_name(par, model, mode,
 %                         grid)>, the grid being the one the run uses (the
 %                         resolved lattice.points_per_axis, else lattice.step,
@@ -30,7 +32,7 @@ function W = seeded_atlas_wrapper(cfg)
 %                         or read; library_dir, res, max_mode, seed_modes
 %                         (and library_confirmation) are ignored with a
 %                         printed line; the field scale and the family
-%                         lookup come from the source (Guzzo_noXA: also its
+%                         lookup come from the source (M. xanthus model: also its
 %                         res parameter)
 %     points_per_axis     the coupled grid: an odd point count per pool axis
 %                         (scalar or one per pool), passed as
@@ -39,7 +41,8 @@ function W = seeded_atlas_wrapper(cfg)
 %                         settings_overrides.lattice.step). Setting it here and
 %                         in settings_overrides.lattice.points_per_axis is
 %                         refused (one setting, one place)
-%     max_mode            the highest mode-n seed library built beside the three
+%     max_mode            the highest higher-mode (n >= 3; not used in the paper)
+%                         half-cell library built beside the three
 %                         base files (atlas_build_libraries opts.max_mode; 2,
 %                         the default, builds no mode-n file; 3..: the files
 %                         branch_MODE3.._latest.mat that seed_modes 'all'
@@ -49,8 +52,7 @@ function W = seeded_atlas_wrapper(cfg)
 %     from_pilot          production: a pilot run folder whose settings to keep
 %     import_from         '' = no import; a finished run folder whose roots
 %                         seed this run (settings import.source_dir; each
-%                         root re-solved once at the nearest node; milestone
-%                         10). The default run_dir then ends in _imp<stamp8>;
+%                         root re-solved once at the nearest node). The default run_dir then ends in _imp<stamp8>;
 %                         the status line reports a changed source (E_IMPORT)
 %     budget              struct (max_calls, max_wall_s, ...): a user leaf; it
 %                         overrides every mode's budget
@@ -169,7 +171,7 @@ if isempty(run_dir)
 end
 U = user_settings(cfg, run_dir);
 [S, SRCw] = sa_settings('resolve', U, M);
-S = sa_settings('scale_counts', M, M.normalize(par), S, SRCw);   % milestone 8 (L above the reference)
+S = sa_settings('scale_counts', M, M.normalize(par), S, SRCw);   % point counts above the reference L
 sa_progress('begin', S.report.progress_interval_s);
 progress_end = onCleanup(@() sa_progress('end')); %#ok<NASGU>
 if lib_ok
@@ -182,7 +184,7 @@ Z = sa_resume('status', run_dir, S, cur);
 W.lattice = grid_of(M, cur.theta, Z.settings);
 W.library_dir = library_dir; W.run_dir = run_dir; W.plot = fullfile(run_dir, 'plots', 'roots_3d.fig');
 W.trace_dirs = arrayfun(@(t) fullfile(run_dir, 'traces', t.name), cfg.traces(:).', 'UniformOutput', false);
-fprintf('\n================ seeded coupled atlas (%s) ================\n', sa_settings('version'));
+fprintf('\n================ phase atlas (%s) ================\n', sa_settings('version'));
 fprintf(' model            %s   mode %s\n', cfg.model, cfg.mode);
 fprintf(' parameters       %s\n', param_text(par));
 if focus
@@ -291,7 +293,7 @@ tf = (ischar(m) || isStringScalar(m)) && strcmp(m, 'focus');
 end
 
 function [par, note] = source_res(par, src)
-% Guzzo_noXA in focus: res is one of the model's parameters (the library
+% M. xanthus model in focus: res is one of the model's parameters (the library
 % grid); a focus run uses no library, and the import requires the source's
 % parameters, so res is the source's stored one (unchanged when the source
 % cannot be read: the run then refuses with the import's message)
@@ -360,7 +362,7 @@ if ~isempty(cfg.points_per_axis)
 end
 U = merge(U, so);
 if ~isempty(cfg.import_from)
-    U.import.source_dir = cfg.import_from;        % milestone 10 (edit block import_from)
+    U.import.source_dir = cfg.import_from;        % (edit block import_from)
 end
 b = cfg.budget;                     % the edit block's budget wins over every other budget leaf
 for f = fieldnames(b).'

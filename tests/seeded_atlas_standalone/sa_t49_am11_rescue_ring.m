@@ -1,9 +1,9 @@
 function rows = sa_t49_am11_rescue_ring(E)
-%SA_T49_AM11_RESCUE_RING  Milestone-4 T49 (packet v0.3 AM-11, owner 2026-10-15):
-%   rescue is on in every mode and rescue.ring defaults to true (M3
-%   behaviour); rescue.ring = false gives continuation only in the ring band
-%   (E3) while the interior is unchanged; with rescue.ring = true the ring
-%   behaviour is v0.4's (T40 runs under it unchanged).
+%SA_T49_AM11_RESCUE_RING  Rescue is on in every mode and
+%   rescue.ring defaults to true; rescue.ring = false gives continuation only in
+%   the ring band while the interior is unchanged; with rescue.ring = true the
+%   ring behaviour is that of sa_t40_ring, which runs under it
+%   unchanged.
 T = 'T49 AM-11 rescue scope';
 rows = struct('test', {}, 'assertion', {}, 'pass', {}, 'detail', {});
 addpath(E.stub);
@@ -12,18 +12,18 @@ ok = true; det = {};
 for m = sa_modes('modes')
     u = struct('model', 'stub_two_pool', 'run_dir', 'x', 'mode', m{1});
     if any(strcmp(m{1}, {'production', 'focus'})), u.budget = struct('max_calls', 10, 'max_wall_s', 10); end
-    if strcmp(m{1}, 'focus'), u.import = struct('source_dir', 'x'); end   % M11 amended: focus needs a source
+    if strcmp(m{1}, 'focus'), u.import = struct('source_dir', 'x'); end   % focus mode needs a source
     [S, P] = sa_settings('resolve', u, M);
-    % M5 amendment (packet v0.2 section 3): every mode layer sets rescue.ring
+    % every mode layer sets rescue.ring
     % false and rescue.rungs {secant}; the package default keeps ring true and
-    % the M4 ladder
+    % the full ladder
     ok = ok && S.routes.rescue && ~S.rescue.ring && S.routes.continuation && strcmp(P.routes.rescue, 'mode') && ...
         strcmp(P.rescue.ring, 'mode') && isequal(S.rescue.rungs, {'secant'});
     det{end+1} = sprintf('%s rescue %d ring %d rungs {%s}', m{1}, S.routes.rescue, S.rescue.ring, ...
         strjoin(S.rescue.rungs, ',')); %#ok<AGROW>
 end
 D0 = sa_settings('defaults', M);
-rows = sa_check(rows, T, ['defaults (M5-amended): rescue on, rescue.ring = false and rungs {secant} (mode) in smoke, ' ...
+rows = sa_check(rows, T, ['defaults: rescue on, rescue.ring = false and rungs {secant} (mode) in smoke, ' ...
     'pilot and production; package default ring true, ladder diagonal-secant-deep'], ...
     ok && D0.rescue.ring && isequal(D0.rescue.rungs, {'diagonal', 'secant', 'deep'}), strjoin(det, '; '));
 d = sa_m3_testdir(E, 't49');

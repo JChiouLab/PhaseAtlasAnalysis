@@ -1,5 +1,5 @@
 function rows = sa_t27_rescue(E)
-%SA_T27_RESCUE  Milestone-3 T27: rescue ladder. Wall nodes (k1 = 2, |k2| <=
+%SA_T27_RESCUE  Rescue ladder. Wall nodes (k1 = 2, |k2| <=
 %   1) refuse every non-exact guess at their own coordinate, so continuation
 %   edges and the R1 diagonal edge are refused; only the R2 secant guess
 %   2*deval(P1, x1) - deval(P2, x1) (exact for linear targets) succeeds, from

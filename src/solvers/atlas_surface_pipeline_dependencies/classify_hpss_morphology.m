@@ -1,12 +1,13 @@
 function info = classify_hpss_morphology(sol, opts)
-%CLASSIFY_HPSS_MORPHOLOGY Classify a half-domain BVP profile before reuse.
+%CLASSIFY_HPSS_MORPHOLOGY Classify a half-domain BVP profile (before it is used as a starting profile).
 %
-% A valid HPSS has one boundary-associated crown and its trough at the
-% opposite boundary.  The crown may lie slightly inside the boundary
-% ("half-volcano"), but an interior trough, a second crown, or a dominant
-% interior peak is not HPSS morphology.
+% A valid half-peak (HPSS) state has one peak at a boundary and its minimum at the
+% opposite boundary.  The peak may lie slightly inside the boundary,
+% but an interior minimum, a second peak, or a dominant
+% interior peak is not a half-peak shape.
 %
-% Classes: HPSS, HSS, MPSS_LIKE, MULTIPEAK, UNKNOWN.
+% Classes: HPSS (half-peak), HSS (flat, no-peak), MPSS_LIKE (single interior peak),
+% MULTIPEAK (several peaks), UNKNOWN (polarized but not a boundary peak, or ill-formed).
 
     if nargin < 2, opts = struct(); end
     opts = set_default(opts, 'amplitude_tol', 0.5);
@@ -44,7 +45,7 @@ function info = classify_hpss_morphology(sol, opts)
     end
 
     % Inspect either mirror orientation in one canonical orientation:
-    % boundary-associated crown at the left and far-boundary trough at right.
+    % boundary peak at the left and minimum at the far boundary on the right.
     if u(1) < u(end)
         u = fliplr(u);
         info.orientation_flipped = true;

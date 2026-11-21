@@ -1,5 +1,5 @@
 function rows = sa_t78_grid_version(E)
-%SA_T78_GRID_VERSION  Milestone 7c items 4 and 5: the version label 0.8; the
+%SA_T78_GRID_VERSION  The software version label; the
 %   wrapper's points_per_axis (header grid line, refusal of a second place,
 %   a folder on another grid refused E_SETTINGS, never mixed); an older
 %   version's folder still loads, plots and traces, is refused on resume, and
@@ -10,12 +10,7 @@ rows = struct('test', {}, 'assertion', {}, 'pass', {}, 'detail', {});
 addpath(E.stub);
 d0 = sa_m3_testdir(E, 't78');
 v = sa_settings('version');
-% P3 amended: 0.10 (model_options.main_variable and the seam rule of the family label); was 0.9
-% P4 amended: 0.11 (mode names as the family label, uniform-state flatness); was 0.10
-% M8 amended: 0.12 (seed_modes, mode-n libraries, length scaling); was 0.11
-% M9 amended: 1.0.0-rc1 (the release self-check of the traced bvp4c, provenance.arch); was 0.12
-% M10 amended: 1.0.0-rc2 (import, uncapped defaults); was 1.0.0-rc1
-rows = sa_check(rows, T, 'software version is seeded_atlas_standalone/1.0.0-rc2 (no milestone text)', ...
+rows = sa_check(rows, T, 'software version is seeded_atlas_standalone/1.0.0-rc2 (plain version string)', ...
     strcmp(v, 'seeded_atlas_standalone/1.0.0-rc2'), v);
 
 % ---- the shipped script --------------------------------------------------------------------------------------
@@ -26,7 +21,7 @@ old = regexp(w, '(?m)^%\s*settings_overrides\.lattice\.points_per_axis', 'once')
 rows = sa_check(rows, T, ['run_seeded_atlas.m: a live points_per_axis = 51 line, passed to the wrapper; no commented ' ...
     'settings_overrides.lattice.points_per_axis line left; the way back to a fixed step is stated'], ...
     ~isempty(live) && passed && isempty(old) && contains(w, '[] = a fixed step'));
-% M9 amended (E8): two added lines put the script's own folder on the path and call setup_atlas('quiet')
+% two added lines put the script's own folder on the path and call setup_atlas('quiet')
 % after the package is added, before the wrapper
 i_pkg = strfind(w, 'addpath(fullfile(here, ''src'', ''pipelines'', ''seeded_atlas_standalone''));');
 i_e8 = regexp(w, '(?m)^addpath\(here\);\r?\nsetup_atlas\(''quiet''\);', 'once');

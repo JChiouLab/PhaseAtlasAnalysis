@@ -1,49 +1,43 @@
 function result = run_quarter_hpss_sweeper_for_mpss(p, out_dir)
-    % RUN_QUARTER_HPSS_SWEEPER_FOR_MPSS  Continuation-based quarter-domain HPSS
-    % sweep, the search engine for the MPSS constructor (Packet 1D).
+    % RUN_QUARTER_HPSS_SWEEPER_FOR_MPSS  Continuation-based quarter-domain half-peak (HPSS)
+    % sweep, the search engine for the full-peak (MPSS) constructor build_mpss_branch.m.
     %
-    % WHY THIS EXISTS -----------------------------------------------------------
-    % build_mpss_branch.m originally solved every quarter-domain HPSS cell as an
-    % INDEPENDENT cold start (HSS -> cos-perturbed PDE relax -> BVP). Cold starts
-    % fail wherever the PDE relax does not land on the polarized branch at that
-    % density, so the accepted MPSS region came out fragmented. This function
-    % replaces the independent search with the HPSS sweeper's proven CONTINUATION
-    % strategy: seed one center cell, then predictor-corrector continue across the
-    % grid so each cell is warm-started from a neighbour already on the branch.
+    % Why this exists: solving every quarter-domain half-peak cell as an independent cold start
+    % (no-peak state -> cos-perturbed PDE relaxation -> BVP) fails wherever the relaxation does
+    % not land on the polarized branch at that density, so the accepted full-peak region came out
+    % fragmented. This function instead uses the continuation strategy of the half-peak sweeper:
+    % seed one centre cell, then predictor-corrector continue across the grid so each cell is
+    % started from a neighbour already on the branch.
     %
-    % WHAT IT PRODUCES ----------------------------------------------------------
-    % A grid of quarter-domain HPSS profiles (14-var bvp4c structs, peak forced to
-    % x=0) on [0, L_quarter], indexed identically to the atlas (Delta n_PAK,
-    % Delta n_GEF) grid, at HALF-scaled masses. build_mpss_branch.m reflects/
-    % stitches each solved quarter profile peak-to-peak into an MPSS. MPSS is still
-    % CONSTRUCTED, never solved as a direct interior-peak BVP.
+    % What it produces: a grid of quarter-domain half-peak profiles (14-variable bvp4c structs,
+    % peak forced to x = 0) on [0, L_quarter], indexed like the (Delta n_PAK, Delta n_GEF) grid,
+    % at half-scaled masses. build_mpss_branch.m reflects and stitches each solved quarter profile
+    % peak-to-peak into a full-peak profile; the full-peak state is constructed, never solved as a
+    % direct interior-peak BVP.
     %
-    % MASS-GRID CONVENTION (the single most error-prone number) ------------------
-    %   atlas cell (i,j):  nG_half = M_BG/2 + GEF_DIFF(i,j)/2
+    % Mass-grid convention:
+    %   grid cell (i,j):   nG_half = M_BG/2 + GEF_DIFF(i,j)/2
     %                      nP_half = M_P /2 + PAK_DIFF(i,j)/2
     %   quarter target:    nG_q    = nG_half/2 ,  nP_q = nP_half/2
     %   solve domain:      L_quarter = L_total/4
-    % Same grid INDICES as the atlas; half the absolute mass range; twice the
-    % mass-density. (Equivalent to running the sweeper with M_BG/2, M_P/2, L/2.)
+    % Same grid indices as the half-domain grid; half the absolute mass range; twice the
+    % mass density. (Equivalent to running the half-peak sweeper with M_BG/2, M_P/2, L/2.)
     %
-    % REUSE POSTURE -------------------------------------------------------------
-    % Calls ONLY the shared standalone BVP core (run_bvp_v7, construct_bvp_guess_v7,
-    % run_pde_chunked, get_hss_local, validate_halfwave -- the Packet 1B files).
-    % The continuation ORCHESTRATION (predictor-corrector, neighbour rescue) is a
-    % self-contained copy of run_hybrid_sweeper_pdefb.m's proven pattern, kept
-    % here so this packet does NOT edit the production HPSS sweeper and cannot
-    % change HPSS behavior. Writes only MPSS-namespaced files; never touches any
-    % canonical HSS/HPSS .mat.
+    % Reuse: calls only the shared BVP core (run_bvp_v7, construct_bvp_guess_v7,
+    % run_pde_chunked, get_hss_local, validate_halfwave). The continuation orchestration
+    % (predictor-corrector, neighbour retry) is a self-contained copy of the pattern in
+    % run_hybrid_sweeper_pdefb.m. Writes only its own files; never touches the half-peak or
+    % no-peak library files.
     %
-    % PRODUCTION CONTROLS (Invariant 8) -----------------------------------------
+    % Controls:
     %  * checkpoint after Phase 3 and every Phase 4 pass -> checkpoint_quarter_hpss_<id>.mat
-    %  * resume via p.quarter_resume_from (a quarter checkpoint); solved cells skipped
-    %  * Phase 4 rescue: parfeval + per-cell timeout + cancel (no growing broadcast;
+    %  * resume via p.quarter_resume_from (a quarter checkpoint); solved cells are skipped
+    %  * Phase 4 retry: parfeval + per-cell timeout + cancel (no growing broadcast;
     %    only the 1-2 neighbour seeds each cell needs are pre-sliced)
-    %  * failed cells masked, never fabricated (Invariant 2)
+    %  * failed cells are masked, never filled in
     %
-    % Output: data/outputs/quarter_hpss_for_mpss_<id>.mat (+ checkpoint). Returns a
-    % struct with SOL_grid (quarter HPSS structs / [] at failed), failure_mask, the
+    % Output: quarter_hpss_for_mpss_<id>.mat in out_dir (+ checkpoint). Returns a
+    % struct with SOL_grid (quarter half-peak structs
     % atlas grid, and provenance.
 
     % ---- parameters ----------------------------------------------------------
@@ -62,39 +56,38 @@ function result = run_quarter_hpss_sweeper_for_mpss(p, out_dir)
     if ~isfield(p, 'pde_max_chunks'), p.pde_max_chunks = 12; end
     if ~isfield(p, 'pde_fallback_T'), p.pde_fallback_T = max(1, p.pde_T_end/4); end
     if ~isfield(p, 'mass_tol'),       p.mass_tol = 1e-4; end
-    % Oscillatory-regime PDE fallback (default OFF -> byte-identical behaviour).
+    % Oscillatory-regime PDE fallback (default OFF).
     % Same design as run_hybrid_sweeper_pdefb.m: bounded relaxation with early
     % non-relaxation detection + oscillation-phase snapshots as bvp4c SEED
-    % candidates. Snapshots are seeds only; validate_halfwave AND the quarter
-    % mass gate are unchanged and still applied to every accepted solve.
+    % candidates. Snapshots are seeds only; validate_halfwave and the quarter
+    % mass gate still apply to every accepted solve.
     if ~isfield(p, 'osc_fallback'),   p.osc_fallback   = false; end
     if ~isfield(p, 'osc_conv_tol'),   p.osc_conv_tol   = 1e-6;  end
     if ~isfield(p, 'osc_min_chunks'), p.osc_min_chunks = 3;     end
     if ~isfield(p, 'osc_rel'),        p.osc_rel        = 0.5;   end
     if ~isfield(p, 'osc_n_snap'),     p.osc_n_snap     = 6;     end
     % Accept a quarter solve only if its RECOMPUTED integral mass is on target
-    % (Invariant 4 + 10: the 14-var BVP's s1,s2 multipliers can absorb a mass
+    % (the 14-variable BVP's s1,s2 sources can absorb a mass
     % discrepancy, so a shape-valid half-peak may still sit at the wrong mass;
     % such a solve must not be stored OR propagated as a continuation seed).
     % Gate at mass_tol/2 so the reflected (doubled) MPSS mass stays within
     % mass_tol in classify_mpss_profile. Off-mass cells fall through to the
     % cold-start rescue floor instead of polluting the field.
     if ~isfield(p, 'quarter_mass_tol'), p.quarter_mass_tol = p.mass_tol/2; end
-    % Packet 1D controls
+    % Continuation controls
     if ~isfield(p, 'use_parallel'),        p.use_parallel = true;  end
     if ~isfield(p, 'cell_timeout'),        p.cell_timeout = 60;    end   % s, rescue only
     if ~isfield(p, 'checkpoint_every'),    p.checkpoint_every = 25; end
     if ~isfield(p, 'quarter_resume_from'), p.quarter_resume_from = ''; end
     if ~isfield(p, 'rescue_max_passes'),   p.rescue_max_passes = 5; end
     if ~isfield(p, 'max_reroot_tries'),    p.max_reroot_tries = p.res*p.res; end
-    % Phase 3 (row continuation) previously had NO per-row bound: a plain
+    % Phase 3 (row continuation) bounds each row by a time limit: a plain
     % parfor blocks until every row returns, so one row stuck near a fold
     % (repeated failed predictor-corrector -> PDE fallback across many cells)
-    % can silently stall the whole phase for hours with zero progress
-    % visibility (hit 2026-07-16 on an oscillatory param set). A timed-out
-    % row's unset cells simply stay in failure_mask -- Phase 4's rescue
-    % (already parfeval+timeout-guarded) picks them up via neighbour/cold
-    % start, so nothing is lost, just deferred.
+    % could stall the whole phase for hours with no progress
+    % visible. A timed-out row's unset cells simply stay in failure_mask; Phase 4's
+    % retry (also parfeval+timeout-guarded) picks them up via neighbour/cold
+    % start, so nothing is lost, only deferred.
     if ~isfield(p, 'phase3_row_timeout'),  p.phase3_row_timeout = 120; end  % s, use_parallel only
 
     par = p;
@@ -136,12 +129,12 @@ function result = run_quarter_hpss_sweeper_for_mpss(p, out_dir)
     else
         computation_id = datestr(now, 'yyyymmdd_HHMMSS');
         SOL_grid     = cell(res, res);
-        failure_mask = true(res, res);   % true == not solved (mark, don't fabricate)
+        failure_mask = true(res, res);   % true == not solved (mark the cell, never fill it in)
         did_phase0to3 = false;
     end
 
     t_start = tic;
-    fprintf('=== run_quarter_hpss_sweeper_for_mpss (Packet 1D) ===\n');
+    fprintf('=== run_quarter_hpss_sweeper_for_mpss ===\n');
     fprintf('L_total=%.3f  L_quarter=%.3f  res=%d  use_parallel=%d\n', ...
             L_total, L_quarter, res, p.use_parallel);
 
@@ -220,8 +213,8 @@ function result = run_quarter_hpss_sweeper_for_mpss(p, out_dir)
                     for li = live
                         % Snapshot StartDateTime ONCE (queued->running is an
                         % unzoned NaT -> zoned-datetime transition; reading it
-                        % twice can mix zoned/unzoned and error -- see the
-                        % identical fix in Phase 4 / build_mpss_branch.m).
+                        % twice can mix zoned/unzoned and error; the same
+                        % guard is used in Phase 4 and in build_mpss_branch.m).
                         sd = futures(li).StartDateTime;
                         if isnat(sd), continue; end
                         tz = sd.TimeZone;
@@ -265,15 +258,15 @@ function result = run_quarter_hpss_sweeper_for_mpss(p, out_dir)
     end
 
     % =========================================================================
-    % PHASE 4 - MULTI-PASS RESCUE (neighbour warm-start + cold-start floor)
+    % PHASE 4 - MULTI-PASS RETRY (neighbour warm-start + cold-start floor)
     % =========================================================================
     % Each remaining failed cell is attempted with:
     %   tier 1: neighbour-seeded continuation (warm start) -- adds coherence,
-    %   tier 2: cold start at that cell's quarter density  -- identical to the
-    %           OLD independent builder, so new coverage >= old coverage.
+    %   tier 2: cold start at that cell's quarter density (the 'independent' strategy of
+    %           build_mpss_branch.m), so coverage is at least that of independent solves.
     % Newly solved cells become seeds for the next pass. This both fills gaps in
-    % the connected component and DISCOVERS disconnected components (the golden
-    % MPSS region has two), which a single center-rooted continuation misses.
+    % the connected component and discovers disconnected components (the full-peak
+    % region can have two), which a single center-rooted continuation misses.
     n_before_rescue = sum(~failure_mask(:));
     total_rescued = 0;
     for pass = 1:p.rescue_max_passes
@@ -420,7 +413,7 @@ end
 function [sol_out, ok] = solve_cell_continued(prev_sol, prev_prev, nG, nP, L_q, par, D, p)
     % One continuation step: predictor-corrector BVP, then a PDE-extrapolation
     % fallback (same two-tier idea as run_hybrid_sweeper_pdefb Phase 2). Accepts
-    % only a validated half-peak (Invariant 10).
+    % only a validated half-peak.
     sol_out = []; ok = false;
     guess = predictor_guess(prev_sol, prev_prev);
     [bvp, okb] = run_bvp_v7(guess, L_q, par, D, nG, nP);
@@ -434,19 +427,18 @@ function [sol_out, ok] = solve_cell_continued(prev_sol, prev_prev, nG, nP, L_q, 
 end
 
 function sol_out = rescue_one_cell(neigh_sols, seed1, seed2, nG, nP, L_q, par, D, p)
-    % Three-tier rescue for a still-failed cell:
+    % Three-tier retry for a still-failed cell:
     %   tier 1: try EACH accepted cardinal-neighbour profile as a full-NMax
     %           run_bvp_v7 warm start (validated + mass-gated). Trying every
     %           accepted neighbour -- not just one, at the full NMax the core uses
-    %           -- is what fills the interior holes (verified 2026-07-10: recovers
-    %           ~85% of the holes the old single/tight rescue left behind).
+    %           -- is what fills the interior holes (it recovered about 85% of the holes
+    %           that a single tight-NMax retry left behind).
     %   tier 2: collinear-pair linear extrapolation (gap-bridging). A warm start
     %           sits AT a neighbour's mass; extrapolation predicts one step PAST
     %           the solved frontier, reaching boundary-frontier cells a warm start
-    %           cannot (verified 2026-07-10: recovers ~75% of the frontier cells a
-    %           warm-start-only rescue leaves behind -- keeps the sweep from losing
-    %           cells a previous run found).
-    %   tier 3: cold start at this density (coverage floor == independent builder).
+    %           cannot (it recovered about 75% of the frontier cells that a
+    %           warm-start-only retry left behind).
+    %   tier 3: cold start at this density (coverage floor = the independent strategy).
     sol_out = [];
     for s = 1:numel(neigh_sols)
         [bvp, ok] = run_bvp_v7(construct_bvp_guess_v7(neigh_sols{s}), L_q, par, D, nG, nP);
@@ -466,7 +458,7 @@ end
 
 function sols = accepted_neighbor_sols(sol_grid, fail_mask, i, j)
     % All accepted (solved, non-empty) cardinal-neighbour solutions of (i,j).
-    % Bounded (<=4) so the parfeval broadcast stays small (Invariant 8: no growing
+    % Bounded (<=4) so the parfeval broadcast stays small (no growing
     % accumulator).
     sols = {};
     [ni, nj] = size(fail_mask);
@@ -486,15 +478,14 @@ end
 
 function [sol_q, ok] = seed_cold_quarter(nG_q, nP_q, L_q, par, D, p)
     % Cold start: HSS -> cos-perturbed PDE relax -> BVP -> validate -> force peak
-    % at x=0. Byte-for-byte the same recipe as build_mpss_branch's original
-    % quarter_hpss_solve, so tier-2 rescue reproduces the old builder exactly.
+    % at x=0. Same recipe as quarter_hpss_solve in build_mpss_branch.m.
     %
     % When p.osc_fallback is true the relaxation is oscillation-aware: it bounds
     % the run (early-stops once it detects the cos-perturbed trajectory is not
     % relaxing) and offers the time-mean + phase snapshots as bvp4c SEED
     % candidates, so a quarter regime that oscillates (rather than settling to a
     % steady quarter peak) can still recover a validated steady seed. Snapshots
-    % are seeds only; validate_halfwave AND the quarter mass gate are unchanged.
+    % are seeds only; validate_halfwave and the quarter mass gate still apply.
     sol_q = []; ok = false;
     try
         [u, q, v, w, pv] = get_hss_local(nG_q, nP_q, L_q, par);
@@ -508,8 +499,7 @@ function [sol_q, ok] = seed_cold_quarter(nG_q, nP_q, L_q, par, D, p)
         % Same cos-perturbed HSS IC as run_pde_chunked, then the oscillation-
         % aware relax -> candidates -> first candidate that yields a validated,
         % on-mass bvp4c solve (validate_halfwave enforces amplitude >= 0.5 on
-        % the SOLUTION, so the old flat-relaxation amplitude pre-check is
-        % subsumed and not needed here).
+        % the SOLUTION, so no separate amplitude pre-check of the relaxed profile is needed).
         y0 = cos_perturbed_ic([u; q; v; w; pv], x, L_q);
         cands = pde_relax_candidates_q(y0, x, par, D, ...
                     p.pde_T_end, p.pde_T_chunk, p.pde_max_chunks, p);
@@ -532,7 +522,7 @@ function [sol_q, ok] = seed_cold_quarter(nG_q, nP_q, L_q, par, D, p)
 end
 
 function y0 = cos_perturbed_ic(y_hss, x, L)
-    % Mass-conserving cos perturbation of a uniform HSS IC -- IDENTICAL to
+    % Mass-conserving cos perturbation of a uniform HSS IC -- same as
     % run_pde_chunked's (0.5*u*cos(pi*x/L) added to u, subtracted from p), so
     % the osc-aware cold start seeds from the same symmetry-broken state the
     % non-osc path does.
@@ -553,11 +543,11 @@ function mres = quarter_mass_res(sol, nG_q, nP_q)
     % BC via the s1,s2 multipliers (rows 11,12), so recomputing the mass is right
     % (s1,s2 can absorb an off-target mass) -- BUT a plain trapz on bvp4c's
     % NON-UNIFORM mesh conflates mesh-discretization error (empirically ~1e-4)
-    % with true mass error. Verified 2026-07-10: genuinely on-mass quarter solves
+    % with true mass error. Genuinely on-mass quarter solves
     % (|s1,s2|~1e-17, deval mass ~1e-13) show coarse-trapz residuals up to 3.5e-4,
-    % which the old gate wrongly rejected. pchip-densifying the species onto a
-    % uniform fine mesh before trapz measures ~1e-6 -- an accuracy fix, NOT a
-    % tolerance change (Invariant 4). Species rows: u=1,q=3,v=5,w=7,p=9.
+    % which a gate on the coarse value would wrongly reject. pchip-densifying the species onto a
+    % uniform fine mesh before trapz measures ~1e-6 -- an accuracy fix, not a
+    % tolerance change. Species rows: u=1,q=3,v=5,w=7,p=9.
     x = sol.x(:).';
     xf = linspace(x(1), x(end), 2000);
     u = interp1(x, sol.y(1,:), xf, 'pchip');
@@ -571,10 +561,10 @@ function mres = quarter_mass_res(sol, nG_q, nP_q)
 end
 
 function sol = force_peak_at_zero(sol)
-    % Ensure u(0) >= u(end) so the quarter peak-end maps to the MPSS seam. If we
+    % Ensure u(0) >= u(end) so the quarter peak-end maps to the full-peak seam. If we
     % must flip, mirror the 5 species in space and drop the derivative rows
-    % (reflect_stitch then finite-differences the seam slope) -- identical to the
-    % original quarter_hpss_solve orientation guard. Usually a no-op because the
+    % (reflect_stitch then finite-differences the seam slope) -- same as the
+    % orientation guard of quarter_hpss_solve in build_mpss_branch.m. Usually a no-op because the
     % cos IC and continuation both keep the peak at x=0.
     if sol.y(1,1) < sol.y(1,end)
         yr = zeros(size(sol.y));
@@ -586,7 +576,7 @@ end
 function guess = predictor_guess(prev_sol, prev_prev)
     % 2-point linear extrapolation of the profile (positivity-guarded); falls back
     % to the last solution when only one is available. All cells share L=L_quarter
-    % so meshes align by resampling. (Same as pdefb predictor_step.)
+    % so meshes align by resampling. (Same as predictor_step in run_hybrid_sweeper_pdefb.m.)
     if isempty(prev_prev)
         guess = construct_bvp_guess_v7(prev_sol); return;
     end
@@ -604,7 +594,7 @@ end
 function sol_out = pde_extrap_fallback(prev_sol, prev_prev, nG, nP, L_q, par, D, p)
     % Extrapolate the neighbour profile one mass step, relax under the RD PDE
     % (no symmetry-breaking cos -- the IC is already polarized), then BVP. Same as
-    % pdefb pde_fallback_extrapolated, on the quarter domain.
+    % pde_fallback_extrapolated in run_hybrid_sweeper_pdefb.m, on the quarter domain.
     sol_out = [];
     if isempty(prev_sol), return; end
     x_ic = prev_sol.x; y_ic = prev_sol.y;
@@ -645,7 +635,7 @@ end
 function cands = pde_relax_candidates_q(y0, x, par, D, T_end, T_chunk, max_chunks, p)
     % Quarter-domain twin of run_hybrid_sweeper_pdefb.m's pde_relax_candidates.
     % Bounded, oscillation-aware relaxation returning ORDERED seed-candidate
-    % structs (.x, 14-row .y). Converged -> the single steady state (old seed);
+    % structs (.x, 14-row .y). Converged -> the single steady state (the single-shot seed);
     % not relaxing -> time-mean then phase snapshots. Seeds only, no acceptance.
     cands = {};
     if T_end <= 0, return; end
@@ -714,8 +704,8 @@ end
 
 function sol_out = bvp_seed_extrap(prev_sol, prev_prev, nG, nP, L_q, par, D)
     % Fast neighbour-seeded BVP with a tight NMax so a stiff input can't run the
-    % mesh away (bounds Phase-4 per-cell wall time). Same as pdefb
-    % bvp_seed_extrapolated, on the quarter domain.
+    % mesh away (bounds Phase-4 per-cell wall time). Same as
+    % bvp_seed_extrapolated in run_hybrid_sweeper_pdefb.m, on the quarter domain.
     sol_out = [];
     if isempty(prev_sol), return; end
     x_ic = prev_sol.x; y_ic = prev_sol.y;
@@ -746,8 +736,8 @@ end
 
 function sol_out = run_pde_polarised_local(y0, x, L, par, D, T_end, T_chunk, max_chunks)
     % Relax an already-polarized IC under the RD PDE with reflecting BCs, NO
-    % cos perturbation. Same as pdefb run_pde_polarised (which is not a shared
-    % standalone file), reproduced here so this sweeper stays self-contained.
+    % cos perturbation. Same as run_pde_polarised in run_hybrid_sweeper_pdefb.m (a local function there),
+    % reproduced here so this sweeper stays self-contained.
     sol_out = [];
     if T_end <= 0, return; end
     if T_chunk > T_end, T_chunk = T_end; end
@@ -779,8 +769,8 @@ end
 
 function [seed1, seed2] = neighbour_seeds(sol_grid, fail_mask, i, j)
     % Prefer a collinear polarized pair (for linear extrapolation toward (i,j));
-    % else the closest single polarized cardinal neighbour. Flat/HSS neighbours
-    % are skipped. Same as pdefb find_neighbour_seeds.
+    % else the closest single polarized cardinal neighbour. Flat (no-peak) neighbours
+    % are skipped. Same as find_neighbour_seeds in run_hybrid_sweeper_pdefb.m.
     [ni, nj] = size(fail_mask);
     seed1 = []; seed2 = [];
     if i >= 3 && is_pol(sol_grid,fail_mask,i-1,j) && is_pol(sol_grid,fail_mask,i-2,j)
@@ -846,7 +836,7 @@ function result = pack_result(SOL_grid, failure_mask, PAK_DIFF, GEF_DIFF, NGq, N
 end
 
 function finalize_and_save(result, out_dir)
-    % Write a timestamped, NON-canonical quarter-grid file for provenance.
+    % Write a timestamped quarter-grid file for provenance (not a library file).
     out_path = fullfile(out_dir, sprintf('quarter_hpss_for_mpss_%s.mat', result.computation_id));
     SOL_grid = result.SOL_grid; failure_mask = result.failure_mask; %#ok<NASGU>
     PAK_DIFF = result.PAK_DIFF; GEF_DIFF = result.GEF_DIFF; %#ok<NASGU>

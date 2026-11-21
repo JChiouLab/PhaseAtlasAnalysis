@@ -1,11 +1,11 @@
 function varargout = sa_seed_modes(action, varargin)
-%SA_SEED_MODES  The seed_modes setting: active seed types and the pre-run count
-%   (milestone 8, packet sections 4.3 and 5).
+%SA_SEED_MODES  The seed_modes setting: active seed types (starting-profile
+%   shapes) and the pre-run count.
 %
 %   settings.seed_modes is a cell row of LEFT-drawn half shapes ('0', 'n+',
 %   'n-', n >= 1) or 'all'. Each listed shape is seeded on both halves;
-%   families are the ordered pairs of the listed shapes' type ids (filtered
-%   by the census and by settings.families). The model module owns the
+%   sheets (family labels) are the ordered pairs of the listed shapes' type
+%   ids (filtered by the census and by settings.families). The model module owns the
 %   mapping shape -> type id, base file and transform, the type order and
 %   the mirror rule (optional member seed_shape); this file names none of
 %   them.
@@ -15,7 +15,8 @@ function varargout = sa_seed_modes(action, varargin)
 %       library folder (every shape it offers; each skipped 'empty' mode
 %       file is named in a printed line) and stores the resolved list in
 %       S.seed_modes; when 'all' finds no mode-n file with n >= 3 in the
-%       folder, a warning (SA:SEED:W_NO_MODE_FILES) says that only the base
+%       folder (higher-mode half-cell states with n >= 3 monotone runs), a
+%       warning (SA:SEED:W_NO_MODE_FILES) says that only the base
 %       shapes are seeded and how to build the files (max_mode); maps the
 %       shapes to type ids in the module's type
 %       order; when the types differ from the module's library_types,
@@ -23,14 +24,14 @@ function varargout = sa_seed_modes(action, varargin)
 %       built from it. A = struct(shapes, types, skipped, default). At the
 %       default seed_modes M and S are returned unchanged.
 %   lib = SA_SEED_MODES('load', M, manifest, theta, parameters, A)
-%       The module's library 'load' with the active types (the 0.11 call
-%       when A.default).
+%       The module's library 'load' with the active types (the call without
+%       the types argument when A.default).
 %   L = SA_SEED_MODES('table', M, C, T, S)
-%       The pre-run lines (zero solves): one per seedable family (and one
+%       The pre-run lines (zero solves): one per seedable sheet (and one
 %       per pair with 0 seeds, '0 (no cell with both halves)'), with the
 %       expected drawn label left / mirror(right), the library seeds, the
 %       cold calls this run declares and rough hours at the module's
-%       measured cold rate; families with a new shape say 'no measured
+%       measured cold rate; sheets with a new shape say 'no measured
 %       rate; legacy rate used'. Totals last.
 %   SA_SEED_MODES('print', M, C, T, S)   prints the table
 
@@ -88,7 +89,7 @@ A.shapes = shapes;
 A.types = types;
 if isequal(types, M.library_types) && isempty(A.skipped) && ~ischar(S.seed_modes) && ...
         isequal(S.seed_modes, shapes)
-    return                                   % the default: 0.11 exactly
+    return                                   % the default seed_modes: nothing changes
 end
 if ischar(S.seed_modes) || ~isequal(sort(S.seed_modes), sort(shapes))
     S.seed_modes = shapes;
@@ -155,7 +156,7 @@ for f = 1:numel(C.names)
     h = ncold * rate / 3600;
     new = ~(any(strcmp(tL, legacy)) && any(strcmp(tR, legacy)));
     tag = '';
-    if new, tag = '  (no measured rate; legacy rate used)'; note = true; end
+    if new, tag = '  (no measured rate; default rate used)'; note = true; end
     L{end+1} = sprintf('%-18s %-9s %7d %11d %8.2f%s', C.names{f}, e, seeds(f), ncold, h, tag); %#ok<AGROW>
     tot = tot + [seeds(f) ncold h];
 end

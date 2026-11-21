@@ -1,9 +1,7 @@
-% run_pde_chunked  --  shared V7 per-point BVP core (extracted 2026-07-09, Packet 1B).
-% Single source of truth for run_hybrid_sweeper_pdefb.m AND build_mpss_branch.m.
-% Extracted verbatim from run_hybrid_sweeper_pdefb.m; do not fork. Equations, BCs,
-% tolerances, and mass conventions are unchanged.
+% run_pde_chunked  --  chunked pdepe relaxation to steady state (fission yeast model; pdepe, not central differences + ode15s).
+% Shared by run_hybrid_sweeper_pdefb.m and build_mpss_branch.m; keep a single copy.
 function sol_out = run_pde_chunked(y0, x, L, par, D, T_end, T_chunk, max_chunks)
-    % V7-style PDE relaxation: chunked integration with mass-conserving
+    % PDE relaxation: chunked integration with mass-conserving
     % cos-perturbation IC and early stopping when max|du/dt| chunk-to-chunk is
     % below 1e-6.  T_chunk and max_chunks are chosen so T_end <= T_chunk*max_chunks.
     sol_out = [];

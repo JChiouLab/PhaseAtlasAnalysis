@@ -1,5 +1,5 @@
 function rows = sa_t61p_traced_solver(E)
-%SA_T61P_TRACED_SOLVER  Milestone-9 T61p (packet v0.2 sections 5, 7.1): the
+%SA_T61P_TRACED_SOLVER  The
 %   portable check of the traced bvp4c copy. It generates into scratch only
 %   and never moves, rewrites or deletes the installed copy. About 36 tiny
 %   bvp4c calls (three self-checks).
@@ -35,7 +35,7 @@ g = fullfile(d, 'gen');
 R = sa_bvp4c_setup('generate', g);
 Lt = lines_of(fullfile(tb, 'bvp4c.m'));
 Lg = lines_of(fullfile(g, 'sa_bvp4c_traced.m'));
-ins = find(contains(Lg, 'sa_bvp4c_setup: inserted (M6 mesh trace)'));
+ins = find(contains(Lg, 'sa_bvp4c_setup: inserted (mesh trace)'));
 rest = Lg; rest(ins) = [];
 i1 = num(R.anchor_function); i2 = num(R.anchor_initial); i3 = num(R.anchor_proposal);
 ok = numel(ins) == 2 && numel(Lg) == numel(Lt) + 2 && isequal(find(~cellfun(@isequal, rest, Lt)), i1) && ...

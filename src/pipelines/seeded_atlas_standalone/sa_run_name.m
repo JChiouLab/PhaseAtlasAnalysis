@@ -1,30 +1,30 @@
 function name = sa_run_name(parameters, settings)
-%SA_RUN_NAME  Propose a run_dir folder NAME for one parameter set, after the
-%   uncoupled pipeline's per-parameter folder convention.
+%SA_RUN_NAME  Propose a run_dir folder NAME for one parameter set, following
+%   the per-parameter folder naming of the half-cell library runs.
 %
 %   name = SA_RUN_NAME(parameters, settings)
 %       <model>_<mode>_<tag><value>_..._<grid>_<sha8>. Every scalar numeric
 %       field of `parameters` is shown, in field order, under its own name without
-%       underscores, with its value printed as the uncoupled folder names
+%       underscores, with its value printed as the library folder names
 %       print it: %g, '.' -> 'p', '-' -> 'm', '+' dropped. For the fission-
-%       yeast parameter set this is exactly the uncoupled folder's parameter
+%       yeast parameter set this is exactly the library folder's parameter
 %       text (..._L7_MBG14_MP3p444); this file stays model-free, so no
 %       per-model tag table is kept here. Fields that would take the
 %       parameter part past 150 characters are left out of the name. <grid>
 %       is the coupled grid of settings.lattice, printed the same way: n<count>
-%       when lattice.points_per_axis is set (n51; one count per pool joined by
-%       'x', n25x99), otherwise step<step> (step0p02; per-axis steps
-%       step0p01x0p05); without a settings.lattice field there is no grid
-%       part. The caller passes the grid the run will use (the resolved
-%       settings). sha8 is the first 8 hex digits of the SHA-256 of the
-%       full parameter text (model, mode and every field at %.17g; not the
-%       grid), so two parameter sets that print alike still get different
+%       when lattice.points_per_axis is set (n51; one count per conserved
+%       protein joined by 'x', n25x99), otherwise step<step> (step0p02;
+%       per-axis steps step0p01x0p05); without a settings.lattice field there
+%       is no grid part. The caller passes the grid the run will use (the
+%       resolved settings). sha8 is the first 8 hex digits of the SHA-256 of
+%       the full parameter text (model, mode and every field at %.17g; not
+%       the grid), so two parameter sets that print alike still get different
 %       names. The name enters no solve, row or key. A proposal only: the
 %       caller decides the
 %       parent folder; a changed scientific setting is a new run, so reusing
 %       a name for other settings is refused by seeded_atlas_run (non-empty
 %       run_dir).
-%       Milestone 10: when settings.import.source_dir is set, the name gains
+%       When settings.import.source_dir is set, the name gains
 %       _imp<stamp8>, the first 8 hex digits of the source run's stamp
 %       (sa_import 'stamp'), so a same-grid follow-up never collides with
 %       its source. With import.source_stopped true (a killed source) the

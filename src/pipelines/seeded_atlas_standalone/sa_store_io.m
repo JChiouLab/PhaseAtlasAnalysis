@@ -1,8 +1,8 @@
 function varargout = sa_store_io(action, varargin)
-%SA_STORE_IO  Save/load wrapper around the copied root-store kernel.
+%SA_STORE_IO  Save/load wrapper around the root-store kernel (sa_root_store).
 %
 %   SA_STORE_IO('save', store, file)
-%       Atomic write of a (monolithic, legacy) store (sa_write).
+%       Atomic write of a monolithic store (sa_write).
 %   SA_STORE_IO('save_shard', store, file, key, attempt_count)
 %       Atomic write of one node's shard: the kernel
 %       store of node `key`, stamped with the run's attempt count at the time
@@ -13,7 +13,7 @@ function varargout = sa_store_io(action, varargin)
 %       written as [] with a flag (profile_dedup{r}(1|2, q)); every reader
 %       below restores it, so the in-memory kernel store is isequaln to the
 %       one saved. The kernel, its fields and every verdict are untouched.
-%       Older 'sa_store_io/shard-1' files load unchanged.
+%       Shard files of the older format 'sa_store_io/shard-1' load unchanged.
 %   S = SA_STORE_IO('read_shard', file)
 %       The shard file's variables with S.store DECODED and NOT
 %       re-validated: the form a checkpoint is compared in (sa_search) and
@@ -66,7 +66,7 @@ function varargout = sa_store_io(action, varargin)
 %       the run folder (verdict re-derivation and the profile check).
 %   fn = SA_STORE_IO('run_profiles', run_dir, M)   the profile recomputation
 %   store = SA_STORE_IO('light', store)
-%       The in-memory form the executor keeps between calls (memory only):
+%       The in-memory form the search driver keeps between calls (memory only):
 %       every discovery's returned_mesh and returned_profile (the n_dense
 %       grid) set to []. Everything else is kept: representative and
 %       comparison profiles, ids, routes, verdicts, comparisons. The kernel

@@ -1,5 +1,5 @@
 function rows = sa_t77_trace_at(E)
-%SA_T77_TRACE_AT  Milestone 7c item 2: a trace started from a figure position
+%SA_T77_TRACE_AT  A trace started from a figure position
 %   (entry.at), the nearest root on the figure, its staleness rule, and the
 %   figure's data tips. Zero solves: stub runs, a stub integrator.
 T = 'T77 trace by position';

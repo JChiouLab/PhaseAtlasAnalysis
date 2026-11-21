@@ -2,7 +2,7 @@ function rows = sa_t83_start_lookups(E)
 %SA_T83_START_LOOKUPS  The lineage-start lookups (sa_continuation 'targets',
 %   'next_start', 'unowned_roots', 'next_target', 'node_parent') against the
 %   per-element versions they replace (the reference functions below are
-%   the 89775cc6 code, verbatim apart from their names). Zero bvp4c calls.
+%   the earlier per-element code, verbatim apart from their names). Zero bvp4c calls.
 %   A synthetic 9 x 9 lattice (index -4..4 per axis; ring = the outer
 %   band), 0-3 roots per node (some created by the per-root pass), and a
 %   queue grown as 'expand' grows it: a lineage per start, successes
@@ -200,7 +200,7 @@ end
 end
 
 % =========================================================================
-% reference: the per-element versions (89775cc6 sa_continuation.m)
+% reference: the per-element versions (the earlier sa_continuation.m)
 
 function tf = in_targets(Q, S, q)
 switch Q.phase

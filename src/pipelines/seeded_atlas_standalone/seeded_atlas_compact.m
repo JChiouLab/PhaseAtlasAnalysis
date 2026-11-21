@@ -6,8 +6,8 @@ function out = seeded_atlas_compact(run_dir, opts)
 %   out = SEEDED_ATLAS_COMPACT(run_dir, opts)
 %
 %   1. Refused unless the run's status (sa_resume 'status' against its own
-%      stored settings) is completed and not yet compacted; a flat (software
-%      0.5) folder is evidence and is refused. A cleanly STOPPED run (not
+%      stored settings) is completed and not yet compacted; a run folder in
+%      the old flat layout is never compacted. A cleanly STOPPED run (not
 %      completed: queue_final.mat present, its attempt count equal to the
 %      attempt files, no journal start without an end, no integrity stop;
 %      stop reasons such as disk_floor, budget_calls, budget_wall) is
@@ -45,7 +45,7 @@ function out = seeded_atlas_compact(run_dir, opts)
 
 if nargin < 2, opts = struct(); end
 if strcmp(sa_layout('layout', run_dir), 'flat')
-    error('SA:COMPACT:E_LEGACY', '%s is a flat (software 0.5 or earlier) folder: evidence, never compacted.', ...
+    error('SA:COMPACT:E_LEGACY', '%s is a run folder in the early flat layout: kept as is, never compacted.', ...
         run_dir);
 end
 D = sa_layout('state', run_dir);
@@ -56,8 +56,8 @@ if exist(fullfile(D, 'settings_effective.mat'), 'file') ~= 2
     error('SA:COMPACT:E_NO_RUN', '%s holds no run.', run_dir);
 end
 E = load(fullfile(D, 'settings_effective.mat'), 'settings');
-% the stored settings, with the focus-mode leaves a folder made before them
-% lacks at their neutral values (sa_resume compares filled structs)
+% the stored settings; leaves that run folders written by older versions
+% lack (focus mode) are filled with neutral values (sa_resume compares filled structs)
 Z = sa_resume('status', run_dir, sa_settings('fill_focus_leaves', E.settings), struct());
 stopped = '';                                     % the stop reason of a cleanly stopped run
 if ~strcmp(Z.state, 'completed')

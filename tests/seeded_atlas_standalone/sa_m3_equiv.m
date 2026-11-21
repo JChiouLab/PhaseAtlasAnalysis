@@ -1,5 +1,5 @@
 function D = sa_m3_equiv(dU, dR, opts)
-%SA_M3_EQUIV  Strict resume equivalence (milestone-3 packet section 2e).
+%SA_M3_EQUIV  Strict resume equivalence.
 %
 %   D = SA_M3_EQUIV(dirU, dirR) compares an uninterrupted run U with a run R
 %   that was killed and resumed: the same completed work units in the same
@@ -12,16 +12,16 @@ function D = sa_m3_equiv(dU, dR, opts)
 %   D = SA_M3_EQUIV(dirU, dirR, struct('prefix_only', true)) compares only
 %   R's completed units against the first ones of U (a run R that stopped
 %   earlier).
-%   D.pass, D.n_units, D.n_interrupted, D.diffs, D.added (M5: attempt-row
-%   fields present on one side only, e.g. nmax / cut_by_cap against an M4
-%   run; never a difference).
-%   M6 (packet v0.2 section 2.3): the row field max_proposed_mesh and the
+%   D.pass, D.n_units, D.n_interrupted, D.diffs, D.added (attempt-row
+%   fields present on one side only, e.g. nmax / cut_by_cap against a run
+%   written by an older version; never a difference).
+%   The row field max_proposed_mesh and the
 %   attempt-file field mesh_trace are added leaves against an older run;
 %   when BOTH sides carry mesh_trace it is compared too (isequaln without
 %   the per-process call token): D.n_trace_compared.
 
 if nargin < 3, opts = struct(); end
-sa_report('refuse_if_compacted', dU, 'sa_m3_equiv');   % M7a RC-7.6: compaction-blind, refuses
+sa_report('refuse_if_compacted', dU, 'sa_m3_equiv');   % the comparison is blind to compacted folders, so it refuses them
 sa_report('refuse_if_compacted', dR, 'sa_m3_equiv');
 prefix = isfield(opts, 'prefix_only') && opts.prefix_only;
 D = struct('pass', false, 'n_units', 0, 'n_interrupted', 0, 'diffs', {{}}, 'added', {{}}, 'n_trace_compared', 0);
@@ -58,8 +58,8 @@ for k = 1:n
         D.added = union(D.added, {'mesh_trace'});
     end
     A = clean_row(a.attempt, []); B = clean_row(b.attempt, m);
-    % M5 (packet v0.2 section 6): row fields present on one side only (nmax,
-    % cut_by_cap against an M2-M4 run) are added leaves, not differences
+    % row fields present on one side only (nmax,
+    % cut_by_cap against a run from an older version) are added leaves, not differences
     only = setxor(fieldnames(A), fieldnames(B));
     if ~isempty(only)
         D.added = union(D.added, only);
@@ -77,7 +77,7 @@ if ~prefix
         D.diffs{end+1} = 'shard file sets differ';
     else
         for k = 1:numel(fu)
-            SU = sa_store_io('read_shard', fullfile(fu(k).folder, fu(k).name));   % AM-9 decoded
+            SU = sa_store_io('read_shard', fullfile(fu(k).folder, fu(k).name));   % decoded form
             SR = sa_store_io('read_shard', fullfile(sa_layout('state', dR), 'roots', fu(k).name));
             if ~isequaln(SU.store, map_store(SR.store, m))
                 D.diffs{end+1} = sprintf('shard %s differs', fu(k).name);
@@ -114,7 +114,7 @@ end
 end
 
 function s = mapstr(s, m)
-% M10 amended (packet v0.2 section 3.4): an import unit's key and its
+% An import unit's key and its
 % guess_source ('import <stamp8> <source attempt id>', seed_right) carry the
 % SOURCE run's attempt ids, which a resume never renumbers: left as they are
 if startsWith(s, 'import'), return; end

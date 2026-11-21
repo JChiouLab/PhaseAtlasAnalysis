@@ -1,9 +1,8 @@
 function varargout = sap_library(action, varargin)
-%SAP_LIBRARY  Read-only reader of the original model's uncoupled seed library.
+%SAP_LIBRARY  Read-only reader of the S. pombe uncoupled library (isolated half-cell states).
 %
-%   Generalizes the campaign adapter sca_ad_b (no typed L, rho or M_BG: every
-%   scale comes from theta, and the library's own `par` must equal the user's
-%   parameters).
+%   Every scale comes from theta (no typed L, rho or M_BG), and the library's own
+%   `par` must equal the user's parameters.
 %
 %   lib = SAP_LIBRARY('load', manifest, theta, parameters)
 %       manifest.directory holds branch_{HSS,HPSS,MPSS}_latest.mat. Loads the
@@ -12,27 +11,27 @@ function varargout = sap_library(action, varargin)
 %       a parameter mismatch, unequal grids or an asymmetric grid is an error:
 %       a library problem never silently degrades to library-free search.
 %   lib = SAP_LIBRARY('load', manifest, theta, parameters, types)
-%       (milestone 8) the same, for the active seed types (sap_seed_shape):
+%       the same, for the active seed shapes (sap_seed_shape):
 %       the three files above are always loaded, in that order; a mode-n
 %       file branch_MODE<n>_latest.mat is loaded (and enters lib.files) only
 %       when an active type needs it, with the same par and grid checks.
 %       A type made on load (1-, 2+, n+, n-) uses its base file's mask.
-%       Without types (or with the default types) lib is as in 0.11.
+%       Without types (or with the default types) only the three base files are loaded.
 %   lib = SAP_LIBRARY('profiles', lib, types)
 %       Loads the stored half profiles (SOL) of the listed types.
 %   c = SAP_LIBRARY('cell', lib, theta, d)
-%       Native cell of lattice coordinate d = [d_P d_G]: in_range, cell
+%       Native cell of grid coordinate d = [d_P d_G]: in_range, cell
 %       [row col] (nearest index on each axis), offsets in native spacings.
 %   h = SAP_LIBRARY('half', lib, theta, type, cell, model_options)
-%       One half profile on xi = linspace(0, 1/2, guess_nodes), normalized.
+%       One half profile on x = linspace(0, 1/2, guess_nodes), normalized.
 %   [g, why] = SAP_LIBRARY('pair_guess', lib, theta, tL, cL, tR, cR, mo)
-%       The 28-row cold guess from two halves (copied corrector pair_guess).
+%       The 28-row cold guess from two halves (copied pair_guess).
 %
 %   Native grid: rows index GEF_DIFF (dimensional d_G * M_BG), columns index
 %   PAK_DIFF (dimensional d_P * M_BG); both coordinates divide by M_BG
-%   (the campaign ruling). Per-type storage differs and is detected, not
+%   (the paper's fractions). Per-type storage differs and is detected, not
 %   assumed: HPSS = 14-row bvp4c struct (deval), MPSS = 5-row {x,y} (pchip),
-%   HSS = uniform 1x5 state of the representative branch.
+%   HSS = uniform 1x5 state.
 
 switch action
     case 'load',       varargout{1} = do_load(varargin{:});
@@ -106,7 +105,7 @@ for t = 2:numel(grids)
 end
 for k = 1:numel(info_of)                     % the active types (made on load: base mask)
     ty = info_of(k).type;
-    if strcmp(ty, info_of(k).base), continue; end   % a stored type: as in 0.11
+    if strcmp(ty, info_of(k).base), continue; end   % a stored type: nothing to do
     lib.mask.(ty) = lib.mask.(info_of(k).base);
     lib.B.(ty) = struct('path', lib.B.(info_of(k).base).path, 'SOL', [], ...
         'base', info_of(k).base, 'transform', info_of(k).transform, 'n', info_of(k).n);
@@ -208,7 +207,7 @@ x_dim = xi * theta.L;                      % xi = x / L (full domain)
 s = SOL{i, j};
 tr = 'none';
 if isfield(lib.B.(type), 'transform'), tr = lib.B.(type).transform; end
-switch tr                                  % milestone 8: shapes made on load
+switch tr                                  % shapes made on load
     case 'rotate'                          % 2+: the stored stitch rotated by a quarter
         m = (numel(s.x) + 1) / 2;
         Lq = s.x(m);
@@ -220,7 +219,7 @@ end
 if isempty(s)
     error('SAP:LIBRARY', '%s SOL is empty at existent cell (%d,%d).', type, i, j);
 end
-if isnumeric(s)                            % HSS: uniform representative state
+if isnumeric(s)                            % HSS: uniform state
     if numel(s) ~= 5
         error('SAP:LIBRARY', 'HSS state at (%d,%d) has %d entries, expected 5.', i, j, numel(s));
     end

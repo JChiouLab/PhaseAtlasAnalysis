@@ -1,5 +1,5 @@
 function J = gnx_jacobian(u, par)
-%GNX_JACOBIAN  Analytic Jacobian of the Guzzo_noXA source vector.
+%GNX_JACOBIAN  Analytic Jacobian of the M. xanthus source vector.
 %
 %   J = GNX_JACOBIAN(u, par)
 %
@@ -9,7 +9,7 @@ function J = gnx_jacobian(u, par)
 %   dsB/dRm = -dBA*Bm^2/(1+(Bm/KA)^2),  dsB/dRc = 0,
 %   dsB/dBm = kBB*Bc - dB/(1+Bm/K)^2 - dBA*Rm*2*Bm/(1+(Bm/KA)^2)^2,
 %   dsB/dBc = kB + kBB*Bm.
-% The structural zeros dsR/dBc and dsB/dRc are exact zeros (packet §5.1 Z3).
+% The structural zeros dsR/dBc and dsB/dRc are exact zeros.
 
 N = size(u, 2);
 J = zeros(4, 4, N);

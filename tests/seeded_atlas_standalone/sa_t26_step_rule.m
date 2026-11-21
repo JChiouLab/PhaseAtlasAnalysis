@@ -1,5 +1,5 @@
 function rows = sa_t26_step_rule(E)
-%SA_T26_STEP_RULE  Milestone-3 T26 (RC-1 with the review addendum): the
+%SA_T26_STEP_RULE  The
 %   adaptive rule refuses an edge when refusals exceed h, within 2h+1 calls;
 %   adversarial alternating refusal/success -> REFUSAL at the cap (9 calls at
 %   h = 4, 13 at h = 6); R^4 S^5 completes in 9; myxo_restart <= 31 calls

@@ -1,17 +1,17 @@
 function [accepted, info, view, opts] = gnx_morphology(x, y4, mt)
-%GNX_MORPHOLOGY  Guzzo_noXA view into the UNCHANGED classify_hpss_morphology.
+%GNX_MORPHOLOGY  M. xanthus (Guzzo_noXA) view into classify_hpss_morphology (used unchanged).
 %
 %   [accepted, info, view, opts] = GNX_MORPHOLOGY(x, y4)
 %   [accepted, info, view, opts] = GNX_MORPHOLOGY(x, y4, mt)
 %   x is 1 x n, y4 is 4 x n with rows Rm Rc Bm Bc (field order). The view
 %   struct handed to classify_hpss_morphology has 7 rows: row 1 = Bm (the
 %   peak field), rows 3, 5, 7 = Rm, Rc, Bc, rows 2, 4, 6 = 0, so its
-%   concentration rows (classify :31-33) are exactly the four fields
-%   (packet §4d). mt holds the per-model thresholds (default
+%   concentration rows are exactly the four fields.
+%   mt holds the per-model thresholds (default
 %   gnx_model('descriptor').morphology); per-profile values:
-%     amplitude_tol = amplitude_rel * max(Bm)   (myxo's relative contrast)
+%     amplitude_tol = amplitude_rel * max(Bm)   (relative contrast of the reference M. xanthus code)
 %     absolute_tol  = absolute_rel  * max(Bm)
-%   accepted = (info.class == "HPSS"). Orientation is NOT decided here
+%   accepted = (info.class == "HPSS"). Orientation is not decided here
 %   (classify flips internally); the caller checks peak-at-0 separately.
 
 if nargin < 3 || isempty(mt)

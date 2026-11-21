@@ -1,13 +1,12 @@
 function rows = sa_t51_am13(E)
-%SA_T51_AM13  Milestone-4 T51 (packet v0.3 AM-13): the guess-mesh defaults.
-%   Model layer: 'subsample' for both models, N = 401 for fission yeast (the
-%   commissioned value; 802 only as the documented pilot lever) and the S3a
-%   decision for Guzzo_noXA (H1: see the S3 record); the package default stays
-%   'parent' (packet v0.3 exactly, so T42 is unchanged; the stub model has no
-%   model layer). T42 itself is run unchanged by the M3 suite.
+%SA_T51_AM13  The guess-mesh defaults.
+%   Model layer: 'subsample' for both models, N = 401 for fission yeast (802
+%   only as an optional larger value) and N = 482 for Guzzo_noXA; the package
+%   default stays 'parent' (so sa_t42_am8 is unchanged; the stub model has no
+%   model layer).
 T = 'T51 AM-13 guess-mesh defaults';
 rows = struct('test', {}, 'assertion', {}, 'pass', {}, 'detail', {});
-n_noxa = 482;                                       % H1 S3a result under the AM-13 rule (S3 record)
+n_noxa = 482;                                       % the Guzzo_noXA value under the same rule
 Mf = sa_model('original_polarity'); Mn = sa_model('guzzo_noxa');
 addpath(E.stub); cl = onCleanup(@() rmpath(E.stub));
 Ms = sa_model('stub_two_pool');
@@ -26,6 +25,6 @@ U = struct('model', 'original_polarity', 'run_dir', 'x', 'continuation', struct(
 Su = sa_settings('resolve', U, Mf);
 U2 = struct('model', 'guzzo_noxa', 'run_dir', 'x', 'continuation', struct('guess_nodes', 241));
 Su2 = sa_settings('resolve', U2, Mn);
-rows = sa_check(rows, T, 'the user may set N (fission yeast 802 = the documented pilot lever; noxa 241 = the M3 commissioned value)', ...
+rows = sa_check(rows, T, 'the user may set N (fission yeast 802 = the documented pilot lever; noxa 241 = the tested value)', ...
     Su.continuation.guess_nodes == 802 && Su2.continuation.guess_nodes == 241);
 end

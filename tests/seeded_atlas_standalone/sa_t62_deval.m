@@ -1,13 +1,12 @@
 function rows = sa_t62_deval(E, varargin)
-%SA_T62_DEVAL  Milestone-6 T62 (packet v0.2 sections 3.2, 6; RC-6.2, RC-6.3):
-%   sa_deval is bit-identical to the toolbox deval. Zero solves.
+%SA_T62_DEVAL  sa_deval is bit-identical to the toolbox deval. Zero solves.
 %   rows = SA_T62_DEVAL(E)
 %     - planted cases on synthetic one-region bvp4c structs: nodes, t(end),
 %       duplicates, unsorted and decreasing xint, a single point, a column
 %       xint, row subsets (repeated, reordered), slope requested or not, -0,
 %       a tiny interval; each also asserted to stay on the FAST path (the
 %       profiler shows no toolbox deval call);
-%     - fallback cases (RC-6.3): every item of the packet's list gives the
+%     - fallback cases: every listed unsupported input gives the
 %       same output (uint64, class, size) or the same error identifier as
 %       deval, and goes through the toolbox (profiler); the missing-solver
 %       case reproduces the toolbox warning (lastwarn) only through the
@@ -21,7 +20,7 @@ function rows = sa_t62_deval(E, varargin)
 %     n_dense grid on the identity rows (sa_identity dense), the comparison
 %     mesh (identity rows), interval midpoints with slopes (sag_coupled24),
 %     the shape-label grid, the clamped reconstruction grids (sap_forced28),
-%     the AM-8 subsample meshes at N = 401 / 482 and the secant form
+%     the subsample meshes at N = 401 / 482 and the secant form
 %     (another record's subsample mesh), and a random permutation (unsorted);
 %     spec.libraries: struct array (name, model, params, manifest): every
 %     bvp4c struct of the loaded library at the library xq sets (uniform,
@@ -65,7 +64,7 @@ end
 rows = sa_check(rows, T, sprintf(['planted cases (%d: nodes, t(end), duplicates, unsorted, decreasing, single point, ' ...
     'column, row subsets, value only, dense, -0, tiny h, -0 slopes): bit-identical to deval (uint64, class, size) ' ...
     'on the fast path'], size(cases, 1)), okp, strjoin(det, ' | '));
-% ---- fallback cases (RC-6.3) ------------------------------------------------------------------
+% ---- fallback cases ------------------------------------------------------------------
 nos = rmfield(s, 'solver');
 dd = synth(20, 3, [0 1]); dd.solver = 'dde23';
 b5 = s; b5.solver = 'bvp5c';
@@ -108,7 +107,7 @@ lastwarn('', ''); try, deval(ifc, ifc.x(20)); catch, end; [~, w2] = lastwarn;
 lastwarn('', ''); try, sa_deval(ifc, ifc.x(20)); catch, end; [~, w3] = lastwarn;
 okw = strcmp(w0, 'MATLAB:deval:MissingSolverField') && strcmp(w1, w0) && strcmp(w3, w2) && ...
     strcmp(w2, 'MATLAB:deval:NonuniqueSolution');
-rows = sa_check(rows, T, sprintf(['fallback cases (%d, RC-6.3: other solver, bvp5c, no solver field, swapped order, empty ' ...
+rows = sa_check(rows, T, sprintf(['fallback cases (%d, other solver, bvp5c, no solver field, swapped order, empty ' ...
     'xint, idx 0 / above n / negative, interface, decreasing x, column or single sol.x, idxNonNegative, single, sparse, ' ...
     'NaN, out-of-range, matrix xint, logical idx): same output or same error identifier as deval, through the toolbox; ' ...
     'the missing-solver warning (%s) and the interface warning (%s) reproduced only through the fallback'], ...

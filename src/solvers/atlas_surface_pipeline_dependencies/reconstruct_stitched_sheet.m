@@ -1,29 +1,32 @@
 function y = reconstruct_stitched_sheet(A, branches, sheet_name, i, j, x_full)
     % RECONSTRUCT_STITCHED_SHEET  Build the full-domain [0, L_total] spatial
-    % profile of atlas sheet <L>+<R> at grid cell (i,j), on the mesh x_full.
+    % profile of sheet <L>+<R> at grid cell (i,j), on the mesh x_full.
     %
-    % This is the SINGLE SOURCE OF TRUTH for atlas-sheet spatial reconstruction,
+    % Note on the paper: this stitching belongs to the uncoupled approximation (two isolated
+    % half-cell states glued at the middle) and is not used for any figure of the paper; the
+    % paper solves the coupled quasi-steady states directly.
+    %
+    % The single definition of sheet reconstruction,
     % shared by run_atlas_pde_trace.m (which uses it to build a PDE initial
     % condition) and classify_pde_to_atlas_sheets.m (which uses it to compare a
-    % PDE frame against candidate sheets). Because both call this exact function,
-    % a PDE trace whose IC is sheet S at cell C reproduces, at t=0, exactly the
-    % classifier's reconstruction of S at C -- so the frame-0 residual is ~0
-    % (the Invariant-7 validation anchor).
+    % PDE frame against candidate sheets). Because both call this function,
+    % a PDE trace whose initial condition is sheet S at cell C reproduces, at t=0, exactly the
+    % classifier's reconstruction of S at C, so the frame-0 residual is ~0.
     %
-    % Stitching convention (identical to get_pde_trace.m's IC construction):
-    %   * left half occupies [0, L_half]: branch L's half-domain profile at cell
+    % Stitching convention:
+    %   * left half occupies [0, L_half]: library L's half-domain profile at cell
     %     (i,j), peak at the outer edge x=0, trough at the interface x=L_half.
-    %   * right half occupies [L_half, L_total]: branch R's half-domain profile at
-    %     the MIRROR cell (res+1-i, res+1-j), spatially FLIPPED via x_eval =
+    %   * right half occupies [L_half, L_total]: library R's half-domain profile at
+    %     the mirror cell (res+1-i, res+1-j), spatially flipped via x_eval =
     %     L_total - x, so its trough sits at the interface and its peak at the
-    %     outer edge x=L_total. (exact discrete mirror -- see
+    %     outer edge x=L_total. (Exact discrete mirror, see
     %     build_atlas_sheets.m; no interpolation across grid cells.)
     %
-    % NOT fabrication / not cross-cell interpolation: only the ONE stored per-cell
-    % profile is evaluated at mesh points (via interp1 for HPSS/MPSS, constant for
-    % HSS) -- exactly what get_pde_trace.m does with deval. If the sheet does not
-    % exist at (i,j) (either half's existence_mask false), returns [] (Invariant 2:
-    % missing cells stay unavailable).
+    % No cross-cell interpolation: only the one stored per-cell
+    % profile is evaluated at mesh points (via interp1 for half-peak/full-peak states,
+    % constant for no-peak states). If the sheet does not
+    % exist at (i,j) (either half's existence_mask false), returns [] (missing
+    % cells stay unavailable).
     %
     % Args:
     %   A          - loaded atlas_sheets_*.mat struct (needs .sheets, .L_total, .res)
@@ -58,7 +61,7 @@ function y = reconstruct_stitched_sheet(A, branches, sheet_name, i, j, x_full)
     y = zeros(5, numel(x_full));
     y(:, idx_L) = yL;
     y(:, idx_R) = yR;
-    y = max(0, y);      % positivity guard (matches get_pde_trace.m)
+    y = max(0, y);      % positivity guard
 end
 
 

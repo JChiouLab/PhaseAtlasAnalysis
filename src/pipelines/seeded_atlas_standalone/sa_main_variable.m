@@ -1,9 +1,14 @@
 function varargout = sa_main_variable(action, varargin)
 %SA_MAIN_VARIABLE  The "main variable": a sum of a model's fields.
 %
-%   The main variable is the quantity the family label (a mode name per
-%   half, sa_mode_name) and the third plot coordinate dn2 = int_0^1 cos(2 pi eta) m
-%   d(eta) look at. It is written as a '+'-separated sum of the model's
+%   The main variable m is the membrane variable that the shape label (a mode
+%   name per half, sa_mode_name) and the third plot coordinate
+%   dn2 = int_0^1 cos(2 pi eta) m d(eta) look at; the defaults are u for the
+%   fission yeast model and Bm for the M. xanthus model. On the rescaled
+%   cell eta = x/L. The paper's Delta n2 = L*dn2 for the M. xanthus model and
+%   M_BG*dn2 for the fission yeast model (whose concentrations are scaled so
+%   that total GEF is 1). It is written as a
+%   '+'-separated sum of the model's
 %   field names, e.g. 'u', 'q' or 'u + q'; whitespace is allowed, every
 %   field at most once, no other text. Model-owned setting
 %   model_options.main_variable (sa_model_<id> validates it with 'parse').

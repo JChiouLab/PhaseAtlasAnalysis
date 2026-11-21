@@ -1,15 +1,16 @@
 function out = gnx_bvp_ode(x, y, par)
-%GNX_BVP_ODE  12-state steady BVP of Guzzo_noXA on [0, ell] (packet §4a).
+%GNX_BVP_ODE  12-state steady BVP of the M. xanthus (Guzzo_noXA) model on [0, ell].
 %
 %   dydx = GNX_BVP_ODE(x, y, par)
 %       State rows (gnx_model('descriptor').state_layout):
 %       1 Rm  2 Rm'  3 Rc  4 Rc'  5 Bm  6 Bm'  7 Bc  8 Bc'  9 sigmaR  10 sigmaB
 %       11 mR  12 mB, with
+%       (Rm = RomR membrane, Rc = RomR cytosol, Bm, Bc = MglB; DM, DC = Dm, Dc of the paper)
 %       Rm'' = -(sR + sigmaR)/DM,  Rc'' = sR/DC,  Bm'' = -(sB + sigmaB)/DM,
 %       Bc'' = sB/DC,  sigma' = 0,  mR' = Rm + Rc,  mB' = Bm + Bc.
-%       Reactions are unclipped (gnx_reaction). This is bvp10_noxa.m:12-26
-%       without the clamp, with the two shifts carried as constant states.
-%   Singularity guard (packet §4c): if any evaluated Bm <= -K/2 the whole
+%       Reactions are unclipped (gnx_reaction); the two uniform sources sigmaR, sigmaB
+%       (the s_k of Eq. 8, here for the isolated half cell) are carried as constant states.
+%   Singularity guard: if any evaluated Bm <= -K/2 the whole
 %   right side is NaN and a guard counter is incremented.
 %   n = GNX_BVP_ODE('guard_count') ; GNX_BVP_ODE('guard_reset')
 

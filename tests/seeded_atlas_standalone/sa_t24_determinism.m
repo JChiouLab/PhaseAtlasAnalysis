@@ -1,5 +1,5 @@
 function rows = sa_t24_determinism(E)
-%SA_T24_DETERMINISM  Milestone-3 T24: the scheduler is a pure function of
+%SA_T24_DETERMINISM  The scheduler is a pure function of
 %   settings and completed outcomes. Two identical stub runs (continuation +
 %   rescue, a refusal wall forcing rescue) give identical work units,
 %   iterates, validity records, stores and scheduler state; the route files

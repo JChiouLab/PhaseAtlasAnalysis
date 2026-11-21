@@ -1,24 +1,26 @@
 function P = sap_post(main_variable)
-%SAP_POST  Post-processing of the original five-field model (plots, traces).
+%SAP_POST  Post-processing of the S. pombe model (plots, traces).
 %
 %   P = SAP_POST() / SAP_POST(main_variable) is the post struct
 %   sa_post_model('original_polarity', main_variable) returns. Coordinates
-%   (plot order): x = dG, y = dP from the byte copy sca_v_obs.m
-%   (figures/fig1/code), z = dn2 = int_0^1 cos(2 pi eta) m d(eta) of the
-%   main variable m (a '+'-sum of u q v w p, sa_main_variable; default u),
-%   with sca_v_obs's mesh and trapezoid: for 'u+q' it is sca_v_obs's dn2
-%   bit for bit (Fig 3's coordinate, the default before software 0.10).
-%   The full-PDE operator is the byte copy fpeq_model.m
-%   (pde_rhs, pde_jacobian) with the run's own theta; the integrator is the
-%   Fig 3 trace loop (ode15s, analytic sparse Jacobian, Refine 1, output
+%   (plot order): x = dG, y = dP from sca_v_obs.m
+%   (fractions of the total GEF and PAK), z = dn2 = int_0^1 cos(2 pi eta) m d(eta) of the
+%   main variable m (a '+'-sum of u q v w p, sa_main_variable; default u;
+%   the paper's Delta n2 of Eq. 10 = M_BG * dn2, because concentrations here are
+%   scaled so that total GEF = 1), with sca_v_obs's mesh and trapezoid:
+%   for 'u+q' it is sca_v_obs's dn2
+%   bit for bit (an older convention, legacy_dn2_variable; the paper's Fig. 3 uses u alone).
+%   The full-PDE operator is the copy fpeq_model.m
+%   (pde_rhs, pde_jacobian) with the run's own theta; the integrator is
+%   ode15s (analytic sparse Jacobian, Refine 1, output
 %   function with a stationarity stop at max|dY/dt| <= 1e-8 and a mass-drift
 %   stop at 1e-6 relative). The output function also prints a progress
 %   status line when one is due (sa_progress; screen only).
 %
-%   Half-domain convention: xi in [0, 1/2], xi = 0 the outer pole of each
-%   half, xi = 1/2 the seam; the left half maps to eta = xi, the right half to
-%   eta = 1 - xi (pchip on a uniform mesh with a node at eta = 1/2, the seam
-%   node taken from the left half), as figures/fig1/code/sca_v_ic.m does.
+%   Half-domain convention: x in [0, 1/2] (units of L), x = 0 the pole of each
+%   half, x = 1/2 the middle; the left half maps to eta = x, the right half to
+%   eta = 1 - x (pchip on a uniform mesh with a node at eta = 1/2, the middle
+%   node taken from the left half).
 
 here = fileparts(mfilename('fullpath'));
 if nargin < 1 || isempty(main_variable), main_variable = 'u'; end
@@ -27,8 +29,8 @@ P.id = 'original_polarity';
 P.field_names = {'u', 'q', 'v', 'w', 'p'};
 v = sa_main_variable('parse', main_variable, P.field_names, 'main_variable');
 P.main_variable = v.text;
-P.legacy_main_variable = 'u';           % the label's variable before software 0.10 (rows 1 / 11)
-P.legacy_dn2_variable = 'u+q';          % dn2's variable before software 0.10 (sca_v_obs)
+P.legacy_main_variable = 'u';           % the label's variable of older versions (rows 1 / 11)
+P.legacy_dn2_variable = 'u+q';          % dn2's variable of older versions (sca_v_obs)
 P.n_fields = 5;
 P.sol_rows = [1 3 5 7 9; 11 13 15 17 19];
 P.profile_rows = [1:5; 6:10];           % identity-profile rows of the left / right half
@@ -37,7 +39,7 @@ P.coord_names = {'dG', 'dP', 'dn2'};
 P.mass_names = {'M_G', 'M_P'};
 P.umax_names = {'umaxL', 'umaxR'};
 P.lattice_axes = [2 1];                 % dG is lattice axis 2, dP axis 1
-P.mass_pairs = [1 3];                   % (u, v): both in the G pool only
+P.mass_pairs = [1 3];                   % (u, v): both in the GEF conserved quantity only
 P.full_profile = @full_profile;
 P.observables = @(theta, x, Y) observables(theta, x, Y, v.index);
 P.trace_ic = @trace_ic;
@@ -45,7 +47,7 @@ P.integrate = @(theta, Y0, entry) integrate(theta, Y0, entry, v.index);
 P.stop_rule = @stop_rule;
 P.entry_defaults = @entry_defaults;
 P.plot_nx = 1001;
-P.aspect = @(c) [1 1/3.6 1/1.4];        % Fig 3b display stretch dG : 3.6 dP : 1.4 dn2
+P.aspect = @(c) [1 1/3.6 1/1.4];        % display stretch of the 3-D atlas: dG : 3.6 dP : 1.4 dn2
 P.files = {fullfile(here, 'sap_post.m'), fullfile(here, 'fpeq_model.m'), fullfile(here, 'sca_v_obs.m')};
 P.stops = {'horizon_reached', 'stationary', 'mass_drift_exceeded'};
 P.drift_warn = Inf;                     % the integrator stops above 1e-6 instead
@@ -110,8 +112,8 @@ end
 end
 
 function [k, d] = stop_rule(m, M0, r)
-% Fig 3's stops, checked after every output frame: the relative drift of
-% either pool mass above 1e-6, then stationarity max|dY/dt| <= 1e-8
+% Stopping rules, checked after every output frame: the relative drift of
+% either mass above 1e-6, then stationarity max|dY/dt| <= 1e-8
 k = ''; d = '';
 dG = abs(m(1)-M0(1))/M0(1); dP = abs(m(2)-M0(2))/M0(2);
 if dG > 1e-6 || dP > 1e-6

@@ -1,14 +1,19 @@
 function varargout = sa_lattice(action, varargin)
-%SA_LATTICE  The target lattice in pool-difference coordinates.
+%SA_LATTICE  The lattice (grid of the phase plane) in coordinates that are
+%   the differences between the two halves' amounts of each conserved protein.
 %
 %   L = SA_LATTICE('build', M, theta, S)
-%       Derive the lattice from the settings and the model's pool targets.
-%       One coordinate per conserved pool. A coordinate is
+%       Derive the lattice from the settings and the model's half-mass targets
+%       (each half's target amount of a conserved protein, (M_c +/- d_c)/2 for
+%       total amount M_c; the units of d are those of the model's pool_targets).
+%       One coordinate per conserved protein. A coordinate is
 %           d = anchor + step*k,          k integer, NEVER accumulated,
-%       and a node is admissible when every half-pool target the model derives
-%       at that coordinate is at least `lattice.margin`. The extents are the
+%       where the anchor is the lattice origin (default d = 0), and a node
+%       (grid point) is admissible when every half-mass target the model
+%       derives at that coordinate is at least `lattice.margin`. The extents are the
 %       admissibility boundary stepped outward from the anchor on each axis,
-%       not a library property: seedability is a separate, later question.
+%       not a library property: whether starting profiles exist is a separate,
+%       later question.
 %
 %   tf = SA_LATTICE('admissible', M, theta, S, d)
 %       The admissibility predicate on one coordinate row.
@@ -29,18 +34,18 @@ function varargout = sa_lattice(action, varargin)
 %       folder is prepared, and by sa_resume('status'), so a refused
 %       derivation writes nothing.
 %   h = SA_LATTICE('steps', L)
-%       The per-axis step row of a lattice (L.steps; a lattice stored before
-%       per-axis steps carries the scalar L.step, expanded here).
+%       The per-axis step row of a lattice (L.steps; a lattice stored by an older
+%       version carries the scalar L.step, expanded here).
 %
 %   Returned fields
 %     step, anchor, margin        the settings actually used (step as set:
 %                                 scalar or one per axis)
 %     steps                       the step of every axis (1 x n_coordinates)
-%     n_coordinates               one per model pool
+%     n_coordinates               one per conserved protein of the model
 %     index_min, index_max        integer extents per axis
 %     index                       n_nodes x n_coordinates integer indices
 %     coordinate                  n_nodes x n_coordinates, anchor + step*index
-%     half_targets                n_nodes x n_half_targets model half targets
+%     half_targets                n_nodes x n_half_targets model half-mass targets
 %     n_nodes                     numel of the rectangle
 %     key                         n_nodes x 1 cellstr target keys
 %     rule                        the text of the rule applied

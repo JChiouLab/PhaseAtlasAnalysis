@@ -1,11 +1,13 @@
 function varargout = sag_seed_shape(action, varargin)
-%SAG_SEED_SHAPE  Guzzo_noXA seed shapes (milestone 8, packet section 4); the
-%   noxa twin of sap_seed_shape (same actions and semantics).
+%SAG_SEED_SHAPE  Seed shapes (starting half-cell profiles) of the M. xanthus model;
+%   the counterpart of sap_seed_shape (same actions and semantics).
 %
-%   A seed shape is a half's mode name in the LEFT half's drawn orientation,
-%   which is the stored pole-to-seam orientation (sa_mode_name): '0', '1+',
-%   '2-' are today's library types; '1-' and '2+' are new shapes made on load
-%   from the HPSS and MPSS files; 'n+' / 'n-' (n >= 3) come from the mode-n
+%   A seed shape is a half's mode name (shape label) in the LEFT half's drawn
+%   orientation, which is the stored pole-to-middle orientation (sa_mode_name):
+%   '0' (no-peak), '1+' (half-peak), '2-' (full-peak) are the library types;
+%   '1-' and '2+' are made on load
+%   from the HPSS and MPSS files; 'n+' / 'n-' (n >= 3; higher-mode half-cell
+%   states) come from the mode-n
 %   file branch_MODE<n>_latest.mat (gnx_build_mode). The right half seeds
 %   the same stored shape; its drawn name is the mirror of the shape.
 %
@@ -26,25 +28,25 @@ function varargout = sag_seed_shape(action, varargin)
 %       MODE files whose run_status is 'empty' (path, status)
 %   f = SAG_SEED_SHAPE('mode_families', types)   the label -> type map built
 %       from the active types (left: shape -> type; right: mirror(shape) ->
-%       type); at the default types it equals the module's 0.11 map
+%       type); at the default types it equals the module's own map
 %   [x, y] = SAG_SEED_SHAPE('stitch', xq, yq, n, start)   n copies of a
 %       piece (peak at its left end) on [0, n*xq(end)]: start 'T' (n-, a
 %       trough at the pole) or 'P' (n+, a peak at the pole); a copy whose
 %       right end is a peak is the mirrored piece, x = (k+1) l - fliplr(xq);
 %       otherwise x = k l + xq; the duplicate join node (each copy's last)
-%       is dropped. At n = 2, 'T' is gnx_validity's peak-to-peak stitch
-%       (build_mpss_branch's reflect_stitch). Model-independent (identical
+%       is dropped. At n = 2, 'T' is the peak-to-peak stitch of the full-peak
+%       (MPSS) library (reflect_stitch in gnx_validity). Model-independent (identical
 %       to sap_seed_shape 'stitch').
 %   xm = SAG_SEED_SHAPE('fold', x, l, start)   the piece coordinate of a
 %       half point x for n copies of a piece of length l (peak at the
 %       piece's x = 0): start 'P' the distance to the nearest even multiple
 %       of l, r = mod(x, 2l), xm = min(r, 2l - r); start 'T' the distance to
 %       the nearest odd multiple, xm = |mod(x, 2l) - l|. At n = 2 'T' equals
-%       the legacy |x - L/4| (bit for bit for 0 <= x <= 2l: mod is exact
+%       |x - L/4| (bit for bit for 0 <= x <= 2l: mod is exact
 %       there).
 %   r = SAG_SEED_SHAPE('cold_rate')  cold seconds per call: 3.0, the middle of
-%       the packet's 2-4 s per noxa coupled call (section 12; no measured
-%       noxa n101-type rate)
+%       an estimated 2-4 s per coupled call of this model (an estimate, not a
+%       measured rate)
 %   d = SAG_SEED_SHAPE('defaults')   the default seed_modes {'0','1+','2-'}
 
 switch action
@@ -56,7 +58,7 @@ switch action
     case 'mode_families', varargout{1} = mode_families(varargin{:});
     case 'stitch',        [varargout{1}, varargout{2}] = stitch(varargin{:});
     case 'fold',          varargout{1} = fold(varargin{:});
-    case 'cold_rate',     varargout{1} = 3.0;   % packet section 12: noxa 2-4 s per call
+    case 'cold_rate',     varargout{1} = 3.0;   % estimated 2-4 s per call of this model
     case 'defaults',      varargout{1} = {'0', '1+', '2-'};
     otherwise, error('SA:SEED:E_ACTION', 'Unknown sag_seed_shape action %s.', action);
 end

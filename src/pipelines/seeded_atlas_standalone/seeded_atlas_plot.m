@@ -18,26 +18,29 @@ function out = seeded_atlas_plot(run_dir, opts)
 %   (identity rows on the comparison mesh): the two halves are assembled
 %   into the full domain (post full_profile, opts.nx points, default the
 %   model's plot_nx) and passed to the model's observables (plot order:
-%   fission yeast dG, dP, dn2; Guzzo_noXA dn_R, dn_B, dn2; dn2 =
-%   int cos(2 pi eta) m d(eta) of the main variable m). The profile-computed
+%   fission yeast dG, dP, dn2; M. xanthus (guzzo_noxa model) dn_R, dn_B, dn2;
+%   dn2 = int cos(2 pi eta) m d(eta) of the main variable m on the rescaled
+%   cell; the paper's Delta n2 is L*dn2 for M. xanthus, M_BG*dn2 for fission
+%   yeast, see sa_main_variable). The profile-computed
 %   lattice coordinates are compared with the node's lattice coordinate
 %   (the gap, in the CSV and UserData).
 %
 %   Main variable. By default the figures show the run's own labels (the
 %   observed families as stored) and dn2 of the run's main variable
-%   (settings model_options.main_variable). A folder written before
-%   software 0.10 records none: its labels were computed on the post
-%   module's legacy_main_variable (fission yeast u, Guzzo_noXA Bm) and dn2
+%   (settings model_options.main_variable). A run folder written by an older
+%   version may record none: its labels were computed on the post
+%   module's legacy_main_variable (fission yeast u, M. xanthus Bm) and dn2
 %   is computed on the current default (u / Bm); a line is printed when
-%   that differs from the dn2 drawn before 0.10 (fission yeast u + q).
-%   A folder written before software 0.11 stores HSS / HPSS / MPSS family
-%   names (a printed line says so); a relabel shows it with mode names.
+%   that differs from the dn2 of the older drawing (fission yeast u + q).
+%   An older run folder may store HSS / HPSS / MPSS family names (no-peak /
+%   half-peak / full-peak; a printed line says so); a relabel shows it
+%   with mode names.
 %   opts.main_variable relabels for plotting: every root's family is
 %   recomputed by the model's shape_label_profile (the current label rule,
 %   the mode names of sa_mode_name, with that main variable and the run's
 %   other model_options where they still exist, else the current defaults;
 %   the flatness reference is the folder's stored anchor-interpolated HSS,
-%   or for a folder written before software 0.11 the same value recomputed
+%   or for an older run folder the same value recomputed
 %   from the folder's library files, or failing that the stored HSS of the
 %   nearest native cell, with a printed note; never a solve) on its stored
 %   representative profile, and dn2 uses
@@ -53,8 +56,8 @@ function out = seeded_atlas_plot(run_dir, opts)
 %   and edge alpha 0.5) so overlapping sheets show, colours fixed per family
 %   name; legend 'FAMILY (n)'. 3-D: view(50, 18) (= matplotlib elevation 18,
 %   azimuth -40, in the display frame); orthographic, no grid, no box;
-%   fission yeast uses the Fig 3b stretch dG : 3.6 dP : 1.4 dn2. 2-D sheets:
-%   the mass-imbalance plane (the 3-D plot's x and y, the same stretch). The
+%   fission yeast uses the Fig. 3B stretch dG : 3.6 dP : 1.4 dn2. 2-D sheets:
+%   the phase plane (the 3-D plot's x and y, the same stretch). The
 %   titles give the run folder, the software version, the root count, the
 %   main variable and PARTIAL RUN (<stop reason>) unless the run completed.
 %   Saved with savefig only (no raster or PDF export); each figure is built
@@ -62,8 +65,8 @@ function out = seeded_atlas_plot(run_dir, opts)
 %
 %   opts
 %     verify   false (default) | true    seeded_atlas_roots verification
-%     out      output folder; REQUIRED for a flat (software 0.5) folder, which
-%              is evidence and is never written into
+%     out      output folder; REQUIRED for a run folder in the old flat layout,
+%              which is never written into
 %     nx       full-domain mesh of the coordinates (odd)
 %     main_variable  '' (default: the run's own) | a '+'-sum of the model's
 %              fields: relabel for plotting (above)
@@ -100,7 +103,7 @@ end
 od = getf(opts, 'out', '');
 if isempty(od) && ~getf(opts, 'coordinates_only', false)   % coordinates_only writes nothing
     if strcmp(lay, 'flat')
-        error('SA:PLOT:E_LEGACY', ['%s is a flat (software 0.5 or earlier) run folder: it is evidence and ' ...
+        error('SA:PLOT:E_LEGACY', ['%s is a run folder in the early flat layout: it is kept as is and ' ...
             'is never written into; pass opts.out (another folder).'], run_dir);
     end
     od = fullfile(run_dir, 'plots');
@@ -288,11 +291,11 @@ if isfield(V.P, 'main_variable')
     V.text = V.P.main_variable;
     V.tag = sa_main_variable('file_tag', V.text);
     if ~V.relabel && isempty(stored)
-        V.note = sprintf(['%s records no main variable (written before software 0.10): the family labels are ' ...
-            'as stored (computed on %s with the pre-0.10 rule); the third coordinate is dn2 of %s, the current ' ...
+        V.note = sprintf(['%s records no main variable (written by an older version): the family labels are ' ...
+            'as stored (computed on %s with the older rule); the third coordinate is dn2 of %s, the current ' ...
             'default'], E.settings.model, V.P.legacy_main_variable, V.text);
         if ~strcmp(V.P.legacy_dn2_variable, V.text)
-            V.note = sprintf('%s (figures drawn before 0.10 used %s)', V.note, V.P.legacy_dn2_variable);
+            V.note = sprintf('%s (older versions used %s)', V.note, V.P.legacy_dn2_variable);
         end
         V.note = [V.note '.'];
     end
@@ -305,7 +308,7 @@ end
 
 function fs = anchor_field_scale(E, M, mo)
 % The field scale a relabel uses: the folder's own when it carries the
-% anchor-interpolated HSS (software 0.11 on); else recomputed from the
+% anchor-interpolated HSS (as written by current versions); else recomputed from the
 % folder's library and settings (files only, no solve); else the stored
 % nearest-cell values, with a printed note.
 fs = E.field_scale;
@@ -374,7 +377,7 @@ end
 
 function files = draw_sheets(sd, skeyf, key, C, R, fam, P, tt, ud)
 % The 2-D sheets: one figure per observed family and one with all of them,
-% in the mass-imbalance plane (the 3-D plot's x and y, its stretch). Sheet
+% in the phase plane (the 3-D plot's x and y, its stretch). Sheet
 % files of an earlier drawing that are no longer drawn are removed. The key
 % file stores base names only, resolved against sd, so a copied run folder
 % never reads or deletes the original folder's sheets.
@@ -443,7 +446,7 @@ f = cellfun(@(n) fullfile(sd, n), sheet_names(Zs.files), 'UniformOutput', false)
 end
 
 function n = sheet_names(stored)
-% bare sheet file names; a key from before this repair stored full paths, of
+% bare sheet file names; a key written by an older version stored full paths, of
 % which only the name is kept; anything that is not a plain name.fig is dropped
 [~, b, e] = cellfun(@fileparts, stored, 'UniformOutput', false);
 n = strcat(b, e);

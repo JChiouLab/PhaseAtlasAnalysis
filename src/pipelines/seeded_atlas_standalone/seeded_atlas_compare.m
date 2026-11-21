@@ -17,28 +17,28 @@ function varargout = seeded_atlas_compare(varargin)
 %       same coordinate (|difference| <= 1e-9 x step on every axis): the
 %       distance of a pair is max over identity fields of
 %       max_x |ours(x) - ref(x)| / max_x |ref(x)| on the reference mesh
-%       (ours by deval; the myxo comparison convention); a node's class from the
+%       (ours by deval; the convention of the M. xanthus reference comparison); a node's class from the
 %       smallest pair distance: agree (<= opts.agree, default 1e-6) | band |
 %       different (>= opts.different, default 1e-2); ours_only |
-%       reference_only. Report classes only: no tolerance is commissioned.
+%       reference_only. Classes are reported only: no pass/fail tolerance is applied.
 %       Memory: the roots are loaded without their iterates; every
 %       representative attempt's sol is first read once, in root order, and
 %       released (the file check a load of every sol makes, in its order),
 %       then each root at a node with a usable reference entry reads its sol
 %       again for its distances; at most one sol is held at a time.
 %       run_dir: a run folder of either layout (sa_layout); the state folder
-%       is read. Writes <run_dir>/compare/<name>.csv and <name>_map.txt (the reach
-%       map with the reference overlaid: A agree, b band, D different,
+%       is read. Writes <run_dir>/compare/<name>.csv and <name>_map.txt (the lattice
+%       map of roots with the reference overlaid: A agree, b band, D different,
 %       o ours-only, r reference-only, . neither).
 %   ref = SEEDED_ATLAS_COMPARE('from_myxo_sheet', file, step, name)
-%       Converter (ported from tests/seeded_atlas_standalone/
-%       sag_myxo_compare.m): a myxo coupled sheet (variables ok_grid, prof
-%       (25 x 25 x 8 x nx), xg); cell (i, j) <-> lattice index [j - 13,
-%       i - 13] at the given step (anchor 0); usable = ok_grid and every
+%       Converter (as in tests/seeded_atlas_standalone/sag_myxo_compare.m):
+%       a coupled sheet of the M. xanthus reference computation (variables
+%       ok_grid, prof (25 x 25 x 8 x nx), xg); cell (i, j) <-> lattice index
+%       [j - 13, i - 13] at the given step (lattice origin 0); usable = ok_grid and every
 %       value finite and > 0 (negative cells solve the clamped problem).
 %   ref = SEEDED_ATLAS_COMPARE('from_stageb_registry', registry_csv, raw_dir, M, family, name)
-%       Converter for a Stage-B accepted-object registry (rows family, i, j,
-%       raw_file; '#' comment lines): each row of `family` becomes a usable
+%       Converter for a registry of accepted reference solutions (rows family,
+%       i, j, raw_file; '#' comment lines): each row of `family` becomes a usable
 %       entry at [raw_dP raw_dG] with the RAW file's raw_sol on its own mesh
 %       (identity rows of the module M). Read only.
 
@@ -114,7 +114,7 @@ for q = 1:n
         mat2str(L.coordinate(q, :), 10), cls{q}, dmin(q), nours(q), nref(q)); %#ok<AGROW>
 end
 sa_write('text', fullfile(od, [ref.name '.csv']), [strjoin(lines, newline) newline]);
-M2 = {sprintf('reach map vs %s (A agree, b band, D different, o ours-only, r reference-only, . neither)', ref.name)};
+M2 = {sprintf('map of lattice nodes vs %s (A agree, b band, D different, o ours-only, r reference-only, . neither)', ref.name)};
 if size(L.index, 2) == 2
     k1 = unique(L.index(:, 1)); k2 = unique(L.index(:, 2));
     for a = k1(end:-1:1).'
@@ -166,7 +166,7 @@ for i = 1:ni
         P = reshape(Z.prof(i, j, :, :), size(Z.prof, 3), size(Z.prof, 4));
         ok = logical(Z.ok_grid(i, j)) && all(isfinite(P(:))) && min(P(:)) > 0;
         nodes(end+1) = struct('coordinate', step * [j - c0, i - c0], 'usable', ok, ...
-            'x', reshape(Z.xg, 1, []), 'profile', P, 'label', sprintf('myxo(%d,%d)', i, j)); %#ok<AGROW>
+            'x', reshape(Z.xg, 1, []), 'profile', P, 'label', sprintf('reference(%d,%d)', i, j)); %#ok<AGROW>
     end
 end
 ref = struct('schema', 'seeded_atlas/reference-1', 'name', name, 'source', file, 'nodes', nodes);

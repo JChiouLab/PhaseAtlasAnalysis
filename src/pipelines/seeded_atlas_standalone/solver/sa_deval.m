@@ -1,6 +1,6 @@
 function varargout = sa_deval(varargin)
 %SA_DEVAL  Exact, vectorized replica of the toolbox deval for one-region bvp4c
-%   solutions (M6 packet v0.2 section 3.2; RC-6.2, RC-6.3).
+%   solutions.
 %
 %   [Sx, Spx] = SA_DEVAL(sol, xint)
 %   [Sx, Spx] = SA_DEVAL(sol, xint, idx)
@@ -23,7 +23,7 @@ function varargout = sa_deval(varargin)
 %   The fast path returns double only and NEVER warns (sap_p28_solve reads
 %   lastwarn after its diagnostics call deval). Everything else falls back
 %   to the toolbox deval, which returns the same output or raises the same
-%   error identifier (RC-6.3):
+%   error identifier:
 %     - a first argument that is not a scalar struct (incl. the swapped
 %       (xint, sol) order);
 %     - a struct without a solver field (the toolbox warns
@@ -37,13 +37,13 @@ function varargout = sa_deval(varargin)
 %     - idx not a nonempty real double vector of integers inside 1..n
 %       (including 0: the toolbox raises MATLAB:badsubscript);
 %     - more than two outputs or a wrong argument count.
-%     - the deval mode of this MATLAB is not 'replica' (milestone 9, E3):
+%     - the deval mode of this MATLAB is not 'replica':
 %       the replica is used only when the toolbox deval.m and
-%       private/ntrp3h.m are the reference files it was proven against and
+%       private/ntrp3h.m are the reference files it was checked against and
 %       the self-check case (e) passed (sa_bvp4c_setup generation record,
 %       cached at run start); otherwise every call goes to the toolbox deval.
 %   sa_deval lives in solver/, which has no private/deval.m, so its own
-%   deval is the toolbox's (pinned by T61 and the runtime evidence).
+%   deval is the toolbox's (checked by tests/seeded_atlas_standalone/sa_t61p_traced_solver.m).
 %   Reached through the one-line private forwarders deval.m in the package
 %   root's private/ and in models/<id>/private/ (tests/ and the uncoupled
 %   pipeline still reach the toolbox deval).

@@ -29,8 +29,8 @@ rows = sa_check(rows, T, 'shared core gnx_model / gnx_reaction resolve from src/
 g = dir(fullfile(E.core, 'gnx_*.m'));
 rows = sa_check(rows, T, 'no gnx_* file added to the shared core', ...
     isequal(sort({g.name}), {'gnx_jacobian.m', 'gnx_model.m', 'gnx_reaction.m'}), strjoin({g.name}, ', '));
-% M8 amended (by path): milestone 8 adds gnx_build_mode.m (the mode-n builder, packet v0.2 section 3.2)
-% to the uncoupled noxa folder, which changes the folder fingerprint; the libraries' fingerprint is
+% The uncoupled Guzzo_noXA folder holds gnx_build_mode.m (the builder of higher-mode half-cell states),
+% which changes the folder fingerprint; the libraries' fingerprint is
 % recomputed over the folder's gnx_* files without it (a scratch copy; content-only hash).
 fp = fullfile(E.scratch, sprintf('t14_fp_%s', datestr(now, 'yyyymmdd_HHMMSSFFF'))); mkdir(fp); %#ok<DATST,TNOW1>
 gf = dir(fullfile(E.solver_noxa, 'gnx_*.m'));
@@ -38,7 +38,7 @@ for k = 1:numel(gf)
     if ~strcmp(gf(k).name, 'gnx_build_mode.m'), copyfile(fullfile(gf(k).folder, gf(k).name), fp); end
 end
 v = gnx_model('version', {fp});
-rows = sa_check(rows, T, 'recomputed model_version (without the M8 gnx_build_mode.m) equals the libraries'' 5d5cc282d4492314...', ...
+rows = sa_check(rows, T, 'recomputed model_version (without gnx_build_mode.m) equals the pinned prefix 04a0838273bebf2a...', ...
     startsWith(v, E.model_version), v);
 pe = strsplit(path, pathsep);
 rows = sa_check(rows, T, 'the uncoupled pipeline''s noxa folder is not on the path', ...
@@ -46,8 +46,8 @@ rows = sa_check(rows, T, 'the uncoupled pipeline''s noxa folder is not on the pa
     strjoin(pe(contains(pe, 'noxa')), ' | '));
 src = {fullfile(E.solver_noxa, 'gnx_hermite_min.m'), fullfile(E.original_module, 'sap_bvp_convergence.m')};
 cpy = {fullfile(E.module, 'sag_hermite_min.m'), fullfile(E.module, 'sag_bvp_convergence.m')};
-pinned = {'10b230f7d82fcadbe81f8f369132ead5b80fa1614d94209915cd3804638ae39a', ...
-          '791036185a281e2aedacb7bc0a466006eb25f3ee6317ec5b3e46c4f9557a8437'};
+pinned = {'5b1720b3dbc6aae4b00244c1d357796fe2d833cf97b1041f194c985597617f22', ...
+          '62be9bc3517dd9c431db979f789f2d587bde65c23a32a81b61ef5b3b2104b17b'};
 for k = 1:2
     a = strsplit(fileread(src{k}), newline); b = strsplit(fileread(cpy{k}), newline);
     same_rest = numel(a) == numel(b) && isequal(a(2:end), b(2:end));

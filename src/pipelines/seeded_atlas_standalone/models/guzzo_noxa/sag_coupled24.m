@@ -1,25 +1,23 @@
 function varargout = sag_coupled24(action, varargin)
-%SAG_COUPLED24  Guzzo_noXA coupled forced paired-half BVP, 24 states (unclipped).
+%SAG_COUPLED24  M. xanthus coupled paired-half BVP, 24 states (unclipped).
 %
-%   Both halves run pole -> seam on
-%   xi in [0, Lh], Lh = L/2: Y_L(xi) = Y(x = xi), Y_R(xi) = Y(x = L - xi)
-%   (myxo bvp24_noxa_coupled.m:18-22).
+%   Both halves run pole -> middle on
+%   x in [0, Lh], Lh = L/2: Y_L(x) = Y(x), Y_R(x) = Y(L - x).
 %
 %   State (24 rows)
 %     1:8    left half   Rm Rm' Rc Rc' Bm Bm' Bc Bc'
+%     1:8    left half   Rm Rm' Rc Rc' Bm Bm' Bc Bc'
 %     9:16   right half  same order
-%     17:20  shifts      sigma_RL sigma_BL sigma_RR sigma_BR  (sigma' = 0)
-%     21:24  accumulators I_RL I_BL I_RR I_BR
-%   Rows 1:16 are myxo's y1..y16, rows 21:24 myxo's y17..y20 and rows 17:20
-%   myxo's bvp4c parameters q = [sRL sBL sRR sBR]. Reactions are gnx_reaction
-%   (unclipped); the shift enters the MEMBRANE species of each pool
-%   (bvp24_noxa_coupled.m:55-63).
+%     17:20  sources     s_RL s_BL s_RR s_BR (named sigma in the code; sigma' = 0)
+%     21:24  accumulators (integrals of the half masses) I_RL I_BL I_RR I_BR
+%   Reactions are gnx_reaction (unclipped); each source enters the membrane
+%   species of its conserved quantity.
 %
 %   Actions
 %     F = ode(x, Y, theta)                24 x N right-hand side (vectorized)
-%     r = bc(ya, yb, theta, tgt)          24 boundary residuals, myxo's order
-%     t = targets(theta, dn_R, dn_B)      half-pool targets nRL nRR nBL nBR
-%     g = pair_guess(xg, YL4, YR4)        24-row cold guess (myxo's builder)
+%     r = bc(ya, yb, theta, tgt)          24 boundary residuals
+%     t = targets(theta, dn_R, dn_B)      half-mass targets nRL nRR nBL nBR
+%     g = pair_guess(xg, YL4, YR4)        24-row cold guess
 %     D = diagnostics(sol, theta, tgt)    seam / mass / shift / velocity values
 %     L = layout()
 %     n = guard_count() ; guard_reset()   singularity-guard hits
@@ -61,8 +59,8 @@ L = struct('n_states', 24, ...
 end
 
 % -------------------------------------------------------------------------
-% The corrector's right-hand side. Unclipped: no clamp of any state may
-% appear in this subfunction (source scan).
+% The right-hand side of the BVP. Unclipped: no clamp of any state may
+% appear in this subfunction (checked by a source scan).
 function [F, hit] = ode(~, Y, theta)
 hit = 0;
 if any(Y(5, :) <= -0.5 * theta.K) || any(Y(13, :) <= -0.5 * theta.K)
@@ -88,8 +86,8 @@ end
 
 % -------------------------------------------------------------------------
 function r = bc(ya, yb, theta, tgt)
-% 24 rows in myxo's order (bvp24_noxa_coupled.m:81-93): 8 pole no-flux,
-% 4 seam continuity, 4 seam flux matches, 4 accumulator starts, 4 targets.
+% 24 residuals: 8 pole no-flux,
+% 4 middle continuity, 4 middle flux matches, 4 accumulator starts, 4 targets.
 r = [ya(2);  ya(4);  ya(6);  ya(8);
      ya(10); ya(12); ya(14); ya(16);
      yb(1) - yb(9);
@@ -108,7 +106,7 @@ end
 % -------------------------------------------------------------------------
 function t = targets(theta, dnR, dnB)
 % (rho + dn/2)*Lh on the left, (rho - dn/2)*Lh on the right
-% (bvp24_noxa_coupled.m:96-102 at rho = 1; model page general form).
+% (rho = 1 in the paper's units).
 Lh = theta.Lh;
 t = struct('nRL', (theta.rho_R + dnR / 2) * Lh, 'nRR', (theta.rho_R - dnR / 2) * Lh, ...
            'nBL', (theta.rho_B + dnB / 2) * Lh, 'nBR', (theta.rho_B - dnB / 2) * Lh);
@@ -116,9 +114,9 @@ end
 
 % -------------------------------------------------------------------------
 function g = pair_guess(xg, GL, GR)
-% Myxo's guess builder (bvp24_noxa_coupled.m:116-128): concentration rows from
-% the two halves (each pole -> seam), derivative rows by gradient on xg,
-% accumulators cumsum(.)*dx, zero shifts (here states, there parameters).
+% Guess builder: concentration rows from
+% the two halves (each pole -> middle), derivative rows by gradient on xg,
+% accumulators cumsum(.)*dx, zero sources (states here).
 xg = xg(:).';
 n = numel(xg);
 dx = xg(2) - xg(1);
@@ -138,8 +136,8 @@ end
 
 % -------------------------------------------------------------------------
 function D = diagnostics(sol, theta, tgt)
-% Values of the module checks, recomputed from the returned
-% iterate (x, y, yp, the bvp4c interpolant). Never trusts a corrector flag.
+% Values of the validity checks, recomputed from the returned
+% iterate (x, y, yp, the bvp4c interpolant). Never trusts a solver flag.
 x = sol.x; y = sol.y; yp = sol.yp;
 ya = y(:, 1); yb = y(:, end);
 D = struct();
@@ -153,7 +151,7 @@ D.acc_end = yb(21:24).';
 D.acc_start = ya(21:24).';
 D.acc_rel = abs(D.acc_end - n) ./ n;
 D.acc_start_max = max(abs(D.acc_start));
-% exact integral of bvp4c's cubic Hermite interpolant of each half-pool density
+% exact integral of bvp4c's cubic Hermite interpolant of each half-mass density
 rowsets = {[1 3], [5 7], [9 11], [13 15]};
 I1 = zeros(1, 4); I2 = zeros(1, 4);
 xm = (x(1:end-1) + x(2:end)) / 2;
@@ -171,7 +169,7 @@ D.mass_dense = I1;
 D.mass_dense_bisected = I2;
 D.mass_dense_rel = abs(I1 - n) ./ n;
 D.mass_refine_rel = abs(I2 - I1) ./ abs(I1);
-% shifts and the shift-flux identities
+% sources and the source-flux identities
 s = ya(17:20).';
 D.sigma = s;                                           % RL BL RR BR
 D.s_max = max(abs(s));
@@ -180,10 +178,10 @@ D.antisym_max = max(D.antisym);
 J = [theta.DM * yb(2) + theta.DC * yb(4), theta.DM * yb(6) + theta.DC * yb(8), ...
      theta.DM * yb(10) + theta.DC * yb(12), theta.DM * yb(14) + theta.DC * yb(16)];
 D.J = J;                                               % J_RL J_BL J_RR J_BR
-D.vel_identity = abs(J + theta.Lh * s);               % every half pool (the velocity
+D.vel_identity = abs(J + theta.Lh * s);               % every half mass (the velocity
 D.vel_discrepancy_max = max(D.vel_identity);           % check needs the right half too)
 D.J_max = max(abs(J));
-D.vel_from_slope = (2 / theta.Lh) * J(1:2);            % = (4/L) J, myxo velocity
+D.vel_from_slope = (2 / theta.Lh) * J(1:2);            % = (4/L) J, velocity of dn (magnitude)
 D.vel_from_shift = -2 * s(1:2);
 end
 

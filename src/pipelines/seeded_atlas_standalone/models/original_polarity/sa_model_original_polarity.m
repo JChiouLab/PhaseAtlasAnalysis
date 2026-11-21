@@ -1,18 +1,18 @@
 function M = sa_model_original_polarity()
-%SA_MODEL_ORIGINAL_POLARITY  Model module of the original five-field model.
+%SA_MODEL_ORIGINAL_POLARITY  Model module of the S. pombe model (five fields u q v w p).
 %
 %   M = SA_MODEL_ORIGINAL_POLARITY() returns the module struct that
 %   sa_model('original_polarity') validates. Everything model-specific the
 %   shared pipeline needs comes from here; shared code
-%   never names a field, pool, half type or model constant.
+%   never names a field, conserved quantity, half type or model constant.
 %
-%   Coupled state (copied corrector sap_forced28, 28 rows, xi in [0, 1/2]):
+%   Coupled state (sap_forced28, 28 rows, x in [0, 1/2] in units of L):
 %     rows 1:10   left half  [u u' q q' v v' w w' p p']
 %     rows 11:20  right half, same order
-%     rows 21:24  shifts s_GL s_PL s_GR s_PR (constant states)
-%     rows 25:28  mass accumulators I_GL I_PL I_GR I_PR
-%   Pools: P = p + q (lattice axis 1), G = u + q + v + w (lattice axis 2), so
-%   the lattice index [i j] is (d_P index, d_G index) as in the campaign CSV.
+%     rows 21:24  sources s_GL s_PL s_GR s_PR (constant states)
+%     rows 25:28  integrals of the half masses I_GL I_PL I_GR I_PR (accumulators)
+%   Conserved quantities: PAK = p + q (grid axis 1), GEF = u + q + v + w (grid axis 2), so
+%   the grid index [i j] is (d_P index, d_G index).
 
 here = fileparts(mfilename('fullpath'));
 copies = copy_records(here);
@@ -21,7 +21,7 @@ M = struct();
 M.id        = 'original_polarity';
 M.version   = sprintf('original_polarity/1 (corrector copies %s)', ...
     strjoin(cellfun(@(h) h(1:12), {copies.copy_sha256}, 'UniformOutput', false), ','));
-M.unclipped = true;                      % reaction has no max(.,0); scanned by a test
+M.unclipped = true;                      % reaction has no max(.,0); checked by a source scan test
 M.n_states  = 28;
 M.fields    = named_rows({'u_L','q_L','v_L','w_L','p_L','u_R','q_R','v_R','w_R','p_R'}, ...
                          [1 3 5 7 9 11 13 15 17 19]);
@@ -41,10 +41,10 @@ M.shifts    = @shifts;
 M.shape_label = @shape_label;
 M.shape_label_profile = @shape_label_profile;
 M.mode_families = mode_families();
-M.seed_shape = @sap_seed_shape;          % milestone 8: seed shapes, type order, mirror rule
-M.scale_counts = @scale_counts;          % milestone 8: point counts that grow with L
-% Milestone 10: the left/right half swap (sap_forced28 'swap', a pure block
-% swap; the permutation lives here, not in the hashed corrector copy) and the
+M.seed_shape = @sap_seed_shape;          % seed shapes, type order, mirror rule
+M.scale_counts = @scale_counts;          % point counts that grow with L
+% The left/right half swap (sap_forced28 'swap', a pure block
+% swap; the permutation lives here) and the
 % permutation it induces on the 10 identity rows (L then R)
 M.reflection = struct('state_perm', [11:20 1:10 23 24 21 22 27 28 25 26], 'identity_perm', [6:10 1:5]);
 M.field_scale = @field_scale;
@@ -57,23 +57,22 @@ M.required_checks = {'seam_concentration','seam_flux','mass_accumulator', ...
 M.model_options_defaults = option_defaults();
 M.validate_model_options = @validate_options;
 M.copies    = copies;
-M.setting_defaults = setting_defaults();     % model layer (optional member)
+M.setting_defaults = setting_defaults();     % model layer of the settings (optional member)
 M.version   = [M.version setting_defaults_tag(M.setting_defaults)];
-% The 'solver:' component -- SHA-256
+% The 'solver:' component: SHA-256
 % prefixes of the traced bvp4c copy, its five helpers, sa_deval, the toolbox
 % bvp4c.m / deval.m and the forwarders; verifies the generated copy first
-% (SA:SOLVER:E_TRACED / E_TOOLBOX at zero calls). E_MODEL is never waived.
+% (SA:SOLVER:E_TRACED / E_TOOLBOX at zero solves).
 M.version   = [M.version sa_bvp4c_setup('component', here)];
 end
 
 % =========================================================================
 
 function sd = setting_defaults()
-% Model layer: the shared leaves at the model's commissioned values (step
+% Model layer: the shared settings at the model's default values (step
 % 0.02; RelTol 1e-6 / AbsTol 1e-8; refinement 1e-8 / 1e-10; guess mesh
-% 'subsample' with N = 401 (802 only as a pilot lever); candidate mesh
-% 'dense'). Applied after the package defaults and before the mode layer;
-% disjoint from every mode layer (sa_settings).
+% 'subsample' with N = 401 (802 as an option for harder cases); candidate mesh
+% 'dense'). Applied after the package defaults and before the run-mode layer.
 sd = struct();
 sd.lattice = struct('step', 0.02);
 sd.solver = struct('reltol', 1e-6, 'abstol', 1e-8);
@@ -85,13 +84,13 @@ sd.report = struct('replay_s_per_record', 0.35);   % report-only replay rate (se
 % per-root continuation pass (on for this model).
 sd.cold = struct('mesh_cap', 10000);
 sd.root_pass = struct('enabled', true);
-% Milestone 8: the reference length of the point-count rule (the largest
-% commissioned L; scale_counts). Enters the model digest.
+% The reference length of the point-count rule (the largest
+% tested L; scale_counts). Enters the model digest.
 sd.scaling = struct('reference_length', 14);
 end
 
 function [S, SRC] = scale_counts(theta, S, SRC)
-% Point counts that grow with L (packet section 6, RC-8.5). The length leaf
+% Point counts that grow with L. The length leaf
 % is the total length L (theta.L = par.L). At L <= reference_length (on the
 % stored double) nothing runs and every leaf keeps its source. Above it,
 % for every leaf whose source is package or model (user values win):
@@ -121,8 +120,8 @@ end
 
 function t = setting_defaults_tag(sd)
 % model_version carries a digest of the model layer (the module files
-% change with the member). report.* is EXCLUDED from the
-% digest -- a report-only leaf never changes a call, so recalibrating it
+% change with the member). report.* is excluded from the
+% digest: a report-only leaf never changes a solve, so recalibrating it
 % never makes runs unresumable.
 if isfield(sd, 'report'), sd = rmfield(sd, 'report'); end
 txt = leaf_text(sd, '');
@@ -154,7 +153,7 @@ s = struct('name', names, 'row', num2cell(rows));
 end
 
 function t = pool_targets(theta, d)
-% d = [d_P d_G] (lattice axis order). Half targets of the copied corrector,
+% d = [d_P d_G] (grid axis order). Half targets of the coupled solve,
 % (M_c +/- d_c)/2 with M_G = 1 and M_P = rho.
 tgt = sap_forced28('targets', theta, d(1), d(2));
 t = struct();
@@ -164,12 +163,12 @@ t.solver_target = tgt;
 end
 
 function F = ode_matrix(x, Y, sol, theta) %#ok<INUSL>
-% The corrector's own right-hand side (the residual check needs F), for all
+% The right-hand side of the coupled BVP (the residual check needs F), for all
 % columns at once. Every entry is computed by the same floating-point
 % operations, in the same order, as sap_forced28('ode', x(k), Y(:, k), theta)
 % on column k (elementwise only: no reduction, no reordering), so F is
-% bit-identical to the column-by-column evaluation; a test pins this on
-% stored records.
+% bit-identical to the column-by-column evaluation (checked by a portable
+% test on stored records).
 th = theta;
 mu = sap_model('mu', th);
 F = zeros(size(Y));
@@ -202,18 +201,18 @@ s.max = max(abs(s.values));
 end
 
 function [lab, info] = shape_label(sol, theta, mo, fs) %#ok<INUSL>
-% The family label: the mode name of the main variable (model_options.
-% main_variable, default u; a sum of fields is summed per half, in the
-% given order), sa_mode_name, with the flatness reference ref = the main
-% variable's value in the uniform (HSS) state at the anchor (fs:
+% The shape label: the mode name (sa_mode_name) of the main
+% variable (model_options.main_variable, default u; a sum of fields is summed
+% per half, in the given order) in each half, with the flatness reference
+% ref = the main variable's value in the uniform (HSS) state at the anchor (fs:
 % field_scale's struct, its anchor_hss_values: the library HSS interpolated
-% to the anchor). shape_nodes points per half (xi = 0 the outer pole,
-% xi = 1/2 the seam). Never affects validity or root identity. It sets the
+% to the anchor). shape_nodes points per half (x = 0 the pole,
+% x = 1/2 the middle). It never affects validity or root identity. It sets the
 % attempt's observed_family and, through the per-root pass, that pass's
-% unit family string (unit keys, replay identity) and the child's
+% unit family string and the child's
 % seed_family, so it is part of the run's settings; it never chooses a
-% guess, a node, an order or a cap. info (tests, proofs): sa_mode_name's info, plus .legacy, the
-% label before software 0.10 (HSS / HPSS / MPSS per half: flat when
+% starting profile, a node, an order or a cap. info: sa_mode_name's info, plus .legacy, the
+% older three-state label (HSS / HPSS / MPSS per half: flat when
 % max - min < 0.25, a maximum at either end of the half -> HPSS).
 xi = linspace(sol.x(1), sol.x(end), mo.shape_nodes);
 Y  = deval(sol, xi);
@@ -227,9 +226,9 @@ function [lab, info] = shape_label_profile(xi, P, theta, mo, fs) %#ok<INUSL>
 % the identity rows (left u q v w p, then right) on the mesh xi, e.g. a
 % root's representative profile on the comparison mesh. Each field the
 % main variable needs is interpolated linearly to shape_label's
-% shape_nodes points, then summed in the same order. Post tools only (a
-% plot relabelled with another main variable, or an older folder shown
-% with mode names); a run's labels come from shape_label.
+% shape_nodes points, then summed in the same order. For post-processing
+% only (a plot relabelled with another main variable); a run's labels come
+% from shape_label.
 xs = linspace(xi(1), xi(end), mo.shape_nodes);
 v = sa_main_variable('parse', mo.main_variable, species());
 Y = zeros(10, numel(xs));
@@ -245,9 +244,9 @@ s = {'u', 'q', 'v', 'w', 'p'};
 end
 
 function f = mode_families()
-% The library half type a half's mode name corresponds to (the per-root
-% pass's family lookup): flat -> HSS; a pole peak of mode 1 (left 1+,
-% right 1-) -> HPSS; a middle peak 2- -> MPSS. Other names have none.
+% The library half type that a half's mode name corresponds to (the per-root
+% pass's family lookup): flat -> HSS (no-peak); a pole peak of mode 1 (left 1+,
+% right 1-) -> HPSS (half-peak); a middle peak 2- -> MPSS (full-peak). Other names have none.
 f = struct('left', {{'0', 'HSS'; '1+', 'HPSS'; '2-', 'MPSS'}}, ...
     'right', {{'0', 'HSS'; '1-', 'HPSS'; '2-', 'MPSS'}});
 end
@@ -258,8 +257,8 @@ info.legacy = sprintf('%s_%s', legacy_shape(mL, mo), legacy_shape(mR, mo));
 end
 
 function s = legacy_shape(u, mo)
-% One half's label before software 0.10 (proofs and tests only): HSS when
-% max - min < 0.25 (the former absolute amplitude default), HPSS when the
+% One half's older label (tests only): HSS when
+% max - min < 0.25 (an absolute amplitude), HPSS when the
 % maximum lies within shape_edge_frac of either end, otherwise MPSS.
 if max(u) - min(u) < 0.25, s = 'HSS'; return; end
 n = numel(u); e = max(1, round(mo.shape_edge_frac * n));
@@ -271,8 +270,8 @@ function fs = field_scale(theta, lib, S)
 % Per field max(|value| of the HSS root chosen by
 % the hss_branch rule at the anchor, floor). One value per species, applied
 % to both halves. hss_values: the same HSS values, raw; anchor_hss_values:
-% the library HSS interpolated to the anchor itself (the family label's
-% uniform-state reference, sa_mode_name 'reference').
+% the library HSS interpolated to the anchor itself (the uniform-state
+% reference of the shape label, sa_mode_name 'reference').
 lib = sap_library('profiles', lib, {'HSS'});
 c = sap_library('cell', lib, theta, S.lattice.anchor);
 if ~c.in_range
@@ -292,7 +291,7 @@ fs.source  = sprintf(['HSS half, hss_branch = %s, native cell (%d,%d) at anchor 
     '[%s], normalized units, floor %g'], S.model_options.hss_branch, ...
     c.cell(1), c.cell(2), num2str(S.lattice.anchor), S.identity.field_scale_floor);
 fs.hss_values = h.Y5(:, 1).';
-% the family label's uniform-state reference: the library HSS interpolated
+% the uniform-state reference of the shape label: the library HSS interpolated
 % bilinearly to the anchor itself (the native grid has no node there in
 % general); the nearest cell's values when a surrounding cell has none
 val = @(i, j) hss_at(lib, theta, [i j], S.model_options);
@@ -313,12 +312,12 @@ if h.available, y = h.Y5(:, 1); else, y = []; end
 end
 
 function d = option_defaults()
-% Model-owned settings (documented defaults). Gate tolerances are the copied
-% corrector's frozen values; the corrector receives the same numbers.
+% Model-owned settings (documented defaults). The validity tolerances are the
+% values of the coupled solve, which receives the same numbers.
 d = struct();
-d.hss_branch        = 'representative';  % HSS seed = library representative branch
-d.guess_nodes       = 401;     % cold-guess xi mesh (campaign xi_n)
-d.seam_tol          = 1e-6;    % seam concentration / seam flux
+d.hss_branch        = 'representative';  % HSS seed = the library's uniform state
+d.guess_nodes       = 401;     % cold-guess mesh in x
+d.seam_tol          = 1e-6;    % middle concentration / middle flux
 d.g6a_tol           = 1e-8;    % accumulator mass
 d.g6b_tol           = 1e-7;    % dense mass
 d.g6b_refine_tol    = 1e-9;    % dense mass refinement 20001 vs 40001
@@ -328,9 +327,9 @@ d.vel_abs           = 1e-9;    % gate = max(abs, rel * |velocity|)
 d.vel_rel           = 1e-6;
 d.main_variable     = 'u';     % the label's and dn2's variable: a '+'-sum of u q v w p
 d.shape_flat_tol    = 0.5606;  % label: a half is 0 (flat) when (max - min) / (uniform value) is below;
-                               %   0.25 / 0.445953 (u of the HSS at the anchor, L = 7 setting) = 0.56060
+                               %   0.5606 = 0.25 / 0.445953, where 0.445953 is u of the uniform state at the anchor (L = 7)
 d.shape_turn_frac   = 0.2;     % label: a turn counts when the profile moves back by this x (max - min)
-d.shape_edge_frac   = 0.02;    % label: the seam window, as a fraction of a half
+d.shape_edge_frac   = 0.02;    % label: the window at the middle, as a fraction of a half
 d.shape_nodes       = 401;
 end
 

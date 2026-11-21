@@ -4,8 +4,8 @@ function varargout = sa_layout(action, varargin)
 %   D = SA_LAYOUT('state', run_dir)
 %       The state folder of a run folder: <run_dir>/internal when it exists
 %       or when the folder is new (missing, empty or holding only the human
-%       files); <run_dir> itself for a flat folder written before the
-%       internal/ layout (state files on top).
+%       files); <run_dir> itself for a flat folder written by an older version
+%       (state files on top, no internal/ folder).
 %   t = SA_LAYOUT('layout', run_dir)   'v2' | 'flat' | 'none'
 %   SA_LAYOUT('create', run_dir)
 %       Makes internal/attempts, internal/roots, plots/ and traces/ in an
@@ -73,7 +73,7 @@ end
 
 function t = readme_text()
 L = {
-sprintf('Seeded coupled atlas run folder (%s)', sa_settings('version'))
+sprintf('Phase atlas run folder (%s)', sa_settings('version'))
 ''
 'Read first'
 '  summary.txt             what the run did: stop reason, calls, roots, and why calls failed'

@@ -1,18 +1,20 @@
 function report = plot_atlas_sheets(opts)
-    % PLOT_ATLAS_SHEETS  Packet 4: per-sheet flux field + nullcline plots for the
-    % nine HSS/HPSS/MPSS atlas sheets built by build_atlas_sheets.m (Packet 3).
+    % PLOT_ATLAS_SHEETS  Per-sheet flux field + nullcline plots for the
+    % nine sheets (no-peak/half-peak/full-peak on each half, HSS/HPSS/MPSS) built by
+    % build_atlas_sheets.m.
     %
-    % Extends plot_phase_planes_multibranch.m's conventions (opts struct,
-    % NaN-safe contour guard, quiver subsampling, display-only NaN fill) to the
-    % atlas-sheet schema rather than forking its HSS-multibranch-specific logic
-    % (different data source: 9 named sheets, not N HSS roots). Does NOT modify
-    % plot_phase_planes_multibranch.m or touch its two canonical output files
-    % (HSS_PhasePlane_Multibranch.pdf, BVP_PhasePlane_Multibranch.pdf).
+    % Note on the paper: these are the uncoupled approximation. The flux plotted here
+    % (-2*Dc*(trough difference) of two isolated half cells, see build_atlas_sheets.m) and its
+    % nullclines are an earlier approximation and are not used for any figure of the paper, whose
+    % phase planes use the flux J of the coupled quasi-steady states (Eq. 9). The axes are absolute
+    % amounts Delta n_PAK and Delta n_GEF (range +-0.95*M), not the fractions Delta n/M of the paper.
     %
-    % Reuses the ALREADY-COMPUTED per-sheet U_flux/V_flux stored in
-    % atlas_sheets_latest.mat (Packet 3's exact discrete-mirror flux, the same
-    % verified baseline formula -2*Dc*(left-right) as plot_phase_planes.m's
-    % calc_fluxes) -- this plotter does NOT recompute flux from branch data.
+    % Options use an opts struct, NaN-safe contour guards, quiver subsampling and a
+    % display-only NaN fill.
+    %
+    % Reuses the already computed per-sheet U_flux/V_flux stored in
+    % atlas_sheets_latest.mat (exact discrete-mirror flux, -2*Dc*(left-right));
+    % this plotter does not recompute flux from the libraries.
     %
     % Options (struct, optional):
     %   opts.atlas_path      - path to the atlas sheets file.
@@ -20,16 +22,15 @@ function report = plot_atlas_sheets(opts)
     %   opts.sheets           - cellstr subset of sheet names to plot, e.g.
     %                          {'HPSS_HPSS','HPSS_MPSS'}. Default: all 9.
     %   opts.show_markers    - if true, overlay 'o' on cells that exist but are
-    %                          NOT sheet_stable_provisional (annotation only,
-    %                          per Invariant 3 -- never gates existence).
+    %                          NOT sheet_stable_provisional (annotation only;
+    %                          never gates existence).
     %                          Default true.
     %   opts.arrow_stride    - integer >=1, quiver arrow subsampling. Default 1.
     %   opts.plot_v_only     - if true, derive the GEF-flux nullcline from v
     %                          alone instead of v+w (re-derived from the sheet's
     %                          own stored flux_left_values/flux_right_values,
-    %                          same raw data, different linear combination --
-    %                          matches the existing opts.plot_v_only convention
-    %                          in plot_phase_planes.m / _multibranch.m). U_flux
+    %                          same raw data, different linear combination).
+    %                          U_flux
     %                          (p-based) is unaffected. Default false (uses the
     %                          sheet's stored V_flux, which is v+w).
     %   opts.save_dir        - output directory for per-sheet PDFs + overview +
@@ -38,9 +39,9 @@ function report = plot_atlas_sheets(opts)
     %                          (Atlas_Sheet_<L>_<R>.pdf, Atlas_Sheets_Overview.pdf,
     %                          Atlas_Nullclines_Combined.pdf); re-running
     %                          overwrites only THIS function's own prior output,
-    %                          never the multibranch plotter's files.
+    %                          never other plotters' files.
     %   opts.visible         - 'on'|'off' figure visibility. Default 'off'
-    %                          (headless-safe; matches _multibranch.m).
+    %                          (headless-safe).
     %
     % Returns report: atlas_path, computation_id, sheet_names plotted,
     % n_exists per sheet, figures_written (paths), any_empty_sheet (cellstr of
@@ -60,7 +61,7 @@ function report = plot_atlas_sheets(opts)
 
     if ~exist(opts.atlas_path, 'file')
         error(['plot_atlas_sheets: atlas sheets file not found: %s.\n', ...
-               'Run build_atlas_sheets first (Packet 3).'], opts.atlas_path);
+               'Run build_atlas_sheets first.'], opts.atlas_path);
     end
     A = load(opts.atlas_path);
     fprintf('=== plot_atlas_sheets: loaded %s ===\n', opts.atlas_path);
@@ -100,7 +101,7 @@ function report = plot_atlas_sheets(opts)
         fprintf('  [%s] sheet_exists=%d/%d  flux_assumption="%s"  -> %s\n', ...
             name, n_exists.(name), numel(sh.sheet_exists), sh.flux_assumption, fpath);
 
-        % Provenance spot-check (Invariant 6/11): print one representative
+        % Provenance spot-check: print one representative
         % existing cell's raw flux inputs so the number is reproducible by hand.
         idx = find(sh.sheet_exists, 1);
         if ~isempty(idx)
@@ -114,7 +115,7 @@ function report = plot_atlas_sheets(opts)
         end
     end
 
-    % ---- 3x3 overview grid (rows=left type, cols=right type, atlas_plan.md order) ----
+    % ---- 3x3 overview grid (rows=left type, cols=right type) ----
     overview_path = fullfile(opts.save_dir, 'Atlas_Sheets_Overview.pdf');
     plot_overview_grid(A, sheet_colors, opts, overview_path);
     figures_written{end+1} = overview_path;
@@ -154,8 +155,7 @@ function plot_one_sheet(sh, name, Dc, col, opts, fpath)
                  'Position', [80 80 900 700], 'Visible', opts.visible);
     hold on; box on;
 
-    % 1. existence-region shading (same contourf-backdrop technique as the
-    % bistable-wedge shading in plot_phase_planes_multibranch.m)
+    % 1. existence-region shading (contourf backdrop)
     if any(ex(:))
         contourf(sh.PAK_DIFF, sh.GEF_DIFF, double(ex), [0.5 0.5], ...
                  'FaceColor', col, 'EdgeColor', 'none', 'FaceAlpha', 0.12, ...
@@ -184,7 +184,7 @@ function plot_one_sheet(sh, name, Dc, col, opts, fpath)
         legend_handles(end+1) = h_gef; legend_labels{end+1} = 'GEF-flux=0 (V_{flux})'; %#ok<AGROW>
     end
 
-    % 4. stability annotation markers (Invariant 3: never gates existence,
+    % 4. stability annotation markers (never gates existence,
     % annotation only -- 'o' on cells that exist but are not provisionally stable)
     if opts.show_markers
         unstable = ex & ~sh.sheet_stable_provisional;
@@ -289,8 +289,7 @@ function plot_all_nullclines(A, names_to_plot, sheet_colors, opts, fpath)
         h_gef = safe_contour_h(sh.PAK_DIFF, sh.GEF_DIFF, V_flux, [0 0], col, 1.8, '--');
         h_pak_ok = ~isempty(h_pak) && isgraphics(h_pak);
         h_gef_ok = ~isempty(h_gef) && isgraphics(h_gef);
-        % One legend entry per sheet (whichever handle drew first), matching
-        % plot_phase_planes_multibranch.m's one-entry-per-branch convention.
+        % One legend entry per sheet (whichever handle drew first).
         if h_pak_ok || h_gef_ok
             if h_pak_ok, h_for_legend = h_pak; else, h_for_legend = h_gef; end
             legend_handles(end+1) = h_for_legend; %#ok<AGROW>
@@ -322,13 +321,13 @@ end
 
 % ==========================================================================
 %  FLUX SELECTION (stored U_flux/V_flux, or v-only re-derivation from the
-%  same stored raw per-species values -- never recomputed from branch files)
+%  same stored raw per-species values -- never recomputed from library files)
 % ==========================================================================
 
 function [U_flux, V_flux] = sheet_flux(sh, Dc, plot_v_only)
     U_flux = sh.U_flux;
     if ~plot_v_only
-        V_flux = sh.V_flux;   % stored value is already v+w (Packet 3 default)
+        V_flux = sh.V_flux;   % stored value is already v+w (default of build_atlas_sheets.m)
         return;
     end
     p_left  = sh.flux_left_values(:,:,3);   % v alone (row 3 of [u,q,v,w,p])
@@ -351,10 +350,8 @@ end
 
 
 % ==========================================================================
-%  NaN-SAFE PLOTTING PRIMITIVES (reused verbatim from
-%  plot_phase_planes_multibranch.m's proven pattern -- copied, not forked,
-%  since these are local/unexported helpers; guards the exact
-%  gobjects(0)/isgraphics crash fixed earlier this session)
+%  NaN-SAFE PLOTTING PRIMITIVES (local helpers; guard against
+%  empty graphics handles gobjects(0) / isgraphics)
 % ==========================================================================
 
 function h = safe_contour_h(X, Y, Z, lvls, col, lw, ls)
