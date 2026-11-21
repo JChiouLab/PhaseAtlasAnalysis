@@ -1,22 +1,22 @@
 function [roots4, info] = gnx_hss_roots(densR, densB, par)
-%GNX_HSS_ROOTS  Homogeneous steady states of Guzzo_noXA by two routes (packet §4e).
+%GNX_HSS_ROOTS  Homogeneous steady states of the M. xanthus (Guzzo_noXA) model by two routes.
 %
 %   [roots4, info] = GNX_HSS_ROOTS(densR, densB, par)
 %   densR, densB: mean densities of the segment. Uniform states satisfy
 %   sR = sB = 0 with Rc = densR - Rm, Bc = densB - Bm; RomR's balance gives
 %   Rm = g*densR/(g + dR), g = kR + kRB*Bm, and one scalar equation
-%   F(Bm) = 0 on [0, densB] remains (noxa_hss_roots.m:24-35).
+%   F(Bm) = 0 on [0, densB] remains.
 %   Route (i): F*(1 + Bm/K)*(1 + (Bm/KA)^2)*(g + dR) is a degree-6
 %     polynomial; its roots with |Im| <= hss_imag*max(1,|Re|) and real part
 %     in [0, densB] are polished on F (fzero on a sign-change bracket around
 %     the root), never on the polynomial.
-%   Route (ii): myxo's 2001-point scan plus fzero (noxa_hss_roots.m:8-20),
+%   Route (ii): the reference M. xanthus code's 2001-point scan plus fzero,
 %     re-implemented here.
 %   Accepted (info.flag = 'ok') when both routes give the same count, the
 %   roots agree to hss_route_rel relative, and each root satisfies
 %   |sR| <= hss_resid_rel*sum|terms|, same for sB. Otherwise info.flag =
 %   'hss_route_disagreement' (existence false at the caller).
-%   roots4 rows are [Rm Rc Bm Bc] (FIELD order; myxo stores [Bm Rm Bc Rc]),
+%   roots4 rows are [Rm Rc Bm Bc] (field order; the reference M. xanthus code stores [Bm Rm Bc Rc]),
 %   sorted by Bm; they are route (i)'s polished roots.
 
 D = gnx_model('descriptor'); tol = D.tol;

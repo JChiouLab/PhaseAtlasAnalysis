@@ -1,20 +1,20 @@
 function R = sag_compare_runs(mode, dirA, dirB)
-%SAG_COMPARE_RUNS  Milestone-2C regression comparator (packet 2C section 1a).
+%SAG_COMPARE_RUNS  Regression comparator of two run folders.
 %
 %   R = SAG_COMPARE_RUNS('leaves', dirA, dirB)
-%       RC-6 leaf list, for a baseline against the stored pre-repair M2 smoke:
+%       leaf list, for a baseline against a stored earlier smoke run:
 %       every attempts/A####.mat: sol.x, sol.y, sol.yp, sol.stats, opts,
 %       warning_id, and the value and pass flag of every check (matched by
 %       name; the check-name sets must agree); the roots in roots.mat
 %       (profiles and memberships); identity_pairs.csv; summary.txt with the
 %       volatile run_dir and wall entries masked. Record STRUCTURE is not
-%       compared (RC-6).
+%       compared.
 %   R = SAG_COMPARE_RUNS('whole', dirA, dirB)
 %       Every leaf of every output file (settings_effective.mat, attempts.mat,
 %       attempts/*.mat, roots.mat, attempts.csv, identity_pairs.csv,
-%       summary.txt), skipping ONLY the frozen volatile list below.
+%       summary.txt), skipping ONLY the fixed volatile list below.
 %   L = SAG_COMPARE_RUNS('volatile')
-%       The frozen volatile list (frozen from code reading before any
+%       The fixed volatile list (fixed from reading the code before any
 %       comparison was made):
 %         run_dir and file paths  settings.run_dir and any text leaf that
 %                                 contains the run folder (masked to <RUN>)
@@ -28,7 +28,7 @@ function R = sag_compare_runs(mode, dirA, dirB)
 %
 %   R.n_diff, R.diffs (cellstr 'path: detail'), R.n_compared, R.volatile_seen.
 %   Read only: nothing is written.
-%   Milestone 3 (additive): a run folder without roots.mat is read from its
+%   A run folder without roots.mat is read from its
 %   per-node shards roots/*.mat (roots concatenated in shard-file order), and
 %   'whole' also walks queue.mat and every shard file when present.
 
@@ -57,7 +57,7 @@ R.diffs{end+1} = sprintf('%s: %s', path, detail);
 end
 
 % =========================================================================
-% RC-6 leaf list
+% leaf list
 
 function R = leaves(dA, dB)
 R = blank();
@@ -111,9 +111,9 @@ for r = 1:min(numel(ra), numel(rb))
 end
 R = cmp_leaf(R, 'identity_pairs.csv', fileread(fullfile(sa_layout('state', dA), 'identity_pairs.csv')), ...
     fileread(fullfile(sa_layout('state', dB), 'identity_pairs.csv')));
-% summary.txt COUNTS (RC-6): every line, masked, except the identity-pair
-% wording sentences under "Identity pairs:" (rewritten by the D5/F2 repair
-% ba5aee0 after the stored smoke); the "Identity pairs: N ...; M in the band"
+% summary.txt COUNTS: every line, masked, except the identity-pair
+% wording sentences under "Identity pairs:" (the wording changed after the
+% stored smoke run); the "Identity pairs: N ...; M in the band"
 % count line itself is kept.
 R = cmp_leaf(R, 'summary.txt (counts, masked)', ...
     summary_counts(mask_text(fileread(fullfile(dA, 'summary.txt')), dA)), ...
@@ -128,7 +128,7 @@ f = dir(fullfile(sa_layout('state', d), 'roots', '*.mat'));
 r = [];
 for k = 1:numel(f)
     S = load(fullfile(f(k).folder, f(k).name));
-    if isfield(S, 'format') && strcmp(S.format, 'sa_store_io/shard-2')   % AM-9 decoded
+    if isfield(S, 'format') && strcmp(S.format, 'sa_store_io/shard-2')   % decoded form
         S = sa_store_io('read_shard', fullfile(f(k).folder, f(k).name));
     end
     r = [r, S.store.roots]; %#ok<AGROW>

@@ -1,30 +1,33 @@
 function report = plot_atlas_surfaces_combined(opts)
-    % PLOT_ATLAS_SURFACES_COMBINED  One combined 3-D plot: all three branch-type
-    % flux surfaces (HSS/HPSS/MPSS) overlaid on shared axes -- the SAME per-type
-    % mirrored-surf style visualize_atlas_surfaces.m uses, just layered into one
-    % figure instead of three -- with all nine atlas-sheet nullclines draped on
+    % PLOT_ATLAS_SURFACES_COMBINED  One combined 3-D plot: the flux surfaces of the three
+    % half-cell types (no-peak HSS, half-peak HPSS, full-peak MPSS) overlaid on shared axes -- the same
+    % per-type mirrored-surf style as visualize_atlas_surfaces.m, layered into one
+    % figure instead of three -- with all nine sheet nullclines draped on
     % top at their correct height.
     %
-    % Two subplots: v+w and p (matching the existing v_only/v+w convention).
-    % Each subplot shows all three branch surfaces (semi-transparent, mirrored
-    % across the origin exactly as visualize_atlas_surfaces.m does), plus every
-    % sheet's nullcline curve for that field (PAK-flux=0 solid on the p subplot,
-    % GEF-flux=0 dashed on the v+w subplot), reusing the nullcline data ALREADY
-    % computed and validated in atlas_sheets_latest.mat (Packet 3/4) -- nothing
-    % is recomputed from branch data except the surfaces themselves.
+    % Note on the paper: the flux here is the uncoupled approximation of build_atlas_sheets.m
+    % (-2*Dc*(trough difference)), and the surfaces and nullclines are not used for any figure of the
+    % paper (Fig. 3B is built from the coupled quasi-steady states).
     %
-    % Nullcline height (no ambiguity, proven not just assumed -- see
-    % verify_nullcline_height_identity.m / this session's validation): a sheet
-    % <L>+<R>'s nullcline is exactly where left branch L's own value at (i,j)
-    % equals right branch R's value at the mirror cell. So ON the nullcline,
-    % L's own surface height and R's mirrored surface height are IDENTICAL by
-    % definition -- draping the curve on L's own displayed surface (which is
-    % always one of the three surfaces already on the plot) is unambiguous and
-    % exact, with no need to choose or blend a "which side" height.
+    % Two subplots: v+w and p (v alone if opts.plot_v_only).
+    % Each subplot shows all three surfaces (semi-transparent, mirrored
+    % across the origin as in visualize_atlas_surfaces.m), plus every
+    % sheet's nullcline curve for that field (PAK-flux=0 solid on the p subplot,
+    % GEF-flux=0 dashed on the v+w subplot), reusing the nullcline data already
+    % computed in atlas_sheets_latest.mat -- nothing
+    % is recomputed from the libraries except the surfaces themselves.
+    %
+    % Nullcline height (unambiguous): a sheet
+    % <L>+<R>'s nullcline is exactly where left library L's own value at (i,j)
+    % equals right library R's value at the mirror cell. So on the nullcline,
+    % L's own surface height and R's mirrored surface height are identical by
+    % definition; draping the curve on L's own displayed surface (which is
+    % always one of the three surfaces already on the plot) is exact,
+    % with no need to choose or blend a "which side" height.
     %
     % Options (struct, optional):
-    %   opts.hss_path/hpss_path/mpss_path - branch file paths (defaults to the
-    %                          canonical branch_*_latest.mat).
+    %   opts.hss_path/hpss_path/mpss_path - library file paths (defaults to the
+    %                          branch_*_latest.mat files).
     %   opts.atlas_path       - atlas sheets file (default
     %                          data/outputs/atlas_sheets_latest.mat).
     %   opts.interpolate_missing - display-only NaN fill of the SURFACES (not
@@ -57,7 +60,7 @@ function report = plot_atlas_surfaces_combined(opts)
 
     if opts.plot_v_only, vw_title = 'v'; else, vw_title = 'v+w'; end
 
-    % ---- load branches (read-only) ----
+    % ---- load libraries (read-only) ----
     types = {'HSS', 'HPSS', 'MPSS'};
     bpaths = struct('HSS', opts.hss_path, 'HPSS', opts.hpss_path, 'MPSS', opts.mpss_path);
     surf_colors = struct('HSS', [0.20 0.60 0.80], 'HPSS', [0.85 0.45 0.10], 'MPSS', [0.60 0.15 0.55]);
@@ -203,7 +206,7 @@ end
 
 % ==========================================================================
 %  NULLCLINE DRAPING (contour on the sheet's own flux field, z-height from
-%  the LEFT branch's raw surface -- exact on the curve, see module docstring)
+%  the LEFT library's raw surface -- exact on the curve, see the header)
 % ==========================================================================
 
 function h = drape_nullcline(flux_field, X, Y, Zsurf, col, ls)
@@ -226,22 +229,15 @@ function C = safe_contourc(x, y, Z, lvls)
     % NATIVE NaN -- contourc handles NaN cells correctly on its own (skips
     % them, does not error) and must NOT be given a sentinel substitute.
     %
-    % An earlier version of this function replaced NaN with an out-of-range
-    % sentinel (copied from visualize_surfaces.m's safe_contourc, designed for
-    % a single smooth outer NaN boundary). Branch existence regions here are
-    % NOT that shape -- they have scattered INTERNAL NaN holes (verified,
-    % "swiss cheese" texture) -- and the sentinel is always a large POSITIVE
-    % number (mx + 10*range), so EVERY negative-valued real cell adjacent to
-    % ANY internal hole spuriously "crosses zero" against the sentinel. Found
-    % 2026-07-10: this manufactured ~2-3x extra contour points per sheet, with
-    % z-heights unrelated to the true flux field (one verified example: a
-    % point placed where real neighbouring U_flux was -0.66 to -1.24 -- nowhere
-    % near a real crossing) and a worst-case left-vs-right-mirror height
-    % mismatch of 6e-2 (vs. the true identity, which is exact to machine
-    % precision -- see module docstring). Plain contourc on the raw NaN data
-    % reproduces plot_atlas_sheets.m's already-correct 2-D nullcline behaviour
-    % (which never used the sentinel trick) and removes the artifacts: 0/842
-    % points NaN, worst-case identity mismatch 1.1e-16 after this fix.
+    % Do not replace NaN by an out-of-range sentinel (as done for a single smooth outer NaN
+    % boundary). The existence regions here have scattered internal NaN holes, and
+    % the sentinel is always a large positive number, so every negative-valued real cell
+    % adjacent to any internal hole would spuriously "cross zero" against the sentinel. That
+    % produced about 2-3x extra contour points per sheet, with z-heights unrelated to the true
+    % flux field and a worst-case left-vs-right-mirror height
+    % mismatch of 6e-2 (the true identity is exact to machine precision). Plain contourc on the
+    % raw NaN data reproduces plot_atlas_sheets.m's 2-D nullcline behaviour and removes the
+    % artifacts (worst-case identity mismatch 1.1e-16).
     if all(isnan(Z(:))), C = []; return; end
     if numel(unique(Z(~isnan(Z)))) < 2, C = []; return; end
     try
@@ -258,10 +254,9 @@ function z = interp2_safe(X, Y, Z, xq, yq)
     % NaN otherwise). These points are the genuine, correctly-placed contour
     % endpoints right at a true existence boundary (median observed distance
     % to the nearest valid cell: ~3.6% of one grid step) -- nearest-neighbour
-    % is an accurate approximation there, not a fabrication (always returns a
-    % real stored value). Exact bilinear precision is unaffected everywhere
-    % else (verified: 0.000e+00 vs the mirror-height identity at interior
-    % points; this fallback only ever engages exactly where linear returns NaN).
+    % is an accurate approximation there (it always returns a
+    % real stored value). Bilinear precision is unaffected everywhere
+    % else; this fallback only engages where linear interpolation returns NaN.
     z = interp2(X, Y, Z, xq, yq, 'linear');
     bad = isnan(z);
     if any(bad)

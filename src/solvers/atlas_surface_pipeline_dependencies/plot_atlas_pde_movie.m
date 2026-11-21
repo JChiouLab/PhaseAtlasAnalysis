@@ -1,31 +1,19 @@
 function report = plot_atlas_pde_movie(opts)
-    % PLOT_ATLAS_PDE_MOVIE  Render a full-domain PDE trajectory (Stage 8's
-    % atlas-seeded trace) into an .mp4 movie: two stacked subplots -- u & q on
+    % PLOT_ATLAS_PDE_MOVIE  Render a full-domain PDE trajectory (the pdepe trace of
+    % run_atlas_pde_trace.m) into an .mp4 movie: two stacked subplots -- u & q on
     % top, v & w & p on bottom, both vs x -- one video frame per stored PDE
-    % time frame (or every opts.frame_stride-th one).
+    % time frame (or every opts.frame_stride-th one). Part of the uncoupled approximation
+    % (not used for any figure of the paper).
     %
-    % Reads the RAW sol_pde (nt x nx x 5) already saved by run_atlas_pde_trace.m
-    % (Packet 5 / Stage 8); does not run or re-run any PDE. Read-only w.r.t. the
-    % trace file; writes only the movie file.
+    % Reads the raw sol_pde (nt x nx x 5) already saved by run_atlas_pde_trace.m; does not run
+    % any PDE. Read-only with respect to the trace file; writes only the movie file.
     %
-    % ON VECTOR FRAMES: not possible, checked directly against
-    % VideoWriter.getProfiles() -- every available profile (MPEG-4, Motion JPEG
-    % AVI/2000, Archival, Uncompressed/Grayscale/Indexed AVI) is a raster codec.
-    % No standard, player-compatible video container (MP4/H.264, AVI, MOV, WebM)
-    % stores vector frames; video is raster-by-design. So instead this renders
-    % at opts.resolution_scale x supersampling (default 3, i.e. tripled): the
-    % figure canvas AND every line width / font size are scaled together by the
-    % same factor, so the extra pixels add real sharpness/detail rather than
-    % just shrinking everything relative to a bigger blank canvas. Confirmed
-    % empirically that getframe() on an invisible figure returns cdata at
-    % EXACTLY the requested Position pixel size, so this works headless too
-    % (also confirmed the raw cdata is pixel-perfect even at large sizes, by
-    % round-tripping it through a .mat file and rendering with Python/PIL,
-    % bypassing this machine's separately-broken imwrite/print/exportgraphics-
-    % to-raster path -- see round_mb16 below for the one real capture bug that
-    % WAS found, in the video ENCODER rather than getframe).
+    % Video is raster-only (every VideoWriter profile is a raster codec), so the movie is rendered at
+    % opts.resolution_scale x supersampling (default 3): the figure canvas and every line width /
+    % font size are scaled together, so the extra pixels add detail. getframe() on an invisible
+    % figure returns the requested pixel size, so this works headless.
     %
-    % Fixed species colour code (RGB / hex, user-specified):
+    % Fixed species colour code (RGB / hex):
     %   u  [255 87  55]/255   #FF5737
     %   q  [128 130 133]/255  #808285
     %   v  [107 31  255]/255  #6B1FFF
@@ -37,43 +25,29 @@ function report = plot_atlas_pde_movie(opts)
     %                      data/outputs/atlas_pde_trace_latest.mat). Must
     %                      contain sol_pde (nt x nx x 5), x_full, t_span.
     %   save_dir         - default data/plots.
-    %   file_name        - default 'Atlas_PDE_Movie.mp4' (fixed name, like Stage
-    %                      10's per-sheet PDFs -- overwritten each time this
-    %                      runs, so repeated pipeline runs don't accumulate
-    %                      large orphaned video files; provenance -- which trace
-    %                      it came from -- is printed to the console and
-    %                      returned in report, not baked into the filename).
+    %   file_name        - default 'Atlas_PDE_Movie.mp4' (fixed name, overwritten each time, so
+    %                      repeated runs do not accumulate large video files; the trace it came from
+    %                      is printed to the console and returned in report).
     %   resolution_scale - raster supersampling factor, >=1. Default 3 (tripled
-    %                      resolution vs. the original 900x750 base canvas ->
-    %                      2704x2256). Figure size, line widths, and font sizes
-    %                      all scale together so the composition looks the
-    %                      same, just sharper -- NOT bigger lines on a bigger
-    %                      blank canvas. Width/height are rounded to the
-    %                      nearest multiple of 16 (confirmed empirically that
-    %                      MATLAB's MPEG-4 writer on this machine corrupts
-    %                      frames -- diagonal streaking, wrong colours -- at
-    %                      large non-16-aligned sizes; classic H.264 macroblock
-    %                      alignment. Merely-even dimensions are NOT sufficient).
+    %                      resolution vs. the 900x750 base canvas -> 2704x2256). Figure size, line
+    %                      widths and font sizes all scale together. Width/height are rounded to the
+    %                      nearest multiple of 16: MATLAB's MPEG-4 writer can corrupt
+    %                      frames (diagonal streaking, wrong colours) at
+    %                      large sizes that are not multiples of 16 (H.264 macroblock
+    %                      alignment); merely even dimensions are not sufficient.
     %   fps              - playback frames per second. Default 15.
     %   frame_stride     - use every Nth stored PDE frame (bounds render
-    %                      time/movie length independent of the trace's own
-    %                      time resolution -- a trace can easily have thousands
-    %                      of stored frames). Default 1 (every frame). A
-    %                      console warning (not an error or a silent
-    %                      truncation) fires above 3000 movie frames, since
-    %                      that many frames at 3x resolution is a real
-    %                      wall-clock and file-size cost.
+    %                      time and movie length independent of the trace's own
+    %                      time resolution). Default 1 (every frame). A
+    %                      console warning (not an error) fires above 3000 movie frames,
+    %                      since that many frames at 3x resolution is a real
+    %                      run-time and file-size cost.
     %   quality          - VideoWriter Quality, 0-100. Default 90.
-    %   visible          - ALWAYS TREATED AS 'off' regardless of what is passed
-    %                      (kept as an option only for interface consistency
-    %                      with the other Stage 8-10 functions; passing 'on'
-    %                      prints a note explaining it was ignored). NOTE:
-    %                      forcing this to 'off' alone was NOT sufficient to
-    %                      prevent getframe() from returning an inconsistently
-    %                      HiDPI-scaled frame size on at least one real
-    %                      machine (still crashed 2026-07-13 even with
-    %                      Visible='off') -- see the per-frame size
-    %                      normalization below, which is the actual fix.
+    %   visible          - always treated as 'off' whatever is passed (kept as an option
+    %                      for consistency with the other plotting functions; passing 'on'
+    %                      prints a note that it was ignored). Forcing 'off' alone does not
+    %                      prevent getframe() from returning a HiDPI-scaled frame size on some
+    %                      machines; see the per-frame size normalization below.
     %
     % Output: data/plots/Atlas_PDE_Movie.mp4 (or opts.file_name).
     %
@@ -102,7 +76,7 @@ function report = plot_atlas_pde_movie(opts)
 
     if ~exist(opts.trace_path, 'file')
         error(['plot_atlas_pde_movie: trace file not found: %s.\n', ...
-               'Run run_atlas_pde_trace first (Packet 5 / pipeline Stage 8).'], opts.trace_path);
+               'Run run_atlas_pde_trace first (pipeline Stage 8).'], opts.trace_path);
     end
     T = load(opts.trace_path);
     req = {'sol_pde', 'x_full', 't_span'};
@@ -119,7 +93,7 @@ function report = plot_atlas_pde_movie(opts)
     nt = numel(frame_idx);
 
     % ---- supersampled canvas size: base 900x750 x resolution_scale, rounded
-    % to the nearest multiple of 16 (see round_mb16 -- MPEG-4 corruption fix) ----
+    % to the nearest multiple of 16 (see round_mb16) ----
     rs = opts.resolution_scale;
     fig_w = round_mb16(900 * rs); fig_h = round_mb16(750 * rs);
     base_lw = 2; base_font_axes = 10; base_font_legend = 9; base_font_title = 13;
@@ -133,7 +107,7 @@ function report = plot_atlas_pde_movie(opts)
         fprintf(['  NOTE: opts.visible=''on'' is ignored here -- the rendering figure is always created\n', ...
                  '  invisibly. A genuinely on-screen figure''s getframe() output can be scaled by the\n', ...
                  '  display''s HiDPI/Retina backing-store factor, and that factor is not guaranteed\n', ...
-                 '  constant frame-to-frame -- confirmed 2026-07-12: this crashed VideoWriter with\n', ...
+                 '  constant frame-to-frame -- this can crash VideoWriter with\n', ...
                  '  "Frame must be W by H" partway through a Visible=on render. Headless figures do not\n', ...
                  '  have this problem (every validated render in this project uses one).\n']);
     end
@@ -143,7 +117,7 @@ function report = plot_atlas_pde_movie(opts)
                  'opts.resolution_scale.'], nt, fig_w, fig_h);
     end
 
-    % ---- fixed species colours (user-specified, not derived from the sheet
+    % ---- fixed species colours (not derived from the sheet
     % palette used elsewhere in the atlas tooling -- this is a raw PDE-state
     % movie, not a phase-plane/sheet plot) ----
     col.u = [255 87  55] / 255;
@@ -191,20 +165,13 @@ function report = plot_atlas_pde_movie(opts)
     open(vw);
 
     % ---- capture loop ----
-    % IMPORTANT: getframe() is not trusted to return a consistent pixel size
-    % frame-to-frame. Forcing Visible='off' (above) was NOT sufficient by
-    % itself to prevent this on at least one real machine -- confirmed
-    % 2026-07-13: getframe output was inconsistently scaled (a HiDPI/Retina
-    % backing-store factor, e.g. exactly 1.5x, showed up on SOME frames but
-    % not others of the SAME headless render), which crashes VideoWriter
-    % ("Frame must be W by H") the moment a mismatched frame appears. Rather
-    % than continuing to chase the display-dependent root cause blind (this
-    % session cannot attach to the reporting machine's display to reproduce
-    % it), every captured frame is unconditionally normalized to the PROMISED
-    % [fig_h fig_w] size (via resize_frame, plain bilinear interpolation, no
-    % toolbox required) before it reaches writeVideo -- so a scaling
-    % inconsistency, whatever its cause, can no longer crash the render. A
-    % one-time console note fires the first time a resize is actually needed.
+    % getframe() is not trusted to return a consistent pixel size frame to frame. Forcing
+    % Visible='off' (above) does not always prevent it: on some machines getframe output is
+    % scaled inconsistently (a HiDPI/Retina factor, e.g. exactly 1.5x, appears on some frames
+    % but not others of the same headless render), which makes VideoWriter fail
+    % ("Frame must be W by H"). Every captured frame is therefore normalized to the promised
+    % [fig_h fig_w] size (via resize_frame, bilinear interpolation, no toolbox required) before it
+    % reaches writeVideo. A one-time console note fires the first time a resize is needed.
     frame_size_px = [fig_h, fig_w, 3];
     resized_note_shown = false;
     for k = 1:nt
@@ -221,7 +188,7 @@ function report = plot_atlas_pde_movie(opts)
         if size(fr.cdata, 1) ~= fig_h || size(fr.cdata, 2) ~= fig_w
             if ~resized_note_shown
                 fprintf(['  NOTE: getframe() returned %dx%d instead of the requested %dx%d on frame %d --\n', ...
-                         '  normalizing every frame to %dx%d to match (this machine''s display is scaling\n', ...
+                         '  normalizing every frame to %dx%d to match (the display is scaling\n', ...
                          '  captures inconsistently; the output video size is unaffected).\n'], ...
                     size(fr.cdata,2), size(fr.cdata,1), fig_w, fig_h, k, fig_w, fig_h);
                 resized_note_shown = true;
@@ -270,15 +237,11 @@ function opts = def(opts, name, val)
 end
 
 function n = round_mb16(x)
-    % Nearest multiple of 16. Confirmed empirically (isolate_16align test,
-    % 2026-07-12): MATLAB's MPEG-4 writer on this machine silently corrupts
+    % Nearest multiple of 16. MATLAB's MPEG-4 writer can silently corrupt
     % frames (diagonal streaking, wrong colours) at large sizes unless
-    % width/height are multiples of 16 -- a classic H.264 macroblock-alignment
-    % requirement, evidently enforced by a hardware-accelerated encoder path
-    % that a plain "even" dimension (the previous, insufficient guard) does not
-    % satisfy. Applied unconditionally, not just for large resolution_scale,
-    % since it's not certain at what size threshold the corrupting code path
-    % activates.
+    % width/height are multiples of 16 (H.264 macroblock alignment); a merely
+    % even dimension does not satisfy it. Applied unconditionally, since the size
+    % at which the corrupting code path activates is not known.
     n = 16 * round(x / 16);
 end
 

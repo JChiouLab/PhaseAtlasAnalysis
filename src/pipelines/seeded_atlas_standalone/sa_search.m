@@ -1,8 +1,15 @@
 function varargout = sa_search(action, varargin)
-%SA_SEARCH  Scheduler and executor.
+%SA_SEARCH  Scheduler and the single entry point for coupled solves.
+%
+%   In the paper's terms: a cold call starts the coupled bvp4c solve from a
+%   half-cell library profile; each solution found then serves as the
+%   starting profile at neighbouring grid points (continuation, with adaptive
+%   step halving); grid points that stay unsolved get a rescue (other starting
+%   profiles). A solution is kept if it is positive and differs from the
+%   stored ones at that point by more than the identity tolerance.
 %
 %   ctx = SA_SEARCH('run', ctx)
-%       Passes: cold -> import (milestone 10: one call per planned row of
+%       Passes: cold -> import (one call per planned row of
 %       ctx.import, sa_import; S.solver, no cold cap, no retry; then the
 %       source-edge knowledge ctx.ik) -> refinement ->
 %       [continuation -> rescue] up to search.max_passes (repeated only while
@@ -12,7 +19,7 @@ function varargout = sa_search(action, varargin)
 %       the target coordinate: every return, substeps included, crosses
 %       sa_validity('evaluate') with the run's solver settings.
 %   [ctx, A, R] = SA_SEARCH('call', ctx, unit, tg, guess, solver)
-%       THE executor. Budget check first (budget_calls, budget_wall,
+%       Every solve goes through here. Budget check first (budget_calls, budget_wall,
 %       budget_ring); then either REPLAY (resume: the next stored attempt must
 %       carry the same work unit; its verdict is re-derived; its attempt
 %       row and the store must replay bit-identically) or a LIVE call: journal
@@ -28,7 +35,7 @@ function varargout = sa_search(action, varargin)
 %   k = SA_SEARCH('unit_key', u)     its deterministic text form
 %   s = SA_SEARCH('solver_for', S, kind)
 %   o = SA_SEARCH('opts_for', ctx, solver)   options the module builds (zero
-%                                    solves: a probe corrector returns nothing)
+%                                    solves: a probe solve returns nothing)
 %   ctx = SA_SEARCH('checkpoint', ctx)
 %   ctx = SA_SEARCH('finish', ctx)   final derived files (pairs, the state,
 %                                    the human-facing files with the
@@ -37,7 +44,7 @@ function varargout = sa_search(action, varargin)
 %                                    refinement parent, continuation parents,
 %                                    the light-shard refill)
 %   Memory: no sol is kept in memory between calls (the refinement loads
-%   its parent by attempt id, as a resumed run always did), and the shards
+%   its parent by attempt id, as a resumed run does), and the shards
 %   are kept light (sa_record_call, flush_shards). Root counts per node:
 %   ctx.nroots (checked against the shards at every checkpoint).
 %   g = SA_SEARCH('free_gib', dir)
@@ -50,7 +57,7 @@ function varargout = sa_search(action, varargin)
 %   beside the attempt rows, like guess_nodes (never a row field or key).
 %   The cold pass calls with solver_for(S,
 %   'cold') (cold.mesh_cap: NMax = mesh_reject = cap; continuation, rescue
-%   and the pass keep S.solver; refinement as before); per phase and search
+%   and the pass keep S.solver; refinement keeps its own tolerances); per phase and search
 %   pass the order is lineages (expand) -> the per-root pass (sa_root_pass,
 %   when root_pass.enabled) -> rescue -> closure while rescue added a node;
 %   the journal 'end' line of a cold call cut by the cap carries the suffix
@@ -58,7 +65,7 @@ function varargout = sa_search(action, varargin)
 %   Screen output (sa_progress; display only, never a record or a key): a
 %   stage line when each stage starts and a status line every
 %   report.progress_interval_s seconds, checked after every call (live or
-%   replayed). The live call runs inside evalc: the corrector, its warning
+%   replayed). The live call runs inside evalc: the solver, its warning
 %   state and its lastwarn capture run exactly as without it; only the text
 %   it would print is captured and passed to sa_progress('solver_text'),
 %   which leaves out bvp4c's mesh-limit warning unless
@@ -106,7 +113,7 @@ if ~ctx.stop && S.routes.cold
         if ctx.stop, break; end
     end
 end
-% ---- import (one call per planned source root; milestone 10) -------------
+% ---- import (one call per planned source root) ---------------------------
 if ~ctx.stop && sa_import('active', ctx)
     stage(ctx, 'import (one call per source root)', 'import');
     rows = ctx.import.rows(strcmp({ctx.import.rows.status}, 'planned'));
@@ -201,9 +208,9 @@ end
 function s = solver_for(S, kind)
 % The solver options of a unit kind. Refinement: refinement
 % tolerances, nmax = mesh_reject. A cold call under a finite
-% cold.mesh_cap gets nmax = mesh_reject = cap; a legacy settings struct
-% without the cold group, or cap Inf, leaves S.solver unchanged (so stored
-% older options re-derive as they ran). Every other kind (continuation,
+% cold.mesh_cap gets nmax = mesh_reject = cap; a settings struct written
+% by an older version without the cold group, or cap Inf, leaves S.solver
+% unchanged (so stored older options re-derive as they ran). Every other kind (continuation,
 % rescue, the per-root pass) keeps S.solver.
 s = S.solver;
 if strcmp(kind, 'refinement')
@@ -259,7 +266,7 @@ error('SA:INTEGRITY', 'Integrity stop at attempt count %d: %s', numel(ctx.attemp
 end
 
 % =========================================================================
-% the executor
+% the solve entry point (sa_search('call'))
 
 function [ctx, A, R] = do_call(ctx, u, tg, guess, solver)
 A = []; R = [];
@@ -670,7 +677,7 @@ if isfield(A, 'cut_by_cap') && isequal(A.cut_by_cap, true), t = [t ' cut_by_cap'
 end
 
 function n = guess_count(guess)
-% Node count of the guess the corrector receives
+% Node count of the guess the solver receives
 % (report-only leaf; NaN when the guess carries no mesh).
 n = NaN;
 if isstruct(guess) && isfield(guess, 'x'), n = numel(guess.x); end

@@ -2,15 +2,15 @@ function rows = sa_t81_shard_repair(E)
 %SA_T81_SHARD_REPAIR  A stop between an accepted call's attempt file and its
 %   node's shard write, at a node that gets no later discovery: the replay
 %   of the next resume rewrites that shard (sa_search repair_shards).
-%   Zero bvp4c calls (stub model, the T28 multi-seed run).
+%   Zero bvp4c calls (stub model, the multi-seed run of sa_t28_lineages).
 %   The stop is built exactly: the run stops (budget) after call k - 1; the
 %   folder is copied; a resume makes call k live; then the folder is put
 %   back to the copy except for call k's attempt file and the journal lines
 %   up to its 'start' (what a kill right after the attempt write leaves:
 %   no shard flush, no 'end' line, checkpoints as before). Two cases: the
-%   node had a shard file before call k (it stays stamped below k; the T28
+%   node had a shard file before call k (it stays stamped below k; the multi-seed
 %   run, two roots per node), and call k was the node's only discovery (no
-%   shard file; the one-family run of T29, box [2 1] with the sa_m3_wall
+%   shard file; the one-family run of sa_t29_resume, box [2 1] with the sa_m3_wall
 %   refusals).
 %   Checks: after the resume the shard is stamped k and byte-equal (after
 %   the 128-byte MAT header, which holds the creation time) to the
@@ -85,7 +85,7 @@ for c = 1:numel(cases)
     rows = sa_check(rows, T, sprintf('%s: a second resume writes no repair note and leaves every shard byte', ...
         cases(c).name), numel(repair_notes(K)) == 1 && isequal(b0, shard_bytes(K)), '');
 end
-% ---- the clean folder (the T28 run) --------------------------------------------------------
+% ---- the clean folder (the multi-seed run) --------------------------------------------------------
 U = cases(1).U; rU = cases(1).rU; A = rU.attempts;
 C = fullfile(d, 'clean');
 copyfile(U, C);

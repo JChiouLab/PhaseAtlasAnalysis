@@ -1,45 +1,44 @@
 function report = build_atlas_sheets(hpss_path, hss_path, mpss_path, out_dir)
-    % BUILD_ATLAS_SHEETS  Packet 3: stitch left/right branch pairs into the nine
-    % HSS/HPSS/MPSS atlas sheets.
+    % BUILD_ATLAS_SHEETS  Stitch left/right half-cell library pairs into the nine sheets
+    % (no-peak = HSS, half-peak = HPSS, full-peak = MPSS; sheet names are <LEFT>_<RIGHT>).
     %
-    % Pure aggregation over the three branch-library files -- NO new BVPs are
-    % solved, NO branch file is modified (read-only via load()), and NO missing
-    % cell is fabricated. A sheet cell's flux/stability fields are populated
-    % ONLY where sheet_exists; NaN/false/"" elsewhere (Invariant 2).
+    % Note on the paper: this is the uncoupled approximation. The sheets and the flux below are
+    % built from isolated half cells and are not used for any figure of the paper, which solves the
+    % coupled whole-cell BVP (Eq. 8) and reads the flux J from its uniform sources (Eq. 9).
     %
-    % Mirror convention (verified 2026-07-10, exact to machine zero against the
-    % actual on-disk grids): the shared grid is built everywhere in this codebase
-    % via `[PAK_DIFF,GEF_DIFF] = meshgrid(deln_pak, deln_G)` with deln_pak,
-    % deln_G symmetric linspaces about 0. So PAK_DIFF depends only on column j,
-    % GEF_DIFF only on row i, and the mass-partition mirror point (-dP,-dG) of
-    % grid cell (i,j) is EXACTLY grid cell (res+1-i, res+1-j) -- pure index
-    % arithmetic, no interpolation, no lookup-by-value. Implemented as
-    % X(end:-1:1, end:-1:1, :), which is its own exact involution.
+    % Pure aggregation over the three library files: no new BVP is solved, no library file is
+    % modified (read-only via load()), and no missing cell is filled in. A sheet cell's
+    % flux/stability fields are populated only where sheet_exists; NaN/false/"" elsewhere.
     %
-    % sheet_exists(i,j) = left.existence_mask(i,j) & right.existence_mask(mirror(i,j))
-    % (atlas_plan.md, Existence and Stability Masks). Stability is annotation
-    % only (Invariant 3): sheet_stable_provisional = sheet_exists &
-    % half_stable_left & half_stable_right -- never a bare "sheet_stable" claim.
+    % Mirror convention (checked to machine zero against the stored grids): the shared grid is
+    % built everywhere in this codebase via `[PAK_DIFF,GEF_DIFF] = meshgrid(deln_pak, deln_G)`
+    % with deln_pak, deln_G symmetric linspaces about 0. So PAK_DIFF depends only on column j,
+    % GEF_DIFF only on row i, and the mirror point (-dP,-dG) of grid cell (i,j) is exactly grid
+    % cell (res+1-i, res+1-j): pure index arithmetic, no interpolation, no lookup by value.
+    % Implemented as X(end:-1:1, end:-1:1, :), which is its own exact involution.
     %
-    % Flux baseline (verified HPSS+HPSS case, plot_phase_planes.m calc_fluxes,
-    % index-mirrored instead of griddedInterpolant-mirrored so no value is
-    % interpolated):
+    % sheet_exists(i,j) = left.existence_mask(i,j) & right.existence_mask(mirror(i,j)).
+    % Stability is an annotation only: sheet_stable_provisional = sheet_exists &
+    % half_stable_left & half_stable_right. Stability is computed only for half-peak states;
+    % no-peak states default to stable and full-peak states are not computed, so the flag
+    % marks half-peak instability only.
+    %
+    % Flux (diagnostic approximation, not Eq. 9; right half taken as the index-mirrored left half):
     %   U_flux = -2*Dc*(p_left - p_right),  V_flux = -2*Dc*(vw_left - vw_right)
-    % where p/vw are read directly from each branch's own flux_values (already
-    % populated by Packet 1D/2 at the branch's own correct reference location --
-    % trough for HPSS, uniform value for HSS, outer trough at the half-domain
-    % interface for MPSS) and flux_left_source/flux_right_source are copied
-    % through verbatim from the branch's own flux_source_location (provenance
-    % preserved, not relabelled).
+    % U_flux and V_flux are the velocities of Delta n_PAK and Delta n_GEF (paper Eq. 9: dDn/dt = -2J).
+    % p and vw (cytosolic PAK and GEF; vw = v + w) are read from each library's flux_values, taken at
+    % the trough for a half-peak state, the uniform value for a no-peak state, and the outer trough
+    % at the half-domain interface for a full-peak state. flux_left_source/flux_right_source are
+    % copied unchanged from the library's flux_source_location.
     %
-    % Args (all optional; default to the canonical branch_*_latest.mat):
+    % Args (all optional; default to the latest branch_*_latest.mat):
     %   hpss_path, hss_path, mpss_path, out_dir
     %
-    % Output: data/outputs/atlas_sheets_<id>.mat (+ atlas_sheets_latest.mat).
+    % Output: atlas_sheets_<id>.mat (+ atlas_sheets_latest.mat) in out_dir.
     % Top-level fields: PAK_DIFF, GEF_DIFF, res, L_total, M_BG, M_P, par,
     % computation_id, source_HSS_path/HPSS_path/MPSS_path, source_HSS_id/
     % HPSS_id/MPSS_id, sheet_names (1x9 cellstr), sheets (1x1 struct with the
-    % 9 fields '<LEFT>_<RIGHT>', each holding the Required Output Fields:
+    % 9 fields '<LEFT>_<RIGHT>', each holding:
     % left_type, right_type, PAK_DIFF, GEF_DIFF, sheet_exists, half_stable_left,
     % half_stable_right, sheet_stable_provisional, U_flux, V_flux,
     % left_type_used, right_type_used, flux_left_source, flux_right_source,
@@ -53,7 +52,7 @@ function report = build_atlas_sheets(hpss_path, hss_path, mpss_path, out_dir)
     if ~exist(out_dir, 'dir'), mkdir(out_dir); end
 
     computation_id = datestr(now, 'yyyymmdd_HHMMSS');
-    fprintf('=== build_atlas_sheets (Packet 3) ===\n');
+    fprintf('=== build_atlas_sheets ===\n');
 
     % ---- load branch libraries, READ-ONLY (load() only, never save() to these) ----
     types = {'HSS', 'HPSS', 'MPSS'};
@@ -93,9 +92,8 @@ function report = build_atlas_sheets(hpss_path, hss_path, mpss_path, out_dir)
     res = B.HSS.res; L_total = B.HSS.L_total; M_BG = B.HSS.M_BG; M_P = B.HSS.M_P;
     par = B.HSS.par;
 
-    % ---- Invariant-3 input sanity: is_stable must already be false wherever
-    % existence is false in every source branch (informational; source data is
-    % trusted but verified, not assumed) ----
+    % ---- input check: is_stable must already be false wherever existence is false in
+    % every source library (informational) ----
     for k = 1:3
         t = types{k};
         fname = sprintf('source_invariant3_%s', t);
@@ -125,7 +123,7 @@ function report = build_atlas_sheets(hpss_path, hss_path, mpss_path, out_dir)
     checks.mirror_involution_exact = max(abs(PAK_DIFF(:) + PM(:))) == 0 && max(abs(GEF_DIFF(:) + GM(:))) == 0;
 
     % ---- swap-symmetry checks: sheet_AB.exists(i,j) == sheet_BA.exists(mirror(i,j)) ----
-    % (atlas_plan.md: sheets 2/4, 3/7, 6/8 -- HSS+HPSS/HPSS+HSS, HSS+MPSS/MPSS+HSS, HPSS+MPSS/MPSS+HPSS)
+    % (pairs: no-peak/half-peak with half-peak/no-peak, no-peak/full-peak with full-peak/no-peak, half-peak/full-peak with full-peak/half-peak)
     swap_pairs = {'HSS_HPSS','HPSS_HSS'; 'HSS_MPSS','MPSS_HSS'; 'HPSS_MPSS','MPSS_HPSS'};
     for r = 1:size(swap_pairs, 1)
         a = swap_pairs{r,1}; b = swap_pairs{r,2};
@@ -172,7 +170,7 @@ function report = build_atlas_sheets(hpss_path, hss_path, mpss_path, out_dir)
     checks.no_fabrication_all_sheets = no_fab_ok;
     checks.no_fabrication_first_violation = first_bad;
 
-    % ---- MPSS flux-label check: verify (not assume) the required label ----
+    % ---- full-peak flux-label check: verify the required label ----
     mpss_label_ok = true;
     for k = 1:numel(sheet_names)
         parts = strsplit(sheet_names{k}, '_');

@@ -1,12 +1,12 @@
 """Crank-Nicolson time-stepper for the 5-species Gef/Pak1 MCRD system, generalizing
-Appendix A of the paper (Eqs. A5-A14) from 2 species to 5.
+Appendix A of Dao et al. (2026) (Eqs. A5-A14) from 2 species to 5.
 
 Because diffusion is diagonal (D = Diag(D_u, D_q, D_v, D_w, D_p), no cross-diffusion),
 the linear (diffusive) part of the Crank-Nicolson update decouples into 5 independent
-per-species linear solves -- exactly the structure of the paper's Au/Av, Bu/Bv blocks,
+per-species linear solves -- exactly the structure of the Au/Av, Bu/Bv blocks,
 just with 5 blocks instead of 2. The nonlinear reaction term f(u_vec) couples the 5
 species pointwise at each grid location (not across grid locations), so it's handled
-with the same fixed-point (Picard) iteration the paper uses for its nonlinear phi term,
+with the same fixed-point (Picard) iteration that Dao et al. (2026) use for its nonlinear phi term,
 generalized to vector-valued f.
 
 Noise (independent OU fields on u and q, from noise.py) is injected as an explicit

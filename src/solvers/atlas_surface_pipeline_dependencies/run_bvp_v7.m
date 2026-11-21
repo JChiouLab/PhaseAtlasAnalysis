@@ -1,7 +1,5 @@
-% run_bvp_v7  --  shared V7 per-point BVP core (extracted 2026-07-09, Packet 1B).
-% Single source of truth for run_hybrid_sweeper_pdefb.m AND build_mpss_branch.m.
-% Extracted verbatim from run_hybrid_sweeper_pdefb.m; do not fork. Equations, BCs,
-% tolerances, and mass conventions are unchanged.
+% run_bvp_v7  --  one bvp4c solve of the isolated half-cell BVP; success requires species positive up to 1e-3.
+% Shared by run_hybrid_sweeper_pdefb.m and build_mpss_branch.m; keep a single copy.
 function [bvp_sol, success] = run_bvp_v7(guess_sol, L, par, D, nG, nP)
     options = bvpset('RelTol', 1e-6, 'NMax', 10000);
     bvp_sol = []; success = false;

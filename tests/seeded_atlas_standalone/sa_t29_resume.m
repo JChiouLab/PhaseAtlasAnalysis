@@ -1,6 +1,6 @@
 function rows = sa_t29_resume(E)
-%SA_T29_RESUME  Milestone-3 T29: kill, then resume == uninterrupted (strict
-%   resume equivalence, packet 2e) for kills mid-call (journal start, no
+%SA_T29_RESUME  Kill, then resume == uninterrupted (strict
+%   resume equivalence) for kills mid-call (journal start, no
 %   file), during an attempt save (planted .tmp_ file, no attempt file),
 %   between the attempt file and its 'end' line, and at EVERY call boundary;
 %   'interrupted' records count toward budget.max_calls only, never toward

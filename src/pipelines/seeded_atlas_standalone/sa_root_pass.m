@@ -1,5 +1,8 @@
 function varargout = sa_root_pass(action, varargin)
-%SA_ROOT_PASS  Per-root continuation pass.
+%SA_ROOT_PASS  Per-root continuation pass: step from every stored
+%   quasi-steady state (root) to the neighbouring grid points that lack a
+%   matching one. A lineage is the chain of continuation steps that starts
+%   from one cold call.
 %
 %   ctx = SA_ROOT_PASS('run', ctx)
 %       Rounds of the pass for the current phase and search pass, placed
@@ -43,12 +46,13 @@ function varargout = sa_root_pass(action, varargin)
 %       -axis1, +axis2, -axis2. T: struct array (p, q, root, attempt,
 %       family, dn, dir). D: counts (start_roots, start_nodes, candidates,
 %       known_a, known_b_only, posed).
-%       Milestone 10, source-edge knowledge (ctx.ik active, sa_import
+%       Source-edge knowledge (ctx.ik active, sa_import
 %       'knowledge'): a target is also left out when the source run already
 %       posed it -- (a) ik.pass_a holds root|q, (b) ik.pass_b holds root|q --
 %       counted in D.source_a / D.source_b (only then present) and recorded
 %       in Q.source_skips (categories pass_a, pass_b) by 'run'.
-%       Family fence (ctx.fence, sa_continuation): a root whose observed
+%       Family fence (ctx.fence, sa_continuation; restricts the run to the
+%       selected sheets): a root whose observed
 %       family is outside the fence is never a start root r (not counted in
 %       start_roots); D.fence_withheld (only with a fence) counts them, and
 %       'run' adds it to Q.fence.pass_starts_withheld. Its children are
@@ -181,7 +185,7 @@ if isfield(ctx, 'fence') && iscell(ctx.fence) && ~isempty(ctx.fence)
 end
 K = [];
 if isfield(ctx, 'ik') && isstruct(ctx.ik) && isfield(ctx.ik, 'active') && ctx.ik.active
-    K = ctx.ik;                              % source-edge knowledge (milestone 10)
+    K = ctx.ik;                              % source-edge knowledge
     D.source_a = 0; D.source_b = 0;
     D.source_list = struct('category', {}, 'lineage', {}, 'round', {}, 'p', {}, 'q', {}, 'root', {});
 end

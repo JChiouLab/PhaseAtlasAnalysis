@@ -35,11 +35,15 @@ function varargout = sa_settings(action, varargin)
 %       Prints the documented default table (one line per leaf).
 %
 %   GROUPS AND DOCUMENTED DEFAULTS (shared, model-free)
-%     model              (char, REQUIRED)  model-module id, resolved by sa_model
+%   (A pool is one conserved protein; each lattice axis is the split of one
+%   pool between the two halves, so there is one axis per pool. A node is a
+%   grid point of the lattice. A family is a sheet, named by its family
+%   label.)
+%     model             (char, REQUIRED)  model-module id, resolved by sa_model
 %     mode               'smoke'           'smoke' | 'pilot' | 'production' |
 %                                          'focus' (selected roots of an
-%                                          earlier run as seeds, with a
-%                                          family fence; see FOCUS MODE
+%                                          earlier run as starting profiles,
+%                                          with a family fence; see FOCUS MODE
 %                                          below) (a scientific leaf: a
 %                                          resume with another mode is refused)
 %     run_dir            (char, REQUIRED)  output directory for this run; must
@@ -72,7 +76,7 @@ function varargout = sa_settings(action, varargin)
 %                                          'per_seed_centre' (per_seed's
 %                                          targets, cold calls ordered nearest
 %                                          d = 0 first; a run option, never a
-%                                          default; milestone 8)
+%                                          default)
 %     targets.list       zeros(0,n_pools)  explicit integer lattice indices
 %                                          (each selected family, if seedable)
 %     targets.per_family struct()          'nearest_anchor': count per family,
@@ -86,9 +90,9 @@ function varargout = sa_settings(action, varargin)
 %                                          folder offers); families are their
 %                                          ordered pairs (sa_seed_modes; the
 %                                          module's seed_shape maps shapes to
-%                                          files); milestone 8
+%                                          files)
 %     scaling.reference_length  Inf        model layer (fission yeast 14,
-%                                          noxa 6): above it the model scales
+%                                          M. xanthus 6): above it the model scales
 %                                          its point counts and mesh limits
 %                                          with L (module scale_counts;
 %                                          source 'derived'); at or below it
@@ -96,7 +100,7 @@ function varargout = sa_settings(action, varargin)
 %     solver.reltol      1e-6
 %     solver.abstol      1e-8
 %     solver.nmax        20000
-%     solver.mesh_reject 20000             explicit, NOT the corrector's 3000
+%     solver.mesh_reject 20000             explicit, NOT the coupled solve's own 3000
 %     validity.n_dense                20001  uniform dense grid (positivity,
 %                                            residual, store profile)
 %     validity.interval_samples       [0.25 0.5 0.75]  fractions inside every
@@ -112,9 +116,9 @@ function varargout = sa_settings(action, varargin)
 %     identity.metric_id              'scaled_rms_v1'
 %     identity.n_comparison_nodes     2001   comparison mesh node count
 %     identity.field_scale_floor      1e-3
-%     identity.relsup_nodes           4001   dedup_roots.py common grid for the
+%     identity.relsup_nodes           4001   common grid for the
 %                                            relative-sup report distance
-%     budget.max_calls   35                 corrector calls, refinement included
+%     budget.max_calls   35                 coupled bvp4c calls, refinement included
 %     budget.max_wall_s  28800              checked before every call
 %     budget.wall_s      Inf                clean per-process stop
 %                                           (budget_wall) under the outer alarm
@@ -130,9 +134,7 @@ function varargout = sa_settings(action, varargin)
 %     continuation.starts           'anchor_and_cold'  | 'anchor'
 %     continuation.max_edges_per_node 2         per lineage and node
 %     continuation.max_lineages     10000       non-anchor lineage slots
-%                                               (milestone 10; was 16)
 %     continuation.max_calls_per_lineage 10000  non-anchor lineages
-%                                               (milestone 10; was 100)
 %     continuation.box              []          [] = whole lattice, or [b1 b2]:
 %                                               nodes with |k_c| <= b_c
 %     continuation.region           'box'       'box' (continuation.box) |
@@ -145,7 +147,9 @@ function varargout = sa_settings(action, varargin)
 %                                               its own mesh | 'uniform' |
 %                                               'subsample'
 %     continuation.guess_nodes      1000        N for 'uniform' / 'subsample'
-%     continuation.families         {}          the family fence: {} = none;
+%     continuation.families         {}          the family fence (restricts
+%                                               propagation to the listed
+%                                               sheets): {} = none;
 %                                               a cell row of observed family
 %                                               labels (mode names such as
 %                                               '1+/0'); or 'selected' (with
@@ -170,7 +174,7 @@ function varargout = sa_settings(action, varargin)
 %                                               families may land on other
 %                                               families; those roots are
 %                                               kept. Not the top-level
-%                                               families (library families
+%                                               families (sheets
 %                                               for cold seeding)
 %     rescue.rungs                  {'diagonal','secant','deep'} (that order)
 %     rescue.max_calls_per_node     16
@@ -211,7 +215,7 @@ function varargout = sa_settings(action, varargin)
 %                                               after the interior
 %     multiseed.max_roots_per_node  10000       no lineage edge into a node
 %                                               holding this many distinct
-%                                               roots (milestone 10; was 4)
+%                                               roots
 %     checkpoint.every_calls        25          checkpoint files (attempts.mat,
 %                                               queue.mat, process_time.mat)
 %                                               rewritten
@@ -220,8 +224,8 @@ function varargout = sa_settings(action, varargin)
 %                                               every checkpoint)
 %     resume                        false       true: continue run_dir
 %     resume_code_override          false       false, or the reason (text)
-%                                               for a lead-approved resume
-%                                               across a code-hash change
+%                                               for resuming across a
+%                                               code-hash change
 %     identity.candidate_mesh       'dense'     | 'comparison'
 %   MESH CAP, PASS AND THINNING GROUPS (PACKAGE defaults are neutral; the
 %   defaults in force sit in the model layer --
@@ -235,11 +239,10 @@ function varargout = sa_settings(action, varargin)
 %                                               solver.mesh_reject
 %     root_pass.enabled             false       per-root continuation pass
 %                                               (sa_root_pass); model layer:
-%                                               fission yeast true, noxa false
+%                                               fission yeast true, M. xanthus false
 %     root_pass.max_halvings        1           h of a pass edge (<= 2h+1
 %                                               calls); <= continuation.max_halvings
 %     root_pass.max_rounds          10000       rounds per search pass
-%                                               (milestone 10; was 8)
 %     root_pass.max_calls_per_round Inf         reached: the pass ends for the
 %                                               current search pass
 %                                               (status root_pass_cap)
@@ -250,7 +253,7 @@ function varargout = sa_settings(action, varargin)
 %     targets.thin.stride           1           positive integer
 %     targets.thin.offset           []          one integer per pool in
 %                                               [0, stride-1] ([] = zeros)
-%   IMPORT GROUP (milestone 10; inert while import.source_dir is ''):
+%   IMPORT GROUP (inert while import.source_dir is ''):
 %     import.source_dir             ''          a finished run folder whose
 %                                               roots seed this run: each is
 %                                               re-solved once at the nearest
@@ -315,8 +318,9 @@ function varargout = sa_settings(action, varargin)
 %   user; import.source_edges defaults to 'auto' and continuation.families
 %   to 'selected' (source 'mode'; a value set by the user wins, {} = no
 %   fence).
-%     model_options      (from M.model_options_defaults; for the original model
-%                         hss_branch, guess mesh, corrector gate tolerances and
+%     model_options      (from M.model_options_defaults; for the fission yeast
+%                         (original_polarity) model hss_branch, guess mesh,
+%                         solver gate tolerances and
 %                         the family label's constants (shape_flat_tol,
 %                         shape_turn_frac, shape_edge_frac, shape_nodes; see
 %                         sa_mode_name); main_variable, the '+'-sum of the
@@ -325,7 +329,7 @@ function varargout = sa_settings(action, varargin)
 %                         sa_main_variable)
 %
 %   The solver itself is NOT a setting: seeded_atlas_run takes an optional
-%   injected corrector (tests use stubs); otherwise the module's real one.
+%   injected solver (tests use stubs); otherwise the module's real one.
 %
 %   DERIVED MEMBERS filled by the resolver and rejected in user input:
 %     software_version, resolved_at, model_version, settings_format
@@ -352,7 +356,7 @@ end
 % =========================================================================
 
 function v = software_version()
-v = 'seeded_atlas_standalone/1.0.0-rc2';
+v = 'seeded_atlas_standalone/1.0.0-rc3';
 end
 
 function P = provenance()
@@ -390,7 +394,7 @@ D.targets  = struct('policy', 'central_nine', 'list', zeros(0,0), ...
                     'per_family', struct(), ...
                     'thin', struct('families', {{}}, 'stride', 1, 'offset', []));   % lever (off)
 D.families = {};
-D.seed_modes = {'0', '1+', '2-'};                                      % milestone 8: today's shapes
+D.seed_modes = {'0', '1+', '2-'};                                      % the paper's three shapes: no-peak, half-peak, full-peak
 D.scaling  = struct('reference_length', Inf);                          % off at package level
 D.solver   = struct('reltol', 1e-6, 'abstol', 1e-8, 'nmax', 20000, ...
                     'mesh_reject', 20000);
@@ -443,10 +447,10 @@ end
 function S = legacy_fill(S)
 % Fill the leaves missing from an older stored effective settings struct
 % with their NEUTRAL values (cap
-% Inf, pass off, no thinning, import off), so loaders treat a legacy folder
-% as it ran. Never written back; leaves present are left untouched. A
-% missing root_pass group takes today's defaults (max_rounds 10000): inert,
-% since such a folder (before milestone 5) ran with the pass off.
+% Inf, pass off, no thinning, import off), so loaders treat a folder
+% written by an older version as it ran. Never written back; leaves present
+% are left untouched. A missing root_pass group takes the current defaults
+% (max_rounds 10000): inert, since such a folder ran with the pass off.
 if ~isstruct(S), return; end
 D = defaults();
 if isfield(S, 'lattice') && isstruct(S.lattice) && ~isfield(S.lattice, 'points_per_axis')
@@ -454,14 +458,14 @@ if isfield(S, 'lattice') && isstruct(S.lattice) && ~isfield(S.lattice, 'points_p
 end
 if ~isfield(S, 'cold') || ~isstruct(S.cold), S.cold = D.cold; end
 if ~isfield(S.cold, 'mesh_cap'), S.cold.mesh_cap = Inf; end
-if ~isfield(S, 'seed_modes'), S.seed_modes = D.seed_modes; end         % before 0.12: today's shapes
+if ~isfield(S, 'seed_modes'), S.seed_modes = D.seed_modes; end         % older folders: the default shapes
 if ~isfield(S, 'scaling') || ~isstruct(S.scaling), S.scaling = D.scaling; end
 if ~isfield(S, 'root_pass') || ~isstruct(S.root_pass), S.root_pass = struct(); end
 for f = fieldnames(D.root_pass).'
     if ~isfield(S.root_pass, f{1}), S.root_pass.(f{1}) = D.root_pass.(f{1}); end
 end
 S.root_pass.enabled = logical(S.root_pass.enabled);
-if ~isfield(S, 'import') || ~isstruct(S.import), S.import = D.import; end   % before 1.0.0-rc2: no import
+if ~isfield(S, 'import') || ~isstruct(S.import), S.import = D.import; end   % older folders: no import
 S = fill_focus_leaves(S);
 if isfield(S, 'targets') && isstruct(S.targets)
     if ~isfield(S.targets, 'thin') || ~isstruct(S.targets.thin), S.targets.thin = D.targets.thin; end
@@ -475,7 +479,7 @@ function S = fill_focus_leaves(S)
 % The selection, stopped-source and fence leaves (focus mode) at their
 % neutral values, where a stored struct lacks them (a folder made before
 % they existed ran without them); leaves present are left untouched. Used
-% by legacy_fill and by the resume comparison (sa_resume), so such a
+% by legacy_fill (older-folder fill) and by the resume comparison (sa_resume), so such a
 % folder is compared as it ran.
 if ~isstruct(S), return; end
 if isfield(S, 'import') && isstruct(S.import)
@@ -527,7 +531,7 @@ end
 end
 
 function [S, SRC] = scale_counts(M, theta, S, SRC)
-% Point counts that grow with L (packet section 6): the module's scale_counts
+% Point counts that grow with L: the module's scale_counts
 % (the arithmetic lives in the model layer) above scaling.reference_length;
 % nothing at or below it. User values win (the module scales only leaves
 % whose source is package or model). The cold cap may only tighten.
@@ -808,7 +812,7 @@ end
 require_posint(S.search.max_passes, 'settings.search.max_passes', id);
 require_logical(S.search.ring_last, 'settings.search.ring_last', id);
 require_posint(S.multiseed.max_roots_per_node, 'settings.multiseed.max_roots_per_node', id);
-% ---- import (milestone 10) ------------------------------------------------
+% ---- import ------------------------------------------------
 require_scalar_struct(S.import, 'settings.import', id);
 v = S.import.source_dir;
 if ~(ischar(v) && (isempty(v) || isrow(v)))
@@ -839,7 +843,7 @@ require_logical(S.resume, 'settings.resume', id);
 o = S.resume_code_override;
 if ~(isequal(o, false) || (ischar(o) && isrow(o) && ~isempty(strtrim(o))))
     error(id, ['settings.resume_code_override must be false or the nonempty reason ' ...
-        '(text) for a lead-approved resume across a code-hash change.']);
+        '(text) for a deliberate resume across a code-hash change.']);
 end
 
 % ---- contradictions ----------------------------------------------------
@@ -1025,7 +1029,7 @@ end
 function [U, dropped] = from_run(run_dir, new_mode)
 f = fullfile(sa_layout('state', run_dir), 'settings_user.mat');
 if exist(f, 'file') ~= 2
-    error('SA:SETTINGS:E_FROM_RUN', '%s holds no settings_user.mat (not a milestone-4 run folder).', run_dir);
+    error('SA:SETTINGS:E_FROM_RUN', '%s holds no settings_user.mat (not a run folder of this package).', run_dir);
 end
 Z = load(f, 'settings');
 U = Z.settings;
@@ -1167,7 +1171,7 @@ end
 k = find(mod(v, 2) == 0, 1);
 if ~isempty(k)
     error(id, ['lattice.points_per_axis = %d is even; the anchor is the middle node, so the count must ' ...
-        'be odd: use %d or %d. (This is not the uncoupled res, a closed grid over 95 %% of the range ' ...
+        'be odd: use %d or %d. (Unlike res, the half-cell library grid, a closed grid over 95 %% of the range ' ...
         'that allows even counts; points_per_axis spans the open physical range.)'], v(k), v(k) - 1, v(k) + 1);
 end
 end

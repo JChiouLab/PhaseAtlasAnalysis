@@ -1,4 +1,4 @@
-"""First-pass deliverable: does paper-style OU active noise change the dynamics of the
+"""Example script: does OU active noise (Dao et al. 2026) change the dynamics of the
 Gef/Pak1 MCRD system?
 
 Runs one noiseless and one noisy trajectory from the same (equilibrium + small
@@ -9,11 +9,9 @@ so the only difference between the two runs is the OU forcing itself. Produces:
   - n_GEF(t) and n_pak(t) for both runs, to quantify how much the *unconstrained*
     noise on (u, q) drifts the two conserved masses
 
-ALL PARAMETER VALUES BELOW ARE PLACEHOLDERS. They were chosen only to give a valid
-positive homogeneous equilibrium and a numerically well-behaved run, so a first
-execution is a mechanics check (does the machinery work, does it visibly show
-something) -- not a physically calibrated result. Swap in real values before drawing
-scientific conclusions.
+ALL PARAMETER VALUES BELOW ARE PLACEHOLDERS (not the Fig. 4 parameters; see noise_driver.py).
+They were chosen only to give a valid positive homogeneous equilibrium and a numerically
+well-behaved run, so an execution is a mechanics check, not a calibrated result.
 """
 
 from __future__ import annotations
@@ -34,8 +32,8 @@ from gef_pak_noise.solver import MCRDSolver, SimulationResult, _SPECIES
 
 REACTION_PARAMS = ReactionParams(a=1.0, b=1.0, c=1.0, d=1.0, e=1.0, f=1.0)  # PLACEHOLDER
 
-# Membrane species (u, q) assumed slow; cytosolic (v, w, p) assumed fast -- see the
-# diffusion-label discrepancy flagged in the plan. Flip this if it's backwards.
+# Membrane species (u, q) assumed slow; cytosolic (v, w, p) assumed fast -- flip
+# this if it is backwards.
 DIFFUSION = {"u": 0.1, "q": 0.1, "v": 5.0, "w": 5.0, "p": 5.0}  # PLACEHOLDER
 
 N_GEF = 5.0  # PLACEHOLDER -- control parameter: total Gef
@@ -48,7 +46,7 @@ DT = 0.01
 T_FINAL = 20.0
 SAVE_EVERY = 20
 
-NOISE_A = 0.05  # PLACEHOLDER -- integrated noise strength (paper's Eq. 3)
+NOISE_A = 0.05  # PLACEHOLDER -- integrated noise strength (Eq. 3 of Dao et al. 2026)
 NOISE_TAU_C = 1.0  # PLACEHOLDER -- OU correlation time
 PERTURBATION_AMPLITUDE = 0.01  # relative amplitude of initial random perturbation
 SEED = 0
@@ -108,7 +106,7 @@ def main():
     make_plots(result_clean, result_noisy, equilibrium)
     save_arrays(result_clean, result_noisy)
 
-    # Quantify the two things this first pass is meant to test.
+    # Quantify the two things this script is meant to test.
     report(result_clean, result_noisy, equilibrium)
 
 

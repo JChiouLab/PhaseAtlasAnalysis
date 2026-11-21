@@ -1,9 +1,9 @@
 function rows = sa_t65_replay(E)
-%SA_T65_REPLAY  Milestone-6 T65 (packet v0.2 sections 3.2, 6): replay and
+%SA_T65_REPLAY  Replay and
 %   kill/resume with mesh traces. Zero solves (stub corrector that notes a
-%   trace like the traced bvp4c). The existing kill/resume tests (T29, T30,
-%   T38/39, T55's pass kill, T57's journal round trip) run unchanged in
-%   their suites (M3, M5).
+%   trace like the traced bvp4c). The other kill/resume tests (sa_t29_resume,
+%   sa_t30_resume_refusals, sa_t38_39_budget_checkpoint, sa_t57_cold_cap) run
+%   unchanged in the same suite.
 %   - a stub run killed mid-edge (inside a continuation edge, at a substep)
 %     resumes equivalent to its uninterrupted twin (sa_m3_equiv, every
 %     trace compared without the per-process token);

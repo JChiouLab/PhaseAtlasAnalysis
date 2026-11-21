@@ -1,9 +1,9 @@
 function varargout = sag_library(action, varargin)
-%SAG_LIBRARY  Read-only reader of the Guzzo_noXA uncoupled seed libraries.
+%SAG_LIBRARY  Read-only reader of the M. xanthus uncoupled libraries (isolated half-cell states).
 %
 %   lib = SAG_LIBRARY('load', manifest, theta, parameters)
 %       manifest = struct('directory', d) plus an optional 'confirmation'
-%       (a pre-seeding confirmation file). Unknown fields are
+%       (a confirmation file with seedable masks). Unknown fields are
 %       refused. Loads the labels, axes, masks and `par` of
 %       branch_{HSS,HPSS,MPSS}_latest.mat (not the profiles) and records each
 %       file's path, bytes and SHA-256. Fails closed unless:
@@ -18,7 +18,7 @@ function varargout = sag_library(action, varargin)
 %       with its seedable masks (confirmed or band), after its
 %       model_version and the library SHA-256 values are checked.
 %   lib = SAG_LIBRARY('load', manifest, theta, parameters, types)
-%       (milestone 8) the same, for the active seed types (sag_seed_shape):
+%       the same, for the active seed shapes (sag_seed_shape):
 %       the three files above are always loaded, in that order; a mode-n
 %       file branch_MODE<n>_latest.mat (gnx_build_mode) is loaded (and enters
 %       lib.files) only when an active type needs it, with the same label,
@@ -27,28 +27,28 @@ function varargout = sag_library(action, varargin)
 %       [0 Lh; 0 L/(2n)]). A missing needed mode file is error SA:SEED:E_FILE,
 %       one with run_status 'empty' SA:SEED:E_EMPTY. A type made on load
 %       (1-, 2+, n+, n-) uses its base file's mask (after the confirmation
-%       intersection). Without types (or with the default types) lib is as
-%       in 0.11.
+%       intersection). Without types (or with the default types) only the
+%       three base files are loaded.
 %   lib = SAG_LIBRARY('profiles', lib, types)
 %   c = SAG_LIBRARY('cell', lib, theta, d)       d = [dn_R dn_B]
 %       Native cell [row col] = [index of dn_B, index of dn_R]; in_range
 %       within +-dn_half_range*(1 + 1e-12); offsets in native spacings.
 %   h = SAG_LIBRARY('half', lib, theta, type, cell, model_options)
 %       Concentrations Rm Rc Bm Bc (4 x guess_nodes) on
-%       xg = linspace(0, Lh, guess_nodes), pole -> seam, dispatched on
+%       xg = linspace(0, Lh, guess_nodes), pole -> middle, dispatched on
 %       storage_kind: uniform state (HSS; hss_branch 'single_root' requires
 %       exactly one root), deval of the bvp4c struct (HPSS, peak at the pole),
 %       deval of the quarter struct reflected peak-to-peak (MPSS:
 %       half(x) = quarter(|x - L/4|), the writer's rule).
-%       Milestone 8, made on load (dispatched on the type's transform):
+%       Made on load (dispatched on the type's transform):
 %       1- (M1m) the HPSS half's samples column-reversed (the guess grid is
 %       uniform, so this is the exact mirror image); 2+ (M2p) deval of the
 %       MPSS quarter at L/4 - |x - L/4| (peaks at both ends); n+ / n- (M<n>p
 %       / M<n>m) deval of the mode-n piece at the fold (sag_seed_shape
-%       'fold', piece length L/(2n)): P-start / T-start.
+%       'fold', piece length L/(2n)): peak-start / trough-start.
 %   [g, why] = SAG_LIBRARY('pair_guess', lib, theta, tL, cL, tR, cR, mo)
 %       The 24-row cold guess from two halves (sag_coupled24 'pair_guess').
-%       Each half is already in its own pole -> seam parameterization, so the
+%       Each half is already in its own pole -> middle parameterization, so the
 %       right half is not reversed.
 
 switch action
@@ -66,7 +66,7 @@ end
 
 function E = expected_labels(Lh, L, n)
 E = struct();
-if nargin >= 3                             % milestone 8: the mode-n file of gnx_build_mode
+if nargin >= 3                             % the mode-n file of gnx_build_mode
     E.(sprintf('MODE%d', n)) = struct('orientation', 'trough_at_0', ...
         'storage_kind', 'piece_bvp4c+stitched_xy', 'domain', [0 Lh; 0 L / (2 * n)]);
 end
@@ -216,7 +216,7 @@ end
 lib.files = files;
 for k = 1:numel(info_of)                     % the active types (made on load: base mask)
     ty = info_of(k).type;
-    if strcmp(ty, info_of(k).base), continue; end   % a stored type: as in 0.11
+    if strcmp(ty, info_of(k).base), continue; end   % a stored type: nothing to do
     bB = lib.B.(info_of(k).base);
     lib.mask.(ty) = lib.mask.(info_of(k).base);
     lib.B.(ty) = struct('path', bB.path, 'SOL', [], 'SOL_quarter', [], 'n_roots', [], ...
@@ -290,7 +290,7 @@ for t = 1:numel(types)
                 S = load(B.path, 'SOL', 'SOL_quarter');
                 lib.B.(ty).SOL = S.SOL; lib.B.(ty).SOL_quarter = S.SOL_quarter;
             end
-        case 'piece_bvp4c+stitched_xy'                 % milestone 8: the mode-n piece
+        case 'piece_bvp4c+stitched_xy'                 % the mode-n piece
             if isempty(B.SOL_piece)
                 S = load(B.path, 'SOL_piece'); lib.B.(ty).SOL_piece = S.SOL_piece;
             end
@@ -342,7 +342,7 @@ B = lib.B.(type);
 xg = linspace(0, theta.Lh, mo.guess_nodes);
 tr = 'none';
 if isfield(B, 'transform'), tr = B.transform; end
-switch tr                                  % milestone 8: shapes made on load
+switch tr                                  % shapes made on load
     case 'rotate'                          % 2+: the MPSS quarter, peaks at both ends
         if isempty(B.SOL_quarter), error('SAG:LIBRARY', 'MPSS profiles are not loaded.'); end
         s = B.SOL_quarter{i, j};

@@ -1,31 +1,31 @@
 function S = gnx_sweep_hpss(P, ell, kind, opts)
-%GNX_SWEEP_HPSS  Half-peak search on a segment [0, ell] (packet §4h).
+%GNX_SWEEP_HPSS  Half-peak (HPSS) search on a segment [0, ell] (M. xanthus model).
 %
 %   S = GNX_SWEEP_HPSS(P, ell, kind)
 %   S = GNX_SWEEP_HPSS(P, ell, kind, opts)
 %   P: gnx_model('parameters'); ell: segment length (Lh = L/2 for HPSS,
 %   L/4 for MPSS quarters); kind: 'hpss' | 'quarter' (validity kind).
 %   Segment masses n = (rho + dn/2)*ell (same densities on every segment, so
-%   the grid cell is unchanged; run_stage3_noxa.m:218-220 with rho = 1).
-%   Myxo's search (run_stage3_noxa.m) with our gates:
-%     anchor bins centre-first 3 x 3 (:69-83), 15 constructed guesses
-%     (3 amplitudes x 5 widths, :257-275, 292-302), anchor column then rows
-%     with break on the first failure (:99-131), constructed-seed pass on
-%     every unsolved cell (:141-152), up to 3 neighbour rescue passes
-%     (:158-182). Warm starts evaluate the neighbour on the uniform
-%     121-point mesh (try_from, :281-290). No anchor is an empty result.
+%   the grid cell is unchanged; as in the reference M. xanthus code with rho = 1).
+%   The search follows the reference M. xanthus code, with the validity gates added:
+%     anchor bins centre-first 3 x 3, 15 constructed guesses
+%     (3 amplitudes x 5 widths), anchor column then rows
+%     with break on the first failure, constructed-seed pass on
+%     every unsolved cell, up to 3 neighbour retry passes.
+%     Warm starts evaluate the neighbour on the uniform
+%     121-point mesh (try_from). No anchor is an empty result.
 %   A solve is accepted iff its gnx_validity record passes; a converged
 %   peak-at-ell return gets one orientation re-solve from
-%   gnx_guess('reverse', sol) (RC-7) and only a converged peak-at-0 result
+%   gnx_guess('reverse', sol) and only a converged peak-at-0 result
 %   is accepted.
-%   Bounds (RC-8): at most opts.max_calls bvp4c calls per sweep (default
+%   Bounds: at most opts.max_calls bvp4c calls per sweep (default
 %   20000), then the sweep stops and keeps its accepted cells
 %   (S.cap_reached); S.n_nmax counts calls whose mesh reached NMax;
 %   opts.ckpt_path (optional): SOLS and records saved after every phase.
 %   opts.solve_opts is passed to gnx_solve (tests inject bvp_fun there).
-%   S.attempt_log (E2, phase B): one row per attempt (phase, cell, guess,
-%   first solve, orientation re-solve, validity outcome), for the §5.3
-%   attribution; checkpointed with SOLS. Recording only; no decision reads it.
+%   S.attempt_log: one row per attempt (phase, cell, guess,
+%   first solve, orientation re-solve, validity outcome), for attributing
+%   failures; checkpointed with SOLS. Recording only; no decision reads it.
 
 if nargin < 4 || isempty(opts), opts = struct(); end
 D = gnx_model('descriptor');

@@ -1,19 +1,20 @@
 function R = gnx_build_mode(P, n, out_dir, opts, varargin)
-%GNX_BUILD_MODE  Mode-n library: n copies of a reflected piece half-peak
-%   (milestone-8 packet sections 3.1-3.3; the noxa twin of build_mode_branch).
+%GNX_BUILD_MODE  Higher-mode half-cell library, mode n: n copies of a reflected half-peak piece
+%   (M. xanthus counterpart of build_mode_branch; the paper uses only no-peak, half-peak and
+%   full-peak states, so modes n >= 3 are an extension).
 %
 %   R = GNX_BUILD_MODE(P, n, out_dir)
 %   R = GNX_BUILD_MODE(P, n, out_dir, opts)
 %       P = gnx_model('parameters', ...); n >= 2 integer (production n >= 3;
-%       n = 2 is today's MPSS and is allowed for tests); out_dir = the
+%       n = 2 is the full-peak state and is allowed for tests); out_dir = the
 %       library folder, which must already hold branch_{HSS,HPSS,MPSS}_latest
-%       .mat of the same P (the grid, Lh, res and model_version are COPIED
+%       .mat of the same P (the grid, Lh, res and model_version are copied
 %       from branch_HSS_latest.mat and checked bit-equal to the HPSS and MPSS
 %       siblings; never taken from the sweep).
-%       1. The piece: gnx_sweep_hpss(P, P.L/(2n), 'quarter', so), UNCHANGED,
+%       1. The piece: gnx_sweep_hpss(P, P.L/(2n), 'quarter', so), unchanged,
 %          so = opts.sweep with so.ckpt_path = <out_dir>/mode<n>_work/
 %          checkpoint_piece_<run_id>.mat. Piece masses (rho + dn/2) * l are
-%          1/n of the half masses at the same densities (gnx_sweep_hpss:8-9).
+%          1/n of the half masses at the same densities (see gnx_sweep_hpss).
 %       2. Every found piece is stitched T-start (a trough at the pole) and
 %          tested (gnx_build_mode('record', ...)); a cell is in the mask iff
 %          every check passes; fail_reason = the first failing check or
@@ -23,14 +24,15 @@ function R = gnx_build_mode(P, n, out_dir, opts, varargin)
 %          mask is all false (the file is still written), else 'complete'.
 %   opts: sweep (struct for gnx_sweep_hpss: max_calls, solve_opts (tests
 %       inject bvp_fun there), verbose), run_id (default a timestamp),
-%       n2_branch ('legacy' (default) | 'general'; which record runs at n = 2).
+%       n2_branch ('legacy' (default) | 'general'; which record runs at n = 2: 'legacy' is the
+%       full-peak record of gnx_validity.m, 'general' the code for any n).
 %   R: path, latest, n_valid, run_status, n_calls, ell, sweep_file.
 %
 %   rec = GNX_BUILD_MODE('record', n, qrec, solq, ctx)       general n
 %   rec = GNX_BUILD_MODE('record_legacy', qrec, solq, ctx)   n = 2, the
-%       gnx_validity.m:156-188 mpss record copied verbatim (kind 'mpss').
+%       mpss record of gnx_validity.m, copied unchanged (kind 'mpss').
 %       ctx: par, ell_q, nR_half, nB_half (as gnx_build_mpss).
-%       General n (kind 'mode'), checks in the legacy order:
+%       General n (kind 'mode'), checks in the n = 2 order:
 %         quarter_valid  the piece's 'quarter' record passes
 %         seam_slope     |Bm'(0)| of the piece (its peak end) <= mpss_slope
 %         trough_slope   n >= 3 only: |Bm'(l)| (its trough end, an interior
@@ -44,19 +46,19 @@ function R = gnx_build_mode(P, n, out_dir, opts, varargin)
 %                        arithmetic; <= mpss_sym
 %         mass_doubling  dense mass of the stitch, the piece's Hermite
 %                        interpolant at the T fold of n (n_dense - 1) + 1
-%                        uniform points (n = 2: the legacy 2 n_dense - 1),
+%                        uniform points (n = 2: 2 n_dense - 1),
 %                        relative to the half masses (rho + dn/2) Lh;
 %                        <= mass_rel; records n_points
 %         peak_fraction  the piece's argmax position (last maximal node)
-%                        x*/l < 1 - 2 mpss_peak_lo. At n = 2 the legacy
+%                        x*/l < 1 - 2 mpss_peak_lo. At n = 2 the
 %                        stitch's first maximum is the mirrored copy's node
 %                        at l - x*, so pf = (l - x*)/(2l) = 1/2 - x*/(2l) <= 1/2
 %                        < mpss_peak_hi always, and pf > lo <=> x*/l < 1 - 2 lo
 %         contrast       (max - min)/max of Bm on the stitch >= contrast
-%       ('quarter_valid' and 'mass_doubling' keep the legacy names: the
+%       ('quarter_valid' and 'mass_doubling' keep the names used for n = 2: the
 %       piece and the n-fold mass.)
 %   c = GNX_BUILD_MODE('stitch', xq, yq, n, start)   c = {x, y}; 'T' | 'P' (identical
-%       to sag_seed_shape 'stitch'); n = 2 'T' = the legacy peak-to-peak stitch
+%       to sag_seed_shape 'stitch'); n = 2 'T' = the peak-to-peak stitch of the full-peak state
 %   xm = GNX_BUILD_MODE('fold', x, l, start)   piece coordinate (identical to
 %       sag_seed_shape 'fold')
 %   names = GNX_BUILD_MODE('required', n)
@@ -240,12 +242,12 @@ end
 end
 
 function ok = verdict(rec)
-% the legacy record's local verdict (gnx_validity's own)
+% the n = 2 record's local verdict (gnx_validity's own)
 ok = gnx_validity('verdict', rec);
 end
 
 function c = chk(pass, value, tol, varargin)
-% copied from gnx_validity.m:77-80
+% copied from gnx_validity.m
 c = struct('pass', logical(pass), 'value', value, 'tol', tol);
 for k = 1:2:numel(varargin), c.(varargin{k}) = varargin{k+1}; end
 end
@@ -253,11 +255,11 @@ end
 % -------------------------------------------------------------------------
 function rec = legacy_record(qrec, solq, ctx)
 rec = mpss_record(qrec, solq, ctx);
-rec.valid = verdict(rec);                 % as gnx_validity.m:46
+rec.valid = verdict(rec);                 % as in gnx_validity.m
 end
 
 function rec = mpss_record(qrec, solq, ctx)
-% VERBATIM copy of gnx_validity.m:156-188 (mpss_record).
+% Copy of mpss_record in gnx_validity.m (unchanged).
 D = gnx_model('descriptor'); tol = D.tol; nm = D.numerics;
 rec = struct('kind', 'mpss', 'checks', struct(), 'diag', struct(), 'valid', false, ...
     'x', [], 'y', []);
@@ -266,7 +268,7 @@ rec.checks.quarter_valid = chk(qok, double(qok), NaN);
 if ~qok, return; end
 xq = solq.x(:).'; ellq = xq(end);
 yq = solq.y([1 3 5 7], :);
-% peak-to-peak reflection (build_mpss_branch.m:625-650 convention): the
+% peak-to-peak reflection (same convention as build_mpss_branch.m): the
 % quarter's peak (x = 0) goes to the seam x = ell_q of the stitched half.
 x_left = ellq - fliplr(xq);  x_right = ellq + xq;
 xs = [x_left(1:end-1), x_right];
@@ -465,7 +467,7 @@ copyfile(out_path, fullfile(out_dir, sprintf('branch_MODE%d_latest.mat', n)));
 end
 
 function check_struct(s, nR, nB, D, i, j)
-% as gnx_write_library.m:137-149 (RC-7), on the piece
+% as in gnx_write_library.m, on the piece
 if ~(isstruct(s) && isfield(s, 'y') && size(s.y, 1) == 12)
     error('GNX:MODE', 'cell (%d,%d): stored piece is not a 12-row BVP struct.', i, j);
 end
@@ -474,7 +476,7 @@ aend = s.y([11 12], end);
 rel = abs(aend - [nR; nB]) ./ [nR; nB];
 if any(a0 ~= 0) || any(aend == 0) || any(rel > D.tol.acc_end_rel)
     error('GNX:MODE', ['cell (%d,%d): piece accumulators start at [%g %g] and end at ' ...
-        '[%g %g] (targets %g %g); refusing a zeroed or off-mass struct (RC-7).'], ...
+        '[%g %g] (targets %g %g); refusing a zeroed or off-mass struct.'], ...
         i, j, a0(1), a0(2), aend(1), aend(2), nR, nB);
 end
 end

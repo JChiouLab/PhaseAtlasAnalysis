@@ -1,7 +1,7 @@
-% ode_sys_v7  --  shared V7 per-point BVP core (extracted 2026-07-09, Packet 1B).
-% Single source of truth for run_hybrid_sweeper_pdefb.m AND build_mpss_branch.m.
-% Extracted verbatim from run_hybrid_sweeper_pdefb.m; do not fork. Equations, BCs,
-% tolerances, and mass conventions are unchanged.
+% ode_sys_v7  --  right-hand side of the isolated half-cell BVP (fission yeast model).
+% Shared by run_hybrid_sweeper_pdefb.m and build_mpss_branch.m; keep a single copy.
+% State: u,u',q,q',v,v',w,w',p,p' (y1..y10), the two uniform sources s1, s2 (y11, y12) and the two
+% mass accumulators (y13, y14). a = kgg, b = dg, c = kpg, d = dgp, e = k*, f = kg of Table 2.
 function dydx = ode_sys_v7(~, y, par, D)
     u = max(0,y(1)); q = max(0,y(3)); v = max(0,y(5)); w = max(0,y(7)); pv = max(0,y(9));
     s1 = y(11); s2 = y(12);

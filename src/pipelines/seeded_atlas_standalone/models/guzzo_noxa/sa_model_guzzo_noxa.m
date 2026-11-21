@@ -1,19 +1,19 @@
 function M = sa_model_guzzo_noxa()
-%SA_MODEL_GUZZO_NOXA  Model module of Guzzo_noXA (coupled problem).
+%SA_MODEL_GUZZO_NOXA  Model module of the M. xanthus model (coupled problem).
 %
 %   M = SA_MODEL_GUZZO_NOXA() returns the module struct that
-%   sa_model('guzzo_noxa') validates. It puts the
-%   shared model core src/models/guzzo_noxa/ (gnx_model, gnx_reaction; read
-%   only) on the path itself, relative to this file, so sa_model.m stays
-%   untouched. It never puts the uncoupled pipeline's noxa folder on the path
-%   (the packages do not depend on each other): the two functions it
-%   needs from there are SHA-pinned copies (sag_hermite_min,
-%   sag_bvp_convergence).
+%   sa_model('guzzo_noxa') validates. It puts the shared model core
+%   src/models/guzzo_noxa/ (gnx_model, gnx_reaction; read only) on the path
+%   itself, relative to this file. It never puts the uncoupled pipeline's
+%   guzzo_noxa folder on the path (the two packages do not depend on each
+%   other): the two functions it needs from there are verbatim copies
+%   (sag_hermite_min, sag_bvp_convergence).
 %
-%   Coupled state (sag_coupled24, 24 rows, xi in [0, Lh], dimensional um):
+%   Coupled state (sag_coupled24, 24 rows, x in [0, Lh], dimensional um):
 %     1:8 left half Rm Rm' Rc Rc' Bm Bm' Bc Bc'; 9:16 right half;
-%     17:20 shifts sigma_RL sigma_BL sigma_RR sigma_BR; 21:24 accumulators.
-%   Pools R = Rm + Rc (lattice axis 1, dn_R), B = Bm + Bc (axis 2, dn_B).
+%     17:20 sources s_RL s_BL s_RR s_BR (named sigma in the code); 21:24 integrals of
+%     the half masses.
+%   Conserved quantities R = Rm + Rc (grid axis 1, dn_R), B = Bm + Bc (axis 2, dn_B).
 
 here = fileparts(mfilename('fullpath'));
 src = fileparts(fileparts(fileparts(fileparts(here))));
@@ -26,12 +26,12 @@ copies = copy_records(here);
 M = struct();
 M.id        = 'guzzo_noxa';
 M.version   = module_version(here, core);
-M.unclipped = true;                      % gnx_reaction and the ode subfunction; scanned
+M.unclipped = true;                      % gnx_reaction and the ode subfunction apply no max(0,.); positivity is checked afterwards
 M.n_states  = 24;
 M.fields    = named_rows({'Rm_L','Rc_L','Bm_L','Bc_L','Rm_R','Rc_R','Bm_R','Bc_R'}, ...
                          [1 3 5 7 9 11 13 15]);
 M.identity_fields = M.fields;
-M.pools     = struct('name', {'R', 'B'});
+M.pools     = struct('name', {'R', 'B'});          % the two conserved quantities
 M.library_types = {'HSS', 'HPSS', 'MPSS'};
 M.domain    = @(theta) [0 theta.Lh];
 M.normalize = @normalize;
@@ -46,12 +46,11 @@ M.shifts    = @shifts;
 M.shape_label = @shape_label;
 M.shape_label_profile = @shape_label_profile;
 M.mode_families = mode_families();
-M.seed_shape = @sag_seed_shape;          % milestone 8: seed shapes, type order, mirror rule
-% Milestone 10: the left/right half swap (halves, shifts and accumulators in
-% blocks; sag_coupled24's layout) and the permutation it induces on the 8
-% identity rows (L then R)
+M.seed_shape = @sag_seed_shape;          % seed shapes, type order, mirror rule
+% The left/right half swap (halves, sources and integrals in blocks; the layout of
+% sag_coupled24) and the permutation it induces on the 8 identity rows (L then R)
 M.reflection = struct('state_perm', [9:16 1:8 19 20 17 18 23 24 21 22], 'identity_perm', [5:8 1:4]);
-M.scale_counts = @scale_counts;          % milestone 8: point counts that grow with L
+M.scale_counts = @scale_counts;          % point counts that grow with L
 M.field_scale = @field_scale;
 % the settings leaves field_scale reads besides the parameters (a focus run
 % takes the source's field scale only when they equal the source's)
@@ -63,23 +62,22 @@ M.required_checks = {'real_valued', 'positivity_exact', 'seam_concentration', 's
 M.model_options_defaults = option_defaults();
 M.validate_model_options = @validate_options;
 M.copies    = copies;
-M.setting_defaults = setting_defaults();     % model layer (optional member)
+M.setting_defaults = setting_defaults();     % model layer of the settings (optional member)
 M.version   = [M.version setting_defaults_tag(M.setting_defaults)];
-% The 'solver:' component -- SHA-256
+% The 'solver:' component: SHA-256
 % prefixes of the traced bvp4c copy, its five helpers, sa_deval, the toolbox
 % bvp4c.m / deval.m and the forwarders; verifies the generated copy first
-% (SA:SOLVER:E_TRACED / E_TOOLBOX at zero calls). E_MODEL is never waived.
+% (SA:SOLVER:E_TRACED / E_TOOLBOX at zero solves).
 M.version   = [M.version sa_bvp4c_setup('component', here)];
 end
 
 % =========================================================================
 
 function sd = setting_defaults()
-% Model layer: the shared leaves at the model's commissioned values (step
+% Model layer: the shared settings at the model's default values (step
 % 0.15; RelTol 1e-8 / AbsTol 1e-10; refinement 1e-10 / 1e-12; guess mesh
-% 'subsample' with N = 482 = 2 x 241, the cheaper of the two at equal
-% reach; candidate mesh 'comparison'). Applied after the package defaults
-% and before the mode layer; disjoint from every mode layer (sa_settings).
+% 'subsample' with N = 482 = 2 x 241; candidate mesh 'comparison').
+% Applied after the package defaults and before the run-mode layer.
 sd = struct();
 sd.lattice = struct('step', 0.15);
 sd.solver = struct('reltol', 1e-8, 'abstol', 1e-10);
@@ -92,13 +90,13 @@ sd.report = struct('replay_s_per_record', 0.05);   % report-only replay rate (se
 % turns it on).
 sd.cold = struct('mesh_cap', 10000);
 sd.root_pass = struct('enabled', false);
-% Milestone 8: the reference length of the point-count rule (the commissioned
-% L of milestone 2M; scale_counts). Enters the model digest.
+% The reference length of the point-count rule (L = 6, the value of Table 1;
+% scale_counts). Enters the model digest.
 sd.scaling = struct('reference_length', 6);
 end
 
 function [S, SRC] = scale_counts(theta, S, SRC)
-% Point counts that grow with L (packet section 6, RC-8.5). The length leaf
+% Point counts that grow with L. The length leaf
 % is the total length L (theta.L = P.L; Lh = L/2). At L <= reference_length
 % (on the stored double) nothing runs and every leaf keeps its source. Above
 % it, for every leaf whose source is package or model (user values win):
@@ -128,8 +126,8 @@ end
 
 function t = setting_defaults_tag(sd)
 % model_version carries a digest of the model layer (the module files
-% change with the member). report.* is EXCLUDED from the
-% digest -- a report-only leaf never changes a call, so recalibrating it
+% change with the member). report.* is excluded from the
+% digest: a report-only leaf never changes a solve, so recalibrating it
 % never makes runs unresumable.
 if isfield(sd, 'report'), sd = rmfield(sd, 'report'); end
 txt = leaf_text(sd, '');
@@ -183,7 +181,7 @@ s = struct('name', names, 'row', num2cell(rows));
 end
 
 function t = pool_targets(theta, d)
-% d = [dn_R dn_B] (lattice axis order); values [n_RL n_RR n_BL n_BR].
+% d = [dn_R dn_B] (grid axis order); values [n_RL n_RR n_BL n_BR].
 tgt = sag_coupled24('targets', theta, d(1), d(2));
 t = struct();
 t.values = [tgt.nRL tgt.nRR tgt.nBL tgt.nBR];
@@ -198,20 +196,19 @@ s.max = max(abs(s.values));
 end
 
 function [lab, info] = shape_label(sol, theta, mo, fs) %#ok<INUSL>
-% The family label: the mode name of the main variable (model_options.
-% main_variable, default Bm; a sum of fields is summed per half, in the
-% given order), sa_mode_name, with the flatness reference ref = the main
-% variable's value in the uniform (HSS) state at the anchor (fs:
+% The shape label of a solution: the mode name (sa_mode_name) of the main
+% variable (model_options.main_variable, default Bm; a sum of fields is summed
+% per half, in the given order) in each half, with the flatness reference
+% ref = the main variable's value in the uniform (HSS) state at the anchor (fs:
 % field_scale's struct, its anchor_hss_values: the library HSS interpolated
-% to the anchor). shape_nodes points per half (xi = 0 the outer pole,
-% xi = Lh the seam). Never affects validity or root identity. It sets the
+% to the anchor). shape_nodes points per half (x = 0 the pole,
+% x = Lh the middle). It never affects validity or root identity. It sets the
 % attempt's observed_family and, through the per-root pass, that pass's
-% unit family string (unit keys, replay identity) and the child's
-% seed_family, so it is part of the run's settings; it never chooses a
-% guess, a node, an order or a cap. info (tests, proofs): sa_mode_name's info, plus .legacy, the
-% label before software 0.10 (HSS / HPSS / MPSS per half: flat when the
-% relative contrast (max - min)/max < 0.2, a maximum at either end of the
-% half -> HPSS).
+% unit family string and the child's seed_family, so it is part of the run's
+% settings; it never chooses a starting profile, a node, an order or a cap.
+% info: sa_mode_name's info, plus .legacy, the older three-state label (HSS /
+% HPSS / MPSS per half: flat when the relative contrast (max - min)/max <
+% 0.2, a maximum at either end of the half -> HPSS).
 xi = linspace(sol.x(1), sol.x(end), mo.shape_nodes);
 v = sa_main_variable('parse', mo.main_variable, species());
 n = numel(v.index);
@@ -225,9 +222,9 @@ function [lab, info] = shape_label_profile(xi, P, theta, mo, fs) %#ok<INUSL>
 % the identity rows (left Rm Rc Bm Bc, then right) on the mesh xi, e.g. a
 % root's representative profile on the comparison mesh. Each field the
 % main variable needs is interpolated linearly to shape_label's
-% shape_nodes points, then summed in the same order. Post tools only (a
-% plot relabelled with another main variable, or an older folder shown
-% with mode names); a run's labels come from shape_label.
+% shape_nodes points, then summed in the same order. For post-processing
+% only (a plot relabelled with another main variable); a run's labels come
+% from shape_label.
 xs = linspace(xi(1), xi(end), mo.shape_nodes);
 v = sa_main_variable('parse', mo.main_variable, species());
 Y = zeros(8, numel(xs));
@@ -243,9 +240,9 @@ s = {'Rm', 'Rc', 'Bm', 'Bc'};
 end
 
 function f = mode_families()
-% The library half type a half's mode name corresponds to (the per-root
-% pass's family lookup): flat -> HSS; a pole peak of mode 1 (left 1+,
-% right 1-) -> HPSS; a middle peak 2- -> MPSS. Other names have none.
+% The library half type that a half's mode name corresponds to (the per-root
+% pass's family lookup): flat -> HSS (no-peak); a pole peak of mode 1 (left 1+,
+% right 1-) -> HPSS (half-peak); a middle peak 2- -> MPSS (full-peak). Other names have none.
 f = struct('left', {{'0', 'HSS'; '1+', 'HPSS'; '2-', 'MPSS'}}, ...
     'right', {{'0', 'HSS'; '1-', 'HPSS'; '2-', 'MPSS'}});
 end
@@ -256,8 +253,8 @@ info.legacy = sprintf('%s_%s', legacy_shape(mL, mo), legacy_shape(mR, mo));
 end
 
 function s = legacy_shape(b, mo)
-% One half's label before software 0.10 (proofs and tests only): HSS when
-% the relative contrast (max - min)/max < 0.2 (the former default), HPSS
+% One half's older label (tests only): HSS when
+% the relative contrast (max - min)/max < 0.2, HPSS
 % when the maximum lies within shape_edge_frac of either end, otherwise
 % MPSS.
 mx = max(b);
@@ -271,7 +268,7 @@ function fs = field_scale(theta, lib, S)
 % Per field max(|value| of the library HSS at the anchor cell, floor), one
 % value per species, applied to both halves. hss_values: the same HSS
 % values, raw; anchor_hss_values: the library HSS interpolated to the
-% anchor itself (the family label's uniform-state reference, sa_mode_name
+% anchor itself (the uniform-state reference of the shape label, sa_mode_name
 % 'reference').
 lib = sag_library('profiles', lib, {'HSS'});
 c = sag_library('cell', lib, theta, S.lattice.anchor);
@@ -292,7 +289,7 @@ fs.source = sprintf(['library HSS half, hss_branch = %s, native cell (%d,%d) at 
     '[%s], model units, floor %g'], S.model_options.hss_branch, c.cell(1), c.cell(2), ...
     num2str(S.lattice.anchor), S.identity.field_scale_floor);
 fs.hss_values = h.Y4(:, 1).';
-% the family label's uniform-state reference: the library HSS interpolated
+% the uniform-state reference of the shape label: the library HSS interpolated
 % bilinearly to the anchor itself (the native grid has no node there in
 % general); the nearest cell's values when a surrounding cell has none
 val = @(i, j) hss_at(lib, theta, [i j], S.model_options);
@@ -313,11 +310,11 @@ if h.available, y = h.Y4(:, 1); else, y = []; end
 end
 
 function d = option_defaults()
-% Model-owned settings. Gate values are the commissioned gate table;
-% changing one is an amendment.
+% Model-owned settings: default values of the numerical tolerances of the
+% validity checks.
 d = struct();
 d.hss_branch      = 'single_root';   % fail closed unless the HSS cell has one root
-d.guess_nodes     = 241;             % myxo run_stage3c_noxa.m:58
+d.guess_nodes     = 241;             % mesh points of the initial guess profile
 d.seam_tol        = 1e-9;            % seam_concentration, seam_flux
 d.acc_tol         = 1e-12;           % mass_accumulator (uncoupled acc_end_rel)
 d.mass_dense_tol  = 1e-7;            % mass_dense (uncoupled mass_rel), exact Hermite integral
@@ -328,8 +325,8 @@ d.vel_abs         = 1e-9;            % velocity_consistency gate = max(abs, rel*
 d.vel_rel         = 1e-6;
 d.main_variable   = 'Bm';            % the label's and dn2's variable: a '+'-sum of Rm Rc Bm Bc
 d.shape_flat_tol  = 0.2;             % label: a half is 0 (flat) when (max - min) / (uniform value) is below;
-                                     %   at 0.2 the depleted halves of the f = 1 production run whose whole
-                                     %   amplitude is a few per cent of the uniform Bm are flat
+                                     %   at 0.2 the depleted halves of the f = 1 runs, whose whole
+                                     %   amplitude is a few per cent of the uniform Bm, are flat
 d.shape_turn_frac = 0.2;             % label: a turn counts when the profile moves back by this x (max - min)
 d.shape_edge_frac = 0.02;            % label: the seam window, as a fraction of a half
 d.shape_nodes     = 401;
@@ -363,7 +360,7 @@ end
 
 function c = copy_records(here)
 % Provenance of the verbatim copies (only the function-name line differs);
-% sources and their SHA-256 are checked by the tests.
+% sources and their SHA-256 are checked by the portable tests.
 names = {'sag_hermite_min.m', 'sag_bvp_convergence.m'};
 c = struct('file', {}, 'copy_sha256', {});
 for k = 1:numel(names)

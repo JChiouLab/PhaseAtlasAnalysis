@@ -1,25 +1,27 @@
 function P = sag_post(main_variable)
-%SAG_POST  Post-processing of Guzzo_noXA (plots, traces).
+%SAG_POST  Post-processing of the M. xanthus model (plots, traces).
 %
 %   P = SAG_POST() / SAG_POST(main_variable) is the post struct
 %   sa_post_model('guzzo_noxa', main_variable) returns.
-%   Coordinates (plot order): x = dn_R, y = dn_B (the lattice axes: left-
+%   Coordinates (plot order): x = dn_R, y = dn_B (the grid axes: left-
 %   minus-right half masses of R = Rm + Rc and B = Bm + Bc divided by the
-%   half length Lh, trapezoid split at the seam node), z = dn2 = int_0^1
-%   cos(2 pi eta) m d(eta) with eta = x / L, m the main variable (a '+'-sum
-%   of Rm Rc Bm Bc, sa_main_variable; default Bm, the value before 0.10).
-%   Full PDE: pdepe (m = 0) with the structure of Guzzo_noXA.m (the byte
-%   copy beside this file, kept as the reference: pdefun c = 1, f = D u_x,
-%   zero-flux bcfun, its tolerances) and the source terms of gnx_reaction,
-%   the commissioned model core (src/models/guzzo_noxa), with the run's own
+%   half length Lh, trapezoid split at the middle node; fraction of the total
+%   Delta n/M = dn/(2 rho)), z = dn2 = int_0^1
+%   cos(2 pi eta) m d(eta) with eta = x / L (the paper's Delta n2 of Eq. 10 = L * dn2),
+%   m the main variable (a '+'-sum
+%   of Rm Rc Bm Bc, sa_main_variable; default Bm).
+%   Full-model trace: pdepe (m = 0) with the structure of Guzzo_noXA.m (the copy
+%   beside this file, kept as the reference: pdefun c = 1, f = D u_x,
+%   zero-flux bcfun, its tolerances) and the source terms of gnx_reaction
+%   (the model definition in src/models/guzzo_noxa), with the run's own
 %   theta. The initial values are given at the mesh nodes exactly. No drift
 %   or stationarity stop: pdepe runs to the horizon (stop horizon_reached),
 %   or returns fewer times than requested (stop pdepe_incomplete, as
-%   Guzzo_noXA.m guards). The pool masses are recorded at every frame.
+%   Guzzo_noXA.m guards). The masses are recorded at every frame.
 %
-%   Half-domain convention: xi in [0, Lh] pole -> seam; Y_L(xi) = Y(x = xi),
-%   Y_R(xi) = Y(x = L - xi); pchip on a uniform mesh with a node at x = Lh,
-%   the seam node from the left half.
+%   Half-domain convention: x in [0, Lh] pole -> middle; Y_L(x) = Y(x),
+%   Y_R(x) = Y(L - x); pchip on a uniform mesh with a node at x = Lh,
+%   the middle node from the left half.
 
 here = fileparts(mfilename('fullpath'));
 core = fullfile(fileparts(fileparts(fileparts(fileparts(fileparts(here))))), 'src', 'models', 'guzzo_noxa');
@@ -33,8 +35,8 @@ P.id = 'guzzo_noxa';
 P.field_names = {'Rm', 'Rc', 'Bm', 'Bc'};
 v = sa_main_variable('parse', main_variable, P.field_names, 'main_variable');
 P.main_variable = v.text;
-P.legacy_main_variable = 'Bm';          % the label's variable before software 0.10 (rows 5 / 13)
-P.legacy_dn2_variable = 'Bm';           % the third coordinate's variable before software 0.10
+P.legacy_main_variable = 'Bm';          % the label's variable of older versions (rows 5 / 13)
+P.legacy_dn2_variable = 'Bm';           % the third coordinate's variable of older versions
 P.n_fields = 4;
 P.sol_rows = [1 3 5 7; 9 11 13 15];
 P.profile_rows = [1:4; 5:8];            % identity-profile rows of the left / right half
@@ -43,6 +45,8 @@ P.coord_names = {'dn_R', 'dn_B', ['cos_moment_' strrep(v.text, '+', '_')]};
 P.mass_names = {'N_R', 'N_B'};
 P.umax_names = {'BmmaxL', 'BmmaxR'};
 P.lattice_axes = [1 2];
+P.velocity = struct('records', {{'velocity_R_slope', 'velocity_B_slope'}}, 'sign', 1);
+                                        % d(dn_R)/dt, d(dn_B)/dt (= -2 x the left-half sources), the sheet PDFs' flux
 P.mass_pairs = [1 2; 3 4];              % (Rm, Rc) and (Bm, Bc)
 P.full_profile = @full_profile;
 P.observables = @(theta, x, Y) observables(theta, x, Y, v.index);
@@ -89,7 +93,7 @@ F = struct('x', x, 'eta', x / L, 'Y', Y, 'im', im);
 end
 
 function O = observables(theta, x, Y, mv)
-% mv: the main variable's rows (Bm alone, [3], gives the pre-0.10 value bit for bit)
+% mv: the main variable's rows (Bm alone, [3], gives the older value bit for bit)
 L = theta.L; Lh = L / 2;
 im = (numel(x) + 1) / 2;
 R = Y(1, :) + Y(2, :); B = Y(3, :) + Y(4, :);

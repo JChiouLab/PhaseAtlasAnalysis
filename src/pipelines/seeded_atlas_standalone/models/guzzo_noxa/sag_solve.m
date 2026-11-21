@@ -1,13 +1,12 @@
 function R = sag_solve(theta, guess, target, solver, mo, corrector)
-%SAG_SOLVE  One bvp4c call on the coupled Guzzo_noXA BVP, in the common form.
+%SAG_SOLVE  One bvp4c call on the coupled M. xanthus BVP, in the common form.
 %
 %   R = SAG_SOLVE(theta, guess, target, solver, model_options, corrector)
-%   makes exactly ONE corrector call and returns the shared R struct
+%   makes exactly ONE solver call (the coupled-BVP solve) and returns the shared R struct
 %       R.sol          the returned iterate (whatever bvp4c returned; [] when
 %                      it threw). A return is NOT convergence: the shared
-%                      validity boundary decides (memory note "bvp4c return
-%                      is not convergence").
-%       R.opts         reltol, abstol, nmax, mesh_reject (+ module gate values)
+%                      validity checks decide.
+%       R.opts         reltol, abstol, nmax, mesh_reject (+ the validity tolerances)
 %       R.warning_id, R.warning_msg   lastwarn after the call (reset before;
 %                      warnings are never suppressed)
 %       R.corrector_class   'RETURNED' | 'NO_RETURN'
@@ -17,8 +16,7 @@ function R = sag_solve(theta, guess, target, solver, mo, corrector)
 %                      the returned mesh nodes; NaN without a return)
 %   `corrector` (tests) is a stub with the signature
 %       [sol, info] = corrector(theta, guess, target, opts)
-%   Default: bvp4c with bvpset(RelTol, AbsTol, NMax), no other option
-%   (myxo bvp24_noxa_coupled.m:129 sets RelTol and NMax only).
+%   Default: bvp4c with bvpset(RelTol, AbsTol, NMax), no other option.
 %       R.mesh_trace, R.max_proposed_mesh   the
 %                      call's mesh trace (sa_mesh_trace 'take') and its P; NaN
 %                      when nothing was recorded (a stub, or a throw before N0)

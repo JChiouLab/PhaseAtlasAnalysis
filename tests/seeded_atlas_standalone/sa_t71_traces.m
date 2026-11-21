@@ -1,5 +1,5 @@
 function rows = sa_t71_traces(E)
-%SA_T71_TRACES  M7a packet v0.2 section 10 T71: full-PDE traces, with a stub
+%SA_T71_TRACES  Full-PDE traces, with a stub
 %   integrator on stub runs (no time stepping), and the real post modules'
 %   IC builder and stop rule on synthetic states.
 T = 'T71 traces';

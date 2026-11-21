@@ -1,5 +1,5 @@
 function out_path = gnx_write_library(out_dir, type, data, P, meta)
-%GNX_WRITE_LIBRARY  Write one labelled Guzzo_noXA seed library (packet §2c, §4j).
+%GNX_WRITE_LIBRARY  Write one labelled M. xanthus (Guzzo_noXA) half-cell library (starting profiles).
 %
 %   out_path = GNX_WRITE_LIBRARY(out_dir, type, data, P, meta)
 %   type: 'HSS' (data from gnx_sweep_hss), 'HPSS' (gnx_sweep_hpss on Lh) or
@@ -8,12 +8,13 @@ function out_path = gnx_write_library(out_dir, type, data, P, meta)
 %   branch_<TYPE>_<run_id>.mat and copies it to branch_<TYPE>_latest.mat.
 %   Labels: model_id, model_version, schema, fields, state_layout,
 %   orientation, domain, storage_kind; axes dn_R, dn_B (1 x res) beside
-%   R_DIFF, B_DIFF (res x res, = dn*Lh) and Lh. No PAK_DIFF, GEF_DIFF, M_BG,
-%   M_P or a..f are written; `par` is the normalized noxa struct, so the
-%   original reader stops in check_par (error SAP:LIBRARY).
+%   R_DIFF, B_DIFF (res x res, = dn*Lh, amounts of RomR and MglB) and Lh.
+%   (dn is a density difference (n_left - n_right)/(L/2); the paper's fraction is dn/(2*rho).) No PAK_DIFF, GEF_DIFF, M_BG,
+%   M_P or a..f are written; `par` is the normalized M. xanthus struct, so the
+%   fission yeast reader stops in check_par (error SAP:LIBRARY).
 %   Refuses (error GNX:LIBRARY) before writing if: a stored BVP struct has
-%   accumulators that do not start at 0 or end off nR/nB beyond acc_end_rel
-%   (RC-7), existence and SOL / flux disagree, or a stored cell's validity
+%   accumulators that do not start at 0 or end off nR/nB beyond acc_end_rel,
+%   existence and SOL / flux disagree, or a stored cell's validity
 %   record does not pass on recomputation.
 
 D = gnx_model('descriptor');
@@ -143,7 +144,7 @@ aend = s.y([11 12], end);
 rel = abs(aend - [nR; nB]) ./ [nR; nB];
 if any(a0 ~= 0) || any(aend == 0) || any(rel > D.tol.acc_end_rel)
     error('GNX:LIBRARY', ['cell (%d,%d): accumulator rows start at [%g %g] and end at ' ...
-        '[%g %g] (targets %g %g); refusing a zeroed or off-mass struct (RC-7).'], ...
+        '[%g %g] (targets %g %g); refusing a zeroed or off-mass struct.'], ...
         i, j, a0(1), a0(2), aend(1), aend(2), nR, nB);
 end
 end

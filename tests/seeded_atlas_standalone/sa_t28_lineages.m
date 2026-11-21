@@ -1,7 +1,7 @@
 function rows = sa_t28_lineages(E)
-%SA_T28_LINEAGES  Milestone-3 T28 (RC-3, M-C): merge by membership;
-%   call-free merges use no slot; cold-start preference; M-C propagation with
-%   planted roots of two branches (sa_m3_mc_run).
+%SA_T28_LINEAGES  Merge by membership;
+%   call-free merges use no slot; cold-start preference; propagation of a root
+%   along continuation with planted roots of two branches (sa_m3_mc_run).
 T = 'T28 lineages and M-C';
 rows = struct('test', {}, 'assertion', {}, 'pass', {}, 'detail', {});
 addpath(E.stub);

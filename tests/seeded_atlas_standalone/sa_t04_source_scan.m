@@ -1,6 +1,7 @@
 function rows = sa_t04_source_scan(E)
-%SA_T04_SOURCE_SCAN  Shared code is model-free; runtime is campaign-free;
-%   the copied ODE and reaction are unclipped (RC-10).
+%SA_T04_SOURCE_SCAN  Shared code is model-free; the runtime calls none of the
+%   earlier development pipelines' functions (names sap_, cha_, sca_); the
+%   copied ODE and reaction are unclipped.
 %   Comment-only lines are dropped LINE BY LINE (no '.'-spanning regexp);
 %   text inside code lines is scanned, so error messages count too.
 T = 'T04 source scan';
@@ -14,7 +15,7 @@ for k = 1:numel(shared)
     for q = 1:numel(code)
         c = code{q};
         bad = {};
-        % the verbatim M1 kernel uses `delta` as a local name (model-free code)
+        % the verbatim copied kernel uses `delta` as a local name (model-free code)
         if ~isempty(regexp(c, words, 'once')) && ~strcmp(shared(k).name, 'sa_root_store.m')
             bad{end+1} = 'model word'; %#ok<AGROW>
         end
@@ -27,7 +28,7 @@ for k = 1:numel(shared)
         end
     end
 end
-rows = sa_check(rows, T, sprintf('%d shared files name no species, pool, half type, model constant or campaign function', ...
+rows = sa_check(rows, T, sprintf('%d shared files name no species, pool, half type, model constant or project-specific function', ...
     numel(shared)), isempty(hits), strjoin(hits, ' || '));
 
 allm = [dir(fullfile(E.pkg, '*.m')); dir(fullfile(E.module, '*.m'))];
@@ -39,9 +40,9 @@ for k = 1:numel(allm)
         hits{end+1} = allm(k).name; %#ok<AGROW>
     end
 end
-% the copied corrector's comments cite campaign backups; only code lines count
+% the copied corrector's comments mention development files; only code lines count
 hits = hits(~cellfun(@(n) isempty(code_hits(fullfile(E.pkg, n), fullfile(E.module, n))), hits));
-rows = sa_check(rows, T, 'no package code line references a data/experiments or campaign path', ...
+rows = sa_check(rows, T, 'no package code line references a data/experiments or project-specific path', ...
     isempty(hits), strjoin(hits, ', '));
 
 f = fileread(fullfile(E.module, 'sap_forced28.m'));

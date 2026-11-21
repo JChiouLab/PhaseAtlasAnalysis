@@ -1,5 +1,6 @@
 function report = gnx_run_libraries(P, pipeline_dir, opts)
-%GNX_RUN_LIBRARIES  Guzzo_noXA stages 1-3: HSS, HPSS and MPSS seed libraries.
+%GNX_RUN_LIBRARIES  M. xanthus (Guzzo_noXA) stages 1-3: no-peak (HSS), half-peak (HPSS) and full-peak (MPSS)
+%   half-cell libraries (starting profiles).
 %
 %   report = GNX_RUN_LIBRARIES(P, pipeline_dir)
 %   report = GNX_RUN_LIBRARIES(P, pipeline_dir, opts)
@@ -9,7 +10,7 @@ function report = gnx_run_libraries(P, pipeline_dir, opts)
 %   'HSS','HPSS','MPSS'; default all), sweep (struct passed to gnx_sweep_hpss,
 %   e.g. max_calls, solve_opts). Checkpoints go next to the libraries.
 %   Calls this run made (gnx_solve counter) are printed as GNX_CALLS=<n>.
-%   Called from the entry's guzzo_noxa branch (run_atlas_surface_pipeline.m).
+%   Called from the guzzo_noxa branch of run_atlas_surface_pipeline.m.
 
 if nargin < 3 || isempty(opts), opts = struct(); end
 [name, sha8] = gnx_run_name(P);

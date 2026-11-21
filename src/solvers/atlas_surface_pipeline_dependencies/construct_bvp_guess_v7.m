@@ -1,10 +1,7 @@
-% construct_bvp_guess_v7  --  shared V7 per-point BVP core (extracted 2026-07-09, Packet 1B).
-% Single source of truth for run_hybrid_sweeper_pdefb.m AND build_mpss_branch.m.
-% Extracted verbatim from run_hybrid_sweeper_pdefb.m; do not fork. Equations, BCs,
-% tolerances, and mass conventions are unchanged.
+% construct_bvp_guess_v7  --  builds a bvp4c starting guess (with sources and accumulators) from a profile.
+% Shared by run_hybrid_sweeper_pdefb.m and build_mpss_branch.m; keep a single copy.
 function guess_sol = construct_bvp_guess_v7(sol_in)
-    % ROADMAP A: NO integral rescale.  s1, s2 absorb the residual exactly the
-    % way V7's main sweep_bvp relies on.
+    % No integral rescale: s1, s2 absorb the residual mass.
     x = sol_in.x; N = length(x);
     y = zeros(14, N);
     u = sol_in.y(1,:); q = sol_in.y(3,:);

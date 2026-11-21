@@ -1,19 +1,18 @@
 function [sR, sB, absR, absB] = gnx_reaction(u, par)
-%GNX_REACTION  Guzzo_noXA reaction terms, UNCLIPPED (model page; Guzzo_noXA.m:219-233).
+%GNX_REACTION  M. xanthus reaction terms (Eqs. 3-4), unclipped.
 %
 %   [sR, sB] = GNX_REACTION(u, par)
 %   [sR, sB, absR, absB] = GNX_REACTION(u, par)
 %
-% u is 4 x N with rows Rm, Rc, Bm, Bc (field order); par carries kR kRB kB kBB
+% u is 4 x N with rows Rm, Rc, Bm, Bc (paper rm, rc, bm, bc); par carries kR kRB kB kBB
 % dR dB dBA K KA (already scaled, gnx_model('parameters')). Returns 1 x N rows
 %   sR = (kR + kRB*Bm)*Rc - dR*Rm
 %   sB = (kB + kBB*Bm)*Bc - dB*Bm/(1 + Bm/K) - dBA*Aeff*Bm^2,
 %   Aeff = Rm/(1 + (Bm/KA)^2).
 % The source vector is [sR; -sR; sB; -sB]. Concentrations are never clamped;
-% positivity is an acceptance check, not a change to the equations. Expression
-% order follows bvp10_noxa.m:16-20 so positive states give the same values.
+% positivity is an acceptance check, not a change to the equations.
 % absR, absB: sum of the absolute values of the terms (scale for residual
-% tolerances, packet §4e, §5.1 Z1).
+% tolerances).
 
 Rm = u(1, :); Rc = u(2, :); Bm = u(3, :); Bc = u(4, :);
 aeff = Rm ./ (1 + (Bm / par.KA).^2);

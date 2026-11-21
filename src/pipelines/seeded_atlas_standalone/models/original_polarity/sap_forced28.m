@@ -1,23 +1,21 @@
 function varargout = sap_forced28(action, varargin)
-%CHA_FORCED28  Forced 28-state paired-half quasi-steady BVP (unclipped).
+%SAP_FORCED28  Coupled paired-half BVP of the S. pombe model, 28 states (unclipped).
 %
-%   Pole-to-seam xi in [0,H], H = 1/2. Each half carries its OWN shift pair and
-%   its OWN mass accumulators (design section 5.3). State layout and the 28
-%   boundary rows are frozen in DESIGN_LOCAL_P3.md sections 1-2.
+%   Pole-to-middle x in [0,H], H = 1/2 (x/L). Each half carries its OWN pair of
+%   sources and its OWN mass accumulators (integrals of the half masses).
+%   The state layout and the 28 boundary rows are given by layout() and bc_labelled.
 %
 %   Actions
 %     ode(xi,y,th)                 -> 28x1 dy/dxi
 %     bc(ya,yb,th,tgt)             -> 28x1 boundary residual (solver form)
 %     bc_labelled(ya,yb,th,tgt)    -> .res (28x1), .label{28}, .group{28}
-%     targets(th,d_P,d_G)          -> struct n_GL,n_PL,n_GR,n_PR (design 5.1)
-%     from24(sol24,th)             -> 28-row guess from a Packet-2 24-state sol
+%     targets(th,d_P,d_G)          -> struct n_GL,n_PL,n_GR,n_PR (half-mass targets)
+%     from24(sol24,th)             -> 28-row guess from a 24-state solution (one shared source pair)
 %     pair_guess(xi,YL5,YR5,th)    -> 28-row guess from two half profiles
 %     swap(sol)                    -> reflected 28-state (pure block swap)
 %     swap_targets(tgt)            -> reflected targets
 %     reconstruct(sol,neta)        -> full-domain [eta;Y]
-%     diagnostics(sol,th,tgt)      -> seam/mass/shift/velocity diagnostics
-%
-%   Experiment-local; nothing here is canonical.
+%     diagnostics(sol,th,tgt)      -> middle/mass/source/velocity diagnostics
 
 switch action
     case 'ode',          varargout{1} = ode28(varargin{:});
@@ -109,7 +107,7 @@ B = struct('res',res,'label',{lab},'group',{grp},'n',k);
 end
 
 function t = targets(th, d_P, d_G)
-% design section 5.1 with M_G = 1, M_P = rho
+% half-mass targets with M_G = 1, M_P = rho
 MG = 1; MP = th.rho;
 t = struct('d_P', d_P, 'd_G', d_G, 'M_G', MG, 'M_P', MP, ...
     'n_GL', (MG + d_G)/2, 'n_GR', (MG - d_G)/2, ...
@@ -126,8 +124,8 @@ t.derivation = [t0.derivation ' ; reflected (block swap of targets)'];
 end
 
 function g = from24(sol24, ~)
-% Expand an accepted Packet-2 24-state solution to a 28-state guess: the single
-% shared shift pair becomes two equal pairs, and the two global accumulators are
+% Expand a 24-state solution to a 28-state guess: the single
+% shared source pair becomes two equal pairs, and the two global accumulators are
 % replaced by four per-half accumulators rebuilt by cumtrapz of each half.
 xi = sol24.x(:).'; n = numel(xi);
 y = zeros(28, n);
@@ -159,7 +157,7 @@ g = struct('x', xi, 'y', y);
 end
 
 function g = swapsol(sol)
-% Reflection eta -> 1-eta: PURE block swap (DESIGN_LOCAL_P3 section 5).
+% Reflection eta -> 1-eta: pure block swap.
 g = struct('x', sol.x(:).', 'y', sol.y);
 g.y(1:10,:)  = sol.y(11:20,:);
 g.y(11:20,:) = sol.y(1:10,:);
@@ -198,7 +196,7 @@ for g = {'outer_left','outer_right','seam_conc','seam_flux','init_integral','hal
     D.(['max_' g{1}]) = max(abs(B.res(m)));
 end
 
-% ---- shifts ------------------------------------------------------------
+% ---- sources -----------------------------------------------------------
 D.s_GL = sol.y(21,1); D.s_PL = sol.y(22,1);
 D.s_GR = sol.y(23,1); D.s_PR = sol.y(24,1);
 D.s_all = [D.s_GL D.s_PL D.s_GR D.s_PR];
@@ -209,7 +207,7 @@ D.antisym_P = abs(D.s_PL + D.s_PR);
 D.antisym_max = max(D.antisym_G, D.antisym_P);
 D.antisym_rel = D.antisym_max / max(D.s_max, realmin);
 
-% ---- seam --------------------------------------------------------------
+% ---- middle ------------------------------------------------------------
 D.seam_left_values  = sol.y([1 3 5 7 9], end).';
 D.seam_right_values = sol.y([11 13 15 17 19], end).';
 D.seam_conc_mismatch = D.seam_left_values - D.seam_right_values;
@@ -222,7 +220,7 @@ cG = [1 1 1 1 0]; cP = [0 1 0 0 1];
 D.J_G = cG * D.j_from_left(:);
 D.J_P = cP * D.j_from_left(:);
 
-% ---- integrated shift/flux identities (design section 6) ---------------
+% ---- integrated source/flux identities ---------------------------------
 % J_G = H s_GL, J_P = H s_PL ; and per-half c^T mu Y_h'(H) = -H s_{c,h}
 D.identity_JG = D.J_G - H*D.s_GL;
 D.identity_JP = D.J_P - H*D.s_PL;
@@ -237,7 +235,7 @@ D.identity_half_PR = D.cP_mu_dYR + H*D.s_PR;
 D.identity_max = max(abs([D.identity_JG D.identity_JP ...
     D.identity_half_GL D.identity_half_PL D.identity_half_GR D.identity_half_PR]));
 
-% ---- projected velocity, two independent routes ------------------------
+% ---- projected velocity (d/dt of d_P, d_G), two independent routes -----
 D.vel_flux  = [-2*D.J_P, -2*D.J_G];        % [ddt d_P, ddt d_G]
 D.vel_shift = [-2*H*D.s_PL, -2*H*D.s_GL];
 D.vel_discrepancy = abs(D.vel_flux - D.vel_shift);
@@ -261,7 +259,7 @@ nl = [trapz(xi, sum(sol.y([1 3 5 7],:),1)), trapz(xi, sol.y(9,:)+sol.y(3,:)), ..
       trapz(xi, sum(sol.y([11 13 15 17],:),1)), trapz(xi, sol.y(19,:)+sol.y(13,:))];
 D.native_trapz = nl;
 D.G6c_residual = max(abs(nl - D.targets));
-D.G6c_note = 'native adaptive-node trapezoid: DIAGNOSTIC ONLY (Packet-2 review 4)';
+D.G6c_note = 'native adaptive-node trapezoid: DIAGNOSTIC ONLY';
 
 % ---- positivity ---------------------------------------------------------
 conc = sol.y([1 3 5 7 9 11 13 15 17 19], :);

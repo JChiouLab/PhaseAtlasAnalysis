@@ -2,20 +2,22 @@ function C = sa_seedability(M, lib, theta, L)
 %SA_SEEDABILITY  Library seedability census on the target lattice.
 %
 %   C = SA_SEEDABILITY(M, lib, theta, L) for the lattice L of sa_lattice.
-%   Rules (as the campaign census sca_pr0b_l14_mask):
+%   (node = grid point of the lattice; the library holds the half-cell
+%   steady states used as starting profiles.)
+%   Rules:
 %     * a node maps to the library's nearest native cell (module 'cell'
 %       action); a node outside the native swept range is not seedable and
 %       asserts nothing about existence;
 %     * the nearest cell must lie within half a native spacing on every axis,
 %       otherwise the census fails closed;
-%     * family A_B is seedable at a node iff half type A exists at the node's
-%       cell and half type B exists at the exact discrete mirror cell
-%       (res+1-row, res+1-col): no interpolation;
-%     * families are every ordered pair of the module's library types, and the
+%     * sheet A_B (family label) is seedable at a node iff half type A exists
+%       at the node's cell and half type B exists at the exact discrete
+%       mirror cell (res+1-row, res+1-col): no interpolation;
+%     * sheets are every ordered pair of the module's library types, and the
 %       seedable ones are DERIVED from the masks, never typed.
 %
 %   Returned fields
-%     names            1 x nf family names 'A_B' (library type order, A major)
+%     names            1 x nf sheet labels 'A_B' (library type order, A major)
 %     counts           1 x nf seedable node counts
 %     seedable         n_nodes x nf logical
 %     in_range         n_nodes x 1 logical

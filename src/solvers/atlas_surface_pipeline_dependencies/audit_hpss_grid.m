@@ -1,8 +1,8 @@
 function [class_grid, reason_grid, diagnostics_grid, invalid_mask] = ...
     audit_hpss_grid(SOL_grid, failure_mask, class_grid, reason_grid, diagnostics_grid)
-%AUDIT_HPSS_GRID Revalidate every seedable profile before continuation.
+%AUDIT_HPSS_GRID Revalidate every half-peak profile that may serve as a starting profile before continuation.
 %
-% The caller must quarantine invalid_mask cells: clear SOL_grid, set the
+% The caller must discard invalid_mask cells: clear SOL_grid, set the
 % failure mask, and clear derived trough/stability values. Existing diagnostic
 % labels are retained for already-quarantined cells.
 

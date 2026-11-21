@@ -1,6 +1,6 @@
 function C = sag_bvp_convergence(sol, opts, wid, wmsg)
-%CHA_BVP_CONVERGENCE  ONE shared bvp4c convergence classifier for every
-%   experiment-local BVP entry point (Packet-5D-D review section 4.2).
+%BVP_CONVERGENCE  One shared bvp4c convergence classifier for the coupled-BVP
+%   solves.
 %
 %   CONVERGED  <=>  finite return AND stats.maxres < RelTol AND
 %                   NOT(stats.nmeshpoints > NMax).

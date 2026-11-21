@@ -1,5 +1,5 @@
 function [res, st] = sa_m3_mc_run(run_dir, extra, varargin)
-%SA_M3_MC_RUN  The T28 multi-seed stub run: families X_X (branch A) and Y_X
+%SA_M3_MC_RUN  The multi-seed stub run (used by sa_t28_lineages): families X_X (branch A) and Y_X
 %   (branch B) cold at k:0,0, k:2,0 and k:-2,1; box [3 1]; rescue off; at
 %   k:1,1 every return is forced onto branch A (a lineage of branch B lands
 %   there on the anchor lineage's root: a merge).

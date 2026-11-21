@@ -1,5 +1,5 @@
-% validate_halfwave -- compatibility wrapper for the shared HPSS morphology gate.
-% Shared by the HPSS sweeper and MPSS constructor; do not fork classifier logic.
+% validate_halfwave -- wrapper for the half-peak (HPSS) morphology check.
+% Shared by the half-peak sweeper and the full-peak constructor; keep a single classifier.
 function [ok, info] = validate_halfwave(sol, opts)
     if nargin < 2, opts = struct(); end
     info = classify_hpss_morphology(sol, opts);

@@ -1,10 +1,14 @@
 function varargout = sa_continuation(action, varargin)
-%SA_CONTINUATION  Continuation route.
+%SA_CONTINUATION  Continuation route: stepping from a solved quasi-steady state
+%   (root) to neighbouring lattice nodes, each solution serving as the starting
+%   profile at the next node.
 %
 %   Q = SA_CONTINUATION('init', ctx)
-%       Scheduler state: lattice geometry, box, ring, lineages (the anchor
+%       Scheduler state: lattice geometry, box, ring (nodes outside the
+%       library's native range), lineages (chains of continuation steps
+%       from one starting root; the anchor
 %       lineage from the first accepted cold or import root at the anchor
-%       node, in attempt order; milestone 10), root
+%       node, in attempt order), root
 %       ownership, edge table, rescue table. Q holds no clock and no handle.
 %   ctx = SA_CONTINUATION('expand', ctx)
 %       One continuation pass of the current phase: every existing lineage in
@@ -15,7 +19,8 @@ function varargout = sa_continuation(action, varargin)
 %       expanded one after another (start order first).
 %   [ctx, e] = SA_CONTINUATION('edge', ctx, spec)
 %       One edge from a parent iterate at node p toward node q (also used by
-%       the diagonal and deep rescue rungs): 'adaptive' or 'myxo_restart'.
+%       the diagonal and deep rescue rungs): 'adaptive' or 'myxo_restart'
+%       (the restart rule described below).
 %   L = SA_CONTINUATION('report_lines', ctx)     summary section
 %   N = SA_CONTINUATION('node_classes', ctx)     per box node class
 %   r = SA_CONTINUATION('row', Q, index)         lattice row of an index (0 = off)
@@ -41,7 +46,7 @@ function varargout = sa_continuation(action, varargin)
 %   fewer than multiseed.max_roots_per_node roots stored at q, and an untried
 %   cardinal neighbour p holding an expandable root of this lineage. Parent
 %   preference: the axis-1 neighbour nearer the start, then axis 2, then the
-%   farther ones (myxo's column-then-rows tree when every step succeeds). A
+%   farther ones (a column-then-rows tree when every step succeeds). A
 %   successful edge landing on a root owned by an earlier lineage records a
 %   merge and is not expanded again; one landing on an unowned root (a cold
 %   root) adopts it (a call-free merge for that root: it never consumes a
@@ -52,7 +57,7 @@ function varargout = sa_continuation(action, varargin)
 %   Adaptive step rule: s = 1 (one lattice
 %   step), r = 0. Refusal -> s = s/2, r = r+1; success -> advance s,
 %   s = min(2s, remaining). The edge completes at remaining = 0 and is refused
-%   when r > h; at most 2h+1 calls. myxo_restart: level l = 0..h restarts
+%   when r > h; at most 2h+1 calls. myxo_restart rule: level l = 0..h restarts
 %   from the parent with 2^l equal substeps (<= 2^(h+1)-1 calls).
 %   Every substep passes the full boundary at its own coordinate before it
 %   seeds the next; substeps are never stored. Each edge records the
@@ -76,9 +81,9 @@ function varargout = sa_continuation(action, varargin)
 %   pass-created roots (a root whose creating discovery has route
 %   'root_pass'), so no lineage opens from a root the pass steps from;
 %   Q.root_pass holds the pass's rounds table.
-%   Family fence (settings continuation.families; the run context carries
+%   Family fence (a restriction to selected sheets; settings continuation.families; the run context carries
 %   the list in force as ctx.fence, {} or absent = no fence): a root whose
-%   observed family (its representative call's label) is outside the fence
+%   observed family (the shape label of its representative call) is outside the fence
 %   is stored and reported, but a lineage landing on it adopts it without
 %   making it expandable (counted: expansions withheld), next_start and
 %   unowned_roots skip it (lineage starts withheld), the anchor lineage
@@ -140,7 +145,7 @@ Q.rescue_calls = zeros(Q.n, 1);
 Q.rescue_result = repmat({''}, Q.n, 1);
 Q.root_pass = sa_root_pass('blank_rounds');      % the pass's rounds table
 if knowledge_on(ctx)
-    % source-edge skips (milestone 10; only when import.source_edges is not
+    % source-edge skips (only when import.source_edges is not
     % 'none', so a run without them keeps its queue state unchanged)
     Q.source_skips = struct('category', {}, 'lineage', {}, 'round', {}, 'p', {}, 'q', {}, 'root', {});
     Q.source_skip_keys = {};
@@ -151,7 +156,7 @@ if fence_on(ctx)
 end
 % the anchor lineage: the first accepted cold or import root at the anchor
 % node, in attempt order (cold calls come first, so with cold on it is the
-% first accepted cold root, as before); with a fence, the first one inside it
+% first accepted cold root); with a fence, the first one inside it
 A = ctx.attempts;
 k = find((strcmp({A.kind}, 'cold') | strcmp({A.kind}, 'import')) & strcmp({A.outcome}, 'accepted') & ...
     strcmp({A.target_key}, L.key{Q.anchor_node}), 1);
@@ -344,7 +349,7 @@ end
 end
 
 function [root, qbest, att, fam] = next_start(ctx)
-% Unowned accepted roots in the phase's target set (any route, M-C).
+% Unowned accepted roots in the phase's target set (any route).
 root = ''; qbest = 0; att = ''; fam = '';
 Q = ctx.Q;
 best = [];
@@ -445,7 +450,7 @@ end
 end
 
 function [qbest, pbest, skips] = next_target(ctx, l)
-% skips (milestone 10): the candidate edges p -> q left out on source-edge
+% skips: the candidate edges p -> q left out on source-edge
 % knowledge (sa_import 'knowledge'): the lineage root at p maps to a source
 % root whose edge into q the source refused with h >= continuation
 % .max_halvings ('lineage_same_or_stronger'), or, under 'all', with a
@@ -747,7 +752,7 @@ for q = find(Q.box).'
             cls = 'refused';
             reasons = unique({into.failing});
         elseif isfield(Q, 'source_skips') && any([Q.source_skips.q] == q)
-            cls = 'refused';                         % milestone 10: only skipped edges
+            cls = 'refused';                         % only skipped edges
             reasons = {'refused in the source run (not posed here)'};
         elseif ~any(strcmp(Q.phases_run, phase_of(Q, ctx.S, q)))
             cls = 'policy_skipped';

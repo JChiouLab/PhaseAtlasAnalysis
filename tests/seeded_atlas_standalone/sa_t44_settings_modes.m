@@ -1,13 +1,13 @@
 function rows = sa_t44_settings_modes(E)
-%SA_T44_SETTINGS_MODES  Milestone-4 T44 (packet v0.3 sections 2a, 7): layered
+%SA_T44_SETTINGS_MODES  Layered
 %   settings package -> model -> mode -> user with a source per leaf;
 %   model/mode layers disjoint (both real modules, every mode; a planted
 %   overlap is refused); the three new contradictions; unknown leaf and mode;
 %   mode change on resume refused at 0 calls; template / from_run round
 %   trip; settings_user.mat and settings_effective.txt in the run folder.
-%   M5 amendment (packet v0.2 section 7): the stub fixture now sets the M4
-%   rescue ladder explicitly (rescue.ring true is sourced 'user'); a
-%   mode-sourced leaf is checked on budget.max_wall_s instead.
+%   The stub fixture sets the rescue ladder explicitly (rescue.ring true is
+%   sourced 'user'); a mode-sourced leaf is checked on budget.max_wall_s
+%   instead.
 T = 'T44 settings and modes';
 rows = struct('test', {}, 'assertion', {}, 'pass', {}, 'detail', {});
 d = sa_m3_testdir(E, 't44');
@@ -29,7 +29,7 @@ ok = Sn.lattice.step == 0.15 && Sn.solver.reltol == 1e-8 && Sn.solver.abstol == 
     Sn.validity.refine_reltol == 1e-10 && Sn.validity.refine_abstol == 1e-12 && ...
     strcmp(Sn.continuation.guess_mesh, 'subsample') && strcmp(Sn.identity.candidate_mesh, 'comparison') && ...
     strcmp(Pn.solver.reltol, 'model');
-rows = sa_check(rows, T, 'Guzzo_noXA: model layer = the 2C commissioning values (the fixture leaves leave the test fixture)', ...
+rows = sa_check(rows, T, 'Guzzo_noXA: model layer = the tested values (the fixture leaves leave the test fixture)', ...
     ok, sprintf('N %d', Sn.continuation.guess_nodes));
 U = struct('model', 'guzzo_noxa', 'run_dir', 'x', 'lattice', struct('step', 0.1), 'mode', 'pilot');
 [S2, P2] = sa_settings('resolve', U, Mn);
@@ -113,7 +113,7 @@ Up.run_dir = 'y'; Up.budget = struct('max_calls', 900, 'max_wall_s', 3600);
 rows = sa_check(rows, T, ['from_run(pilot, production): user leaves kept (step, candidate_mesh), mode-layer leaves, ' ...
     'pilot.*, run_dir and mode dropped; resolves as production'], strcmp(Sp.mode, 'production') && ...
     Sp.lattice.step == 0.1 && strcmp(Pp.lattice.step, 'user') && strcmp(Sp.identity.candidate_mesh, 'dense') && ...
-    ~isfield(Up, 'pilot') && ~isfield(Up, 'routes') && strcmp(Sp.targets.policy, 'per_seed') && ...   % P2 amended (0.9): production default per_seed (was all_seedable)
+    ~isfield(Up, 'pilot') && ~isfield(Up, 'routes') && strcmp(Sp.targets.policy, 'per_seed') && ...   % production default is per_seed
     isempty(Sp.continuation.box) && all(ismember({'budget.max_calls', 'pilot.sample_per_axis', ...
     'routes.rescue', 'mode', 'run_dir'}, dropped)), strjoin(dropped, ','));
 rmpath(E.stub);

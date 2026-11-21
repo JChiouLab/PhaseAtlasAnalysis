@@ -1,18 +1,20 @@
 function rows = sa_t52_am14(E)
-%SA_T52_AM14  Milestone-4 T52 (packet v0.3 AM-14): load_shard recomputes every
+%SA_T52_AM14  load_shard recomputes every
 %   discovery's returned mesh, returned profile and comparison profile from
 %   its attempt's sol and compares bits.
 %   (a) a CONSISTENTLY tampered shard (re-built through the kernel, so the
-%       AM-1 replay passes) is refused by load_shard alone (SA:STORE_IO:
+%       replay passes) is refused by load_shard alone (SA:STORE_IO:
 %       E_PROFILE), with the profile check built from the run folder;
 %   (b) the untampered shards of the same run pass, every row bit-equal;
-%   (c) real shards (copies) of K2' (G3), K6 and a deterministic sample of K3
-%       pass with the run's re-derivation and profile functions; they were
-%       written under software 0.2, so the check is version-scoped: reported
+%   (c) real shards (copies) from three of the authors' development runs (one
+%       fission yeast, two Guzzo_noXA; not shipped) pass with the run's
+%       re-derivation and profile functions; they were written by an older
+%       software version, so the check is version-scoped: reported
 %       (largest difference), never failed;
-%   (d) pre-AM-9 shard-1 files pass;
+%   (d) shard-1 files (the older storage form) pass;
 %   (e) an older-version record whose profile differs is reported, not failed.
-%   E.am14_real = false skips (c)-(e) (they read milestone-3 folders).
+%   E.am14_real = false skips (c)-(e) (they read the development run folders;
+%   the portable tests set it to false).
 T = 'T52 AM-14 shard profile check';
 rows = struct('test', {}, 'assertion', {}, 'pass', {}, 'detail', {});
 addpath(E.stub);
@@ -67,7 +69,7 @@ sd = fullfile(m3, 'partK2_20261013_113221', 'A');
 [ok, det] = real_set(d, 'K2_shard1', sd, 'guzzo_noxa', 1);
 f1 = dir(fullfile(sa_layout('state', sd), 'roots', '*.mat'));
 Zf = load(fullfile(f1(1).folder, f1(1).name), 'format');
-rows = sa_check(rows, T, '(d) pre-AM-9 shard-1 files (K2 run A) load with the profile check', ...
+rows = sa_check(rows, T, '(d) older shard-1 files (a stored run) load with the profile check', ...
     ok && strcmp(Zf.format, 'sa_store_io/shard-1'), [Zf.format '; ' det]);
 % (e) an older-version record with a differing profile: reported, not failed
 src = sets{1, 2};
@@ -89,7 +91,7 @@ end
 
 function st2 = tamper(st, factor)
 % rebuild the store through the kernel with every returned profile scaled:
-% the AM-1 replay (rebuild) then matches; only AM-14 sees the change
+% the replay (rebuild) then matches; only the profile check sees the change
 disc = [];
 for r = 1:numel(st.roots)
     for q = 1:numel(st.roots(r).discoveries)

@@ -1,7 +1,5 @@
-% pde_eq_v7  --  shared V7 per-point BVP core (extracted 2026-07-09, Packet 1B).
-% Single source of truth for run_hybrid_sweeper_pdefb.m AND build_mpss_branch.m.
-% Extracted verbatim from run_hybrid_sweeper_pdefb.m; do not fork. Equations, BCs,
-% tolerances, and mass conventions are unchanged.
+% pde_eq_v7  --  pdepe equations of the fission yeast model (u, q, v, w, p) for the half-cell PDE.
+% Shared by run_hybrid_sweeper_pdefb.m and build_mpss_branch.m; keep a single copy.
 function [c,f,s] = pde_eq_v7(~, ~, u, dudx, par, D)
     c = ones(5,1);
     f = D .* dudx;

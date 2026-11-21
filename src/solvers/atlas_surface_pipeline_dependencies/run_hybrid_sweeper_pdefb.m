@@ -1,64 +1,49 @@
 function run_hybrid_sweeper_pdefb(p)
-    % RUN_HYBRID_SWEEPER_PDEFB  Phase 2 column sweep with PDE-extrapolation
-    % fallback only.  Drop-in alternative to run_hybrid_sweeper, identical in
-    % every other phase.  Phase 2 collapses the original 4-tier chain
-    % (predictor / lcreep / subdivide / centre-anchor) down to:
-    %     Tier 1: predictor-corrector BVP (unchanged)
-    %     Tier 2: PDE relaxation seeded by an extrapolation of the last 1-2
-    %             successful column points, then BVP at the relaxed state.
-    %
-    % All other phases (0, 1, 3, 4, 5) are unchanged from run_hybrid_sweeper.
-    %
-    % RUN_HYBRID_SWEEPER  V7-Optimized Mass-Axis Sweeper (Roadmap A-H)
+    % RUN_HYBRID_SWEEPER_PDEFB  Mass-axis sweep of the half-peak (HPSS) half-cell state.
     % -----------------------------------------------------------------
-    % Goal: at FIXED L (= p.L), build a (Delta n_PAK, Delta n_GEF) grid of
-    % half-peak BVP steady states. The per-point BVP is V7's exact 14-variable
-    % formulation; the outer continuation has been redesigned to be V7-quality.
+    % Goal: at fixed L (= p.L), build a (Delta n_PAK, Delta n_GEF) grid of
+    % half-peak steady states of an isolated half cell (no flux at the ends; fission yeast model),
+    % using the 14-variable BVP of the shared per-point core (5 species + 5 derivatives +
+    % 2 uniform sources + 2 mass accumulators). Each solved point is used as the starting
+    % profile for its neighbours (continuation).
     %
-    % Architecture (see V7_vs_pipeline_diagnostic.md and docs/sweeping_logic.md):
-    %   Phase 0: V7-style seeding at the centre's mass density.
-    %            * Interactive (default): run PDE at multiple test L values,
-    %              show the user a panel of profiles, ask them to pick the
-    %              cleanest one and how many half-waves it contains; extract
-    %              the fundamental half-wave; creep UP or DOWN in L to L_half.
-    %            * Auto: try a list of L candidates, accept the first one
-    %              with amplitude >= 0.5 in u (HSS rejection threshold).
-    %            All seeds and creep steps are gated by validate_halfwave so
-    %            an HSS solution can never silently masquerade as a half-peak.
-    %   Phase 1: Solve the centre grid point with the seed.
-    %   Phase 2: Column seeding with a four-tier fallback chain at each step:
-    %            (1) predictor-corrector from the previous good column point,
-    %            (2) per-point L-creep at the local density,
-    %            (3) adaptive mass-step subdivision from the previous good
-    %                point (2^level intermediate mass targets, level<=4),
-    %            (4) centre-anchored continuation: walk from sol_mid in mass
-    %                space using a finer step (grid_step / centre_anchor_factor).
-    %            Tier 3 catches Newton-radius failures around folds; tier 4
-    %            recovers from contiguous-tail failures when the local march
-    %            has lost the polarized branch.
-    %   Phase 3: Parallel row sweeps using the same predictor-corrector in
-    %            PAK-mass space.
-    %   Phase 4: Per-point L-creep fallback for any (i,j) the main sweep
-    %            could not solve.
-    %   Phase 5: Eigenvalue-based stability classification on every solved
-    %            grid point (ported from V7's check_stability).
+    % Note on the paper: these half-cell states are the starting profiles of the paper's coupled
+    % pipeline; the rest of the uncoupled workflow built on them is an earlier approximation.
     %
-    % Failed points are NOT fabricated. They are recorded in failure_mask and
-    % left as NaN in the U/Q/V/W/P_trough arrays so downstream visualisations
-    % can mask them.
+    % Phases:
+    %   Phase 0: seeding at the centre's mass density (or at another anchor bin if the centre
+    %            has no half-peak state, see below).
+    %            * Interactive (the default when p.seeding_mode is not set): run the PDE at
+    %              several test L values, show a panel of profiles, ask the user to pick the
+    %              cleanest one and how many half-waves it contains; extract the fundamental
+    %              half-wave; creep UP or DOWN in L to L_half.
+    %            * Auto: try a list of L candidates, accept the first with amplitude >= 0.5 in u
+    %              (the no-peak rejection threshold).
+    %            * Constructed guess (p.phase0_construct): solve the BVP directly from analytic
+    %              edge-peak guesses, without PDE relaxation.
+    %            All seeds and creep steps are checked by validate_halfwave, so a flat
+    %            (no-peak) solution can never pass as a half-peak.
+    %   Phase 1: Solve the anchor grid point with the seed.
+    %   Phase 2: Column continuation from the anchor, two tiers at each step:
+    %            (1) predictor-corrector BVP from the previous good column points,
+    %            (2) PDE relaxation from an extrapolation of the last 1-2 good points,
+    %                then a BVP at the relaxed state.
+    %   Phase 3: Parallel row sweeps with the same predictor-corrector in PAK-mass space.
+    %   Phase 4: Retry of every (i,j) the main sweep could not solve, from solved neighbours
+    %            (parallel, multi-pass, per-cell time limit).
+    %   Phase 5: Eigenvalue-based stability classification of every solved grid point
+    %            (skipped if p.skip_stability).
     %
-    % Roadmap items implemented:
-    %   A: construct_bvp_guess_v7 no longer rescales mass integrals.
-    %   B: Phase0 L-creep + Phase2/3 predictor-corrector + Phase4 per-point
-    %      L-creep fallback.
-    %   C: failure_mask, no HSS fabrication.
-    %   D: validate_halfwave (autocorrelation) gates the Phase 0 seed.
-    %   E: run_pde_chunked with early stopping (V7-style) for seed + fallback.
-    %   F: check_stability_v7 ported from V7; is_stable_grid saved.
+    % Failed points are not filled in. They are recorded in failure_mask and
+    % left as NaN in the U/Q/V/W/P_trough arrays so downstream plots can mask them.
+    %
+    % Notes:
+    %   * The BVP does not rescale the mass integrals; the sources s1, s2 absorb the residual.
+    %   * Solutions are checked for shape (validate_halfwave) at every seed and accept point.
 
     computation_id = datestr(now, 'yyyymmdd_HHMMSS');
 
-    % --- 1. Parameters (default to V7 Gold Standard) -------------------
+    % --- 1. Parameters (built-in default parameters, not the paper's set; see run_atlas_surface_pipeline.m / docs/MODELS.md) -------------------
     if nargin < 1
         p.a = 0.59; p.b = 0.13; p.c = 21.0;
         p.d = 1.3;  p.e = 33.0; p.f = 1.9;
@@ -76,8 +61,7 @@ function run_hybrid_sweeper_pdefb(p)
     if ~isfield(p, 'pde_max_chunks'),   p.pde_max_chunks  = 20;   end
     if ~isfield(p, 'pde_fallback_T'),   p.pde_fallback_T  = 5e6;  end
     if ~isfield(p, 'skip_stability'),   p.skip_stability  = false; end
-    % Oscillatory-regime PDE fallback (default OFF -> behaviour byte-identical
-    % to before). When ON, the PDE-relaxation fallback (a) stops early once it
+    % Oscillatory-regime PDE fallback (default OFF). When ON, the PDE-relaxation fallback (a) stops early once it
     % detects the trajectory is not relaxing to a steady state instead of
     % burning the whole chunk budget, and (b) offers several oscillation-phase
     % snapshots + their time-mean as bvp4c SEED candidates, accepting the first
@@ -90,11 +74,11 @@ function run_hybrid_sweeper_pdefb(p)
     if ~isfield(p, 'osc_n_snap'),       p.osc_n_snap      = 6;     end  % phase snapshots per chunk
     % Phase 4 per-cell wall-clock budget (seconds). A single pathological
     % neighbour-seeded BVP call can otherwise stall bvp4c's mesh refinement
-    % indefinitely and, since Phase 4 used to run as one blocking parfor,
-    % silently wedge the ENTIRE pass with zero console feedback.
+    % indefinitely and silently block the whole pass (so each cell runs as its own
+    % parfeval task with a time limit).
     if ~isfield(p, 'phase4_cell_timeout'), p.phase4_cell_timeout = 30; end
     % Phase 0 seeding strategy:
-    %   'interactive' (default) - V7-style: PDE at several test L, user picks
+    %   'interactive' (default) - PDE at several test L, user picks
     %                              the cleanest pattern, hybrid creeps to L_target.
     %   'auto'                  - small-L start, automatic creep up.
     if ~isfield(p, 'seeding_mode'),     p.seeding_mode    = 'interactive'; end
@@ -128,7 +112,7 @@ function run_hybrid_sweeper_pdefb(p)
 
     % Output containers
     SOL_grid       = cell(res, res);
-    failure_mask   = true(res, res);     % true == not solved (mark, don't fabricate)
+    failure_mask   = true(res, res);     % true == not solved (mark the cell, never fill it in)
     is_stable_grid = false(res, res);
     morphology_class_grid = repmat("NOT_FOUND", res, res);
     morphology_reason_grid = repmat("no_accepted_solution", res, res);
@@ -143,19 +127,17 @@ function run_hybrid_sweeper_pdefb(p)
     out_path = fullfile(out_dir, filename);
 
     % ====================================================================
-    % PHASE 0/1  -  MULTI-BIN ANCHOR SEARCH  (Roadmap B + D + E)
+    % PHASE 0/1  -  MULTI-BIN ANCHOR SEARCH
     % ====================================================================
-    % Robustness (2026-07-17): Phase 0/1 no longer hard-fails when the CENTRE
-    % bin has no seedable HPSS -- e.g. the centre mass is past a fold, so the
-    % static half-peak simply does not exist there (see hpss-fold-vs-pak-mass /
-    % CLAUDE.md 11.6). Instead it tries up to p.phase01_max_bins candidate anchor
+    % Phase 0/1 does not fail outright when the centre bin has no seedable half-peak state,
+    % e.g. when the centre mass is past a fold of the half-peak branch, so the static
+    % half-peak does not exist there. Instead it tries up to p.phase01_max_bins candidate anchor
     % bins (default 9: a centre-first coarse 3x3 spread across the (Dn_PAK,
-    % Dn_GEF) grid), running the Phase-0 seed + Phase-1 solve at EACH bin's own
-    % mass density until one yields a validated HPSS. That bin becomes the anchor
-    % (anchor_i, anchor_j) the column/row continuation marches out from -- it need
-    % NOT be the centre. Only if ALL candidates fail does the sweep error out.
-    % (Mirrors the quarter sweeper's existing re-rooting; the HPSS sweeper used to
-    % hard-fail on the centre alone.)
+    % Dn_GEF) grid), running the Phase-0 seed + Phase-1 solve at each bin's own
+    % mass density until one yields a validated half-peak. That bin becomes the anchor
+    % (anchor_i, anchor_j) the column/row continuation marches out from; it need
+    % not be the centre. Only if all candidates fail does the sweep error out.
+    % (The quarter-domain sweeper re-roots the same way.)
     mid_idx = round(res/2);
     if ~isfield(p, 'phase01_max_bins'), p.phase01_max_bins = 9; end
     anchor_bins = candidate_anchor_bins(res, mid_idx, p.phase01_max_bins);
@@ -226,11 +208,11 @@ function run_hybrid_sweeper_pdefb(p)
             % Tier 1: predictor-corrector BVP
             guess = predictor_step(prev_sol, prev_prev_sol);
             [bvp_sol, ok] = run_bvp_v7(guess, L_half, par, D_vals, tg, tp);
-            % Invariant 10: bvp4c routinely converges from an HPSS guess to a FLAT
-            % (HSS-collapsed) profile. Accepting it here stored a non-peak AND -- worse
-            % -- seeded it to the next cell, propagating the collapse down the march
-            % (diagnosed 2026-07-10: ~1000/2500 res=50 cells were hss_collapsed, and
-            % ~60% of collapse-adjacent cells recover a real half-peak from a VALIDATED
+    % bvp4c routinely converges from a half-peak guess to a flat
+            % (no-peak) profile. Accepting it would store a non-peak and also use it as the
+            % starting profile of the next cell, propagating the collapse down the march
+            % (at res = 50 about 1000/2500 cells were collapsed, and about 60% of the
+            % cells next to a collapse recover a real half-peak from a validated
             % warm start). Reject a collapsed solve so tier 2 (PDE re-polarisation) runs.
             ok = ok && validate_halfwave(bvp_sol);
             tier_used = 1;
@@ -266,7 +248,7 @@ function run_hybrid_sweeper_pdefb(p)
             sum(column_succ)-1, res-1, n_tier1, n_tier2, sum(~column_succ), p2_wall);
 
     % ====================================================================
-    % PHASE 3  -  PARALLEL ROW SWEEPS WITH PREDICTOR-CORRECTOR  (Roadmap B)
+    % PHASE 3  -  PARALLEL ROW SWEEPS WITH PREDICTOR-CORRECTOR
     % ====================================================================
     fprintf('PHASE 3: Parallel row sweeps (predictor-corrector)...\n');
 
@@ -297,7 +279,7 @@ function run_hybrid_sweeper_pdefb(p)
 
                     guess = predictor_step(prev_sol, prev_prev_sol);
                     [bvp_sol, ok] = run_bvp_v7(guess, L_half, par, D_vals, tg, tp);
-                    ok = ok && validate_halfwave(bvp_sol);   % Invariant 10: don't accept/seed a collapsed (flat/HSS) BVP
+                    ok = ok && validate_halfwave(bvp_sol);   % do not accept or seed from a collapsed (flat/no-peak) BVP
                     if ~ok
                         bvp_sol = lcreep_fallback(L_half, par, D_vals, tg, tp, p);
                         ok = ~isempty(bvp_sol);
@@ -352,12 +334,10 @@ function run_hybrid_sweeper_pdefb(p)
         fprintf('PHASE 4 [pdefb]: neighbour-seeded BVP fallback on %d failed point(s)...\n', ...
                 n_failed_after_main);
 
-        % Was 5. Diagnosed 2026-07-10: at res=50 production, pass 5 was still
-        % rescuing 32 cells (rate declining 66,50,43,36,32 but not yet zero) --
-        % the cap cut recovery off before it reached its own fixed point (the
-        % loop already early-stops via `if n_rescued_pass == 0, break; end`, so
-        % raising the cap costs nothing once genuinely exhausted). No morphology/
-        % mass threshold changed; this only lets the existing rescue run longer.
+    % The cap is generous: at res = 50 a pass limit of 5 stopped recovery while
+        % the rate was still declining (66, 50, 43, 36, 32 cells per pass, not yet zero). The loop
+        % early-stops via `if n_rescued_pass == 0, break; end`, so a high cap costs
+        % nothing once the recovery is exhausted. No shape or mass threshold depends on it.
         max_passes      = 15;
         total_attempts  = 0;
         total_rescued   = 0;
@@ -369,12 +349,12 @@ function run_hybrid_sweeper_pdefb(p)
             n_failed_now  = numel(fail_idx_list);
             if n_failed_now == 0, break; end
 
-            % Pre-extract only the (up to 2) neighbour seeds each failed cell
+    % Pre-extract only the (up to 2) neighbour seeds each failed cell
             % actually needs. This is a cheap serial pass over cell-array
-            % pointers (no BVP solves) and replaces broadcasting the ENTIRE
+            % pointers (no BVP solves) and avoids broadcasting the entire
             % growing SOL_grid (every solved cell so far, up to res*res
-            % bvp4c structs) to every worker on every pass -- the main driver
-            % of the memory pressure that stalled the res=50 run.
+            % bvp4c structs) to every worker on every pass, which would
+            % cause memory pressure at large res.
             seed1_list = cell(n_failed_now, 1);
             seed2_list = cell(n_failed_now, 1);
             tg_list    = zeros(n_failed_now, 1);
@@ -393,11 +373,10 @@ function run_hybrid_sweeper_pdefb(p)
             task_idx   = find(seed_avail);
             n_tasks    = numel(task_idx);
 
-            % Submit each solvable cell as its own parfeval task so a single
+    % Submit each solvable cell as its own parfeval task so a single
             % pathological BVP call can be individually timed out and
-            % cancelled instead of blocking the whole batch indefinitely --
-            % the failure mode behind the multi-hour stall (parfor cannot be
-            % interrupted per-iteration; one wedged worker holds up all of
+            % cancelled instead of blocking the whole batch indefinitely
+            % (parfor cannot be interrupted per iteration; one stuck worker holds up all of
             % them, invisibly).
             futures = parallel.FevalFuture.empty(0, n_tasks);
             for t = 1:n_tasks
@@ -459,7 +438,7 @@ function run_hybrid_sweeper_pdefb(p)
                 end
             end
 
-            % Defense in depth: audit the complete seed pool before another
+            % Audit the complete seed pool before another
             % recovery pass can draw neighbours from it.
             trough_grids = {U_trough, Q_trough, V_trough, W_trough, P_trough};
             [SOL_grid, failure_mask, trough_grids, morphology_class_grid, ...
@@ -496,7 +475,7 @@ function run_hybrid_sweeper_pdefb(p)
     end
 
     % ====================================================================
-    % PHASE 5  -  STABILITY CLASSIFICATION  (Roadmap F)
+    % PHASE 5  -  STABILITY CLASSIFICATION
     % ====================================================================
     if p.skip_stability
         fprintf('PHASE 5: Skipped (p.skip_stability = true). is_stable_grid left all-false.\n');
@@ -537,7 +516,7 @@ function run_hybrid_sweeper_pdefb(p)
          'morphology_diagnostics_grid', 'quarantined_nonhpss_mask', ...
          'L_total', 'M_BG', 'M_P', 'par', 'computation_id', 'p');
     copyfile(out_path, fullfile(out_dir, 'bvp_sweep_full_results.mat'));
-    log_metadata(computation_id, filename, 'Hybrid Sweep V7 (PDE-Fallback Variant)', ...
+    log_metadata(computation_id, filename, 'Hybrid sweep (PDE-fallback variant)', ...
                  par, L_total, M_BG, M_P, M_BG/L_total, M_P/L_total, ...
                  stability_notes);
     fprintf('Hybrid Sweep (pdefb) complete: %s\n', out_path);
@@ -571,8 +550,8 @@ function [SOL_grid, failure_mask, trough_grids, class_grid, reason_grid, ...
         diagnostics_grid, quarantine_mask, n_quarantined] = ...
         quarantine_invalid_hpss(SOL_grid, failure_mask, trough_grids, ...
             class_grid, reason_grid, diagnostics_grid, quarantine_mask)
-    % Hard pre-propagation gate. A converged non-HPSS remains documented, but
-    % it is cleared from the seed pool and treated as a failed HPSS solve.
+    % Hard gate before propagation. A converged non-half-peak solution remains documented, but
+    % it is cleared from the seed pool and treated as a failed half-peak solve.
     [class_grid, reason_grid, diagnostics_grid, invalid_mask] = ...
         audit_hpss_grid(SOL_grid, failure_mask, class_grid, reason_grid, ...
                         diagnostics_grid);
@@ -614,8 +593,8 @@ function bins = candidate_anchor_bins(res, mid_idx, max_bins)
 end
 
 function sol = force_peak_at_zero(sol)
-    % Normalize a half-domain HPSS to the canonical orientation: peak at x=0,
-    % trough at x=L_half (CLAUDE.md 1). bvp4c returns the mirror-image solution
+    % Normalize a half-domain half-peak (HPSS) solution to the canonical orientation: peak at x=0,
+    % trough at x=L_half. bvp4c returns the mirror-image solution
     % (peak at x=L_half) about half the time -- an EXACT solution too, since the
     % reaction is x-independent and the no-flux BCs + mass constraints are
     % symmetric under x -> L_half - x -- but build_branch_library then classifies
@@ -644,13 +623,13 @@ function [seed_sol, info] = phase0_lcreep_seed(par, D, L_target, rho_G, rho_P, p
     mode = lower(p.seeding_mode);
     info.mode = mode;
 
-    % --- Tier 0: constructed-guess cold start (default on) -------------------
+    % --- Constructed-guess cold start (p.phase0_construct) -------------------
     % Solve the HPSS BVP directly at L_target from analytic edge-peak guesses,
     % with NO PDE relaxation. This is the robust path for oscillatory regimes
     % where the static half-peak is dynamically UNSTABLE (the stable attractor
-    % is a moving/shuttling peak), so PDE relaxation flees it and the legacy
-    % seed reports "amplitude ~0". bvp4c does not care about temporal stability
-    % and converges to the (existing) steady HPSS from a decent guess. If the
+    % is a moving/shuttling peak), so PDE relaxation flees it and the
+    % PDE-relaxation seed reports "amplitude ~0". bvp4c does not care about temporal stability
+    % and converges to the (existing) steady half-peak (HPSS) state from a decent guess. If the
     % branch has folded away at these masses no guess validates -> fall through.
     if ~isfield(p, 'phase0_construct') || p.phase0_construct
         cs = phase0_construct_seed(par, D, L_target, rho_G, rho_P, p);
@@ -709,8 +688,8 @@ function seed_sol = phase0_construct_seed(par, D, L_target, rho_G, rho_P, p)
     % relaxation. Sweeps a small grid of peak amplitude x width, keeps the
     % highest-amplitude solution that converges AND passes validate_halfwave.
     % Returns [] if none validate (e.g. the static branch has folded away at
-    % these masses). Verified 2026-07-14 to recover the amp~10 HPSS at the
-    % M_P=6 centre where PDE relaxation (subcritical + unstable half-peak) fails.
+    % these masses). Tested to recover the amplitude-10 half-peak state at the
+    % M_P = 6 centre, where PDE relaxation (subcritical + unstable half-peak) fails.
     seed_sol = [];
     nG = rho_G * L_target; nP = rho_P * L_target;
     try
@@ -1002,7 +981,7 @@ end
 
 
 function [bvp_sol, L_fund] = phase0_interactive_seed(par, D, rho_G, rho_P, p)
-    % V7-style interactive seed picker.  Runs PDE at each L in
+    % Interactive seed picker.  Runs PDE at each L in
     % p.L_seed_test_values, plots them in a panel, asks the user to pick the
     % index of the cleanest pattern and how many half-waves are visible.
     L_test = p.L_seed_test_values(:).';   % row vector
@@ -1244,7 +1223,7 @@ end
 
 
 %% ========================================================================
-%  V7 BVP CORE  (per-point solver, identical to V7 except per Roadmap A)
+%  BVP CORE  (per-point solver; mass integrals are not rescaled)
 %  ========================================================================
 
 
@@ -1296,7 +1275,7 @@ end
 
 
 %% ========================================================================
-%  V7-STYLE CHUNKED PDE (Roadmap E)
+%  CHUNKED PDE
 %  ========================================================================
 
 
@@ -1312,13 +1291,13 @@ end
 
 
 %% ========================================================================
-%  SEED VALIDATION (Roadmap D)
+%  SEED VALIDATION
 %  ========================================================================
 
 
 
 %% ========================================================================
-%  STABILITY (Roadmap F) - port of V7 check_stability
+%  STABILITY (eigenvalues of the BVP Jacobian)
 %  ========================================================================
 
 function is_stable = check_stability_v7(sol, par, D)

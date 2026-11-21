@@ -1,5 +1,5 @@
 function rec = gnx_validity(kind, varargin)
-%GNX_VALIDITY  Guzzo_noXA validity record (packet §4; missing check = invalid).
+%GNX_VALIDITY  M. xanthus (Guzzo_noXA) validity record (a missing check counts as invalid).
 %
 %   rec = GNX_VALIDITY('hpss',    sol, srec, ctx)   half-domain BVP struct
 %   rec = GNX_VALIDITY('quarter', sol, srec, ctx)   quarter-domain BVP struct
@@ -15,7 +15,6 @@ function rec = gnx_validity(kind, varargin)
 %         morphology        gnx_morphology on deval at morph_nodes uniform
 %                           nodes: class HPSS (amplitude = relative contrast);
 %                           stores far_trough_gap_rel, autocorr_lag1, mesh
-%                           (packet v1.2 condition 1)
 %       Recorded, not gated: sigma (|sigmaR|, |sigmaB|), bvp4c threshold
 %       AbsTol/RelTol, per-row max|f| on the mesh, residual diagnostic
 %       |y' - F| / max(|F|, threshold) sup and RMS per row on the dense grid,
@@ -32,7 +31,7 @@ function rec = gnx_validity(kind, varargin)
 %       same for sB), route_agreement, single_root.
 %   ok = GNX_VALIDITY('verdict', rec)
 %       Recomputes the verdict from the record: every required check of
-%       rec.kind present with pass == true (fail closed).
+%       rec.kind present with pass == true (a missing check fails the record).
 %   names = GNX_VALIDITY('required', kind)
 
 switch kind
@@ -129,7 +128,7 @@ rec.checks.orientation = chk(bm0 >= bml, [bm0 bml], NaN);
 xg = linspace(0, ell, nm.morph_nodes);
 yg = deval(sol, xg);
 [acc, info] = gnx_morphology(xg, yg(rows, :));
-% v1.2 condition 1 (Z7 ruling): the record names the evaluation mesh and
+% The record names the evaluation mesh and
 % carries far_trough_gap/amp and autocorr_lag1 explicitly (NaN when the
 % classifier stopped before computing them, e.g. at the amplitude gate).
 rec.checks.morphology = chk(acc, string(info.class), "HPSS", 'reason', string(info.reason), ...
@@ -148,7 +147,7 @@ rec.diag.resid_sup = max(r, [], 2).';
 rec.diag.resid_rms = sqrt(mean(r.^2, 2)).';
 rec.diag.maxres = getf(srec, 'maxres', NaN);
 rec.diag.n_mesh = numel(x);
-rec.diag.cyt_mean_121 = [mean(yg(3, :)) mean(yg(7, :))];   % myxo :253 convention
+rec.diag.cyt_mean_121 = [mean(yg(3, :)) mean(yg(7, :))];   % convention of the reference M. xanthus code
 rec.diag.seam = sol.y(rows, end).';
 end
 
@@ -162,7 +161,7 @@ rec.checks.quarter_valid = chk(qok, double(qok), NaN);
 if ~qok, return; end
 xq = solq.x(:).'; ellq = xq(end);
 yq = solq.y([1 3 5 7], :);
-% peak-to-peak reflection (build_mpss_branch.m:625-650 convention): the
+% peak-to-peak reflection (same convention as build_mpss_branch.m): the
 % quarter's peak (x = 0) goes to the seam x = ell_q of the stitched half.
 x_left = ellq - fliplr(xq);  x_right = ellq + xq;
 xs = [x_left(1:end-1), x_right];

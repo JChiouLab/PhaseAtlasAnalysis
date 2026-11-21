@@ -1,11 +1,14 @@
 function report = plot_atlas_phase_plane(opts)
-    % PLOT_ATLAS_PHASE_PLANE  Atlas equivalent of plot_phase_planes_multibranch.m:
-    % one phase-plane page PER SELECTED SHEET, each showing that sheet's own
-    % flux field/nullclines (reused from Packet 3/4, never recomputed) with the
-    % FULL PDE trajectory overlaid -- SOLID where the trajectory was classified
-    % ON THAT sheet (best-fit & on-atlas), DASHED for the rest of the
-    % simulation -- so each page reads as "here is where in this sheet's phase
-    % plane the trajectory sat, in the context of its whole path."
+    % PLOT_ATLAS_PHASE_PLANE  One phase-plane page per selected sheet, each showing that sheet's own
+    % flux field/nullclines (taken from the sheets file, never recomputed) with the
+    % full pdepe trajectory overlaid: solid where the trajectory was classified
+    % on that sheet (best-fit and on-atlas), dashed for the rest of the
+    % simulation. Each page reads as "here is where in this sheet's phase
+    % plane the trajectory sat, in the context
+    %
+    % Note on the paper: this is the uncoupled approximation. The sheets' flux (-2*Dc*(trough
+    % difference), see build_atlas_sheets.m), the nullclines drawn from it and the pdepe trajectory are
+    % an earlier approximation and are not used for any figure of the paper.
     %
     % Which sheets get a page (selection precedence, highest first):
     %   1. opts.sheets non-empty  -> exactly that explicit list.
@@ -21,7 +24,7 @@ function report = plot_atlas_phase_plane(opts)
     %   3. neither                -> auto: every sheet the trajectory was
     %      genuinely on-atlas for >=1 frame (dwelled), in visiting order.
     %      (off-atlas frames never count as "dwelling" even though
-    %      best_sheet_idx still names a least-bad match there -- Packet 7.)
+    %      best_sheet_idx still names a least-bad match there.)
     %
     % Requires a classification (class_path) -- there is no meaningful per-sheet
     % split or ranking without per-frame per-sheet residuals. Modifies neither
@@ -51,7 +54,7 @@ function report = plot_atlas_phase_plane(opts)
     %   visible      - 'on'|'off'. Default 'off'.
     %
     % Output: data/plots/Atlas_PhasePlane_<sheet_name>.pdf, one per selected
-    % sheet (distinct from Packet 4's Atlas_Sheet_<name>.pdf, which has no
+    % sheet (distinct from Atlas_Sheet_<name>.pdf of plot_atlas_sheets.m, which has no
     % trace).
     %
     % Returns report: atlas_path, trace_path, class_path, n_frames,
@@ -82,11 +85,11 @@ function report = plot_atlas_phase_plane(opts)
 
     if ~exist(opts.atlas_path, 'file')
         error(['plot_atlas_phase_plane: atlas sheets file not found: %s.\n', ...
-               'Run build_atlas_sheets first (Packet 3).'], opts.atlas_path);
+               'Run build_atlas_sheets first.'], opts.atlas_path);
     end
     if ~exist(opts.class_path, 'file')
         error(['plot_atlas_phase_plane: classification file not found: %s.\n', ...
-               'Run classify_pde_to_atlas_sheets first (Packet 5) -- a per-sheet ', ...
+               'Run classify_pde_to_atlas_sheets first -- a per-sheet ', ...
                'trace split requires knowing which sheet each frame belongs to.'], opts.class_path);
     end
     A = load(opts.atlas_path);
@@ -119,7 +122,7 @@ function report = plot_atlas_phase_plane(opts)
     [~, rank_order] = sort(best_resid_per_sheet, 'ascend');  % Inf sorts last
 
     % dwelled sheets (auto default): genuinely on-atlas, not the least-bad
-    % off-atlas match (Packet 7: e.g. HSS+HSS is the argmin for most of a
+    % off-atlas match (e.g. no-peak/no-peak is the argmin for most of a
     % moving-peak trajectory's off-atlas tail without ever being "on" it).
     on_mask = ~isnan(best_idx) & ~off_atlas;
     dwelled_order = unique(best_idx(on_mask), 'stable');
@@ -291,10 +294,9 @@ end
 
 
 % ==========================================================================
-%  helpers (copied from plot_atlas_sheets.m's proven pattern -- these are
-%  local/unexported subfunctions there, so they are duplicated here rather
-%  than cross-called, consistent with this codebase's existing convention,
-%  e.g. plot_atlas_surfaces_combined.m)
+%  helpers (copied from plot_atlas_sheets.m, where they are local
+%  subfunctions, so they are duplicated here rather than cross-called,
+%  as in plot_atlas_surfaces_combined.m)
 % ==========================================================================
 
 function s = resid_str(bfit)

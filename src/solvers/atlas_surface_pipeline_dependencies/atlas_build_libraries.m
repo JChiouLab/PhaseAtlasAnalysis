@@ -1,14 +1,15 @@
 function manifest = atlas_build_libraries(model, par, res, out_dir, opts)
-%ATLAS_BUILD_LIBRARIES  Build or reuse the uncoupled seed libraries (Stages 1-3 only).
+%ATLAS_BUILD_LIBRARIES  Build or reuse the half-cell libraries (starting profiles; Stages 1-3 only).
 %
 %   manifest = ATLAS_BUILD_LIBRARIES(model, par, res)
 %   manifest = ATLAS_BUILD_LIBRARIES(model, par, res, out_dir, opts)
 %   d = ATLAS_BUILD_LIBRARIES('default_dir', model, par, res)
 %   tf = ATLAS_BUILD_LIBRARIES('present', model, out_dir)   all three
-%       branch_{HSS,HPSS,MPSS}_latest.mat files exist
+%       branch_{HSS,HPSS,MPSS}_latest.mat files exist (no-peak, half-peak, full-peak)
 %
 %   The library stages of run_atlas_surface_pipeline.m, nothing else (never
 %   Stage 2b or Stages 4-12, so the script's force_trace does not apply).
+%   The libraries are the isolated half-cell steady states the paper uses as starting profiles.
 %   model   'original_polarity' | 'guzzo_noxa'
 %   par     the dimensional parameters: original_polarity a b c d e f Dm Dc
 %           L M_BG M_P (the script's expressions, e.g. 2.38/4, give the same
@@ -22,8 +23,9 @@ function manifest = atlas_build_libraries(model, par, res, out_dir, opts)
 %   opts    force: cellstr of stages to rebuild even when present ('HPSS',
 %           'HSS', 'MPSS'; default {}); confirmation: the noxa pre-seeding
 %           confirmation file put into the manifest (optional)
-%           Milestone 8 (packet section 3.2):
-%           max_mode: build the mode-n libraries n = 3 .. max_mode
+%           Higher-mode libraries:
+%           max_mode: build the higher-mode libraries n = 3 .. max_mode (n monotone runs; more
+%             peaks than the paper's three shapes)
 %             (build_mode_branch / gnx_build_mode) after the three, stopping
 %             after the first mode whose mask is empty (its file is still
 %             written, run_status 'empty'); default 2 = build nothing new.
@@ -51,7 +53,6 @@ function manifest = atlas_build_libraries(model, par, res, out_dir, opts)
 %   must equal the run parameters (the coupled loader checks this again).
 %   Returns the coupled pipeline's library manifest struct('directory',
 %   out_dir) (+ 'confirmation'); prints what it built or reused.
-%   The build path is argument-verified against the script, not rebuilt.
 
 if ischar(model) && strcmp(model, 'default_dir')
     manifest = default_dir(par, res, out_dir);
@@ -193,7 +194,7 @@ fprintf('[pool] %d worker(s)\n', used);
 end
 
 function modes = build_modes(model, par, res, out_dir, opts, max_mode, force)
-% modes 3 .. max_mode, stopping after the first empty one (packet 3.2)
+% modes 3 .. max_mode, stopping after the first empty one
 modes = struct('n', {}, 'path', {}, 'run_status', {}, 'n_valid', {}, 'built', {});
 for n = 3:max_mode
     f = fullfile(out_dir, sprintf('branch_MODE%d_latest.mat', n));

@@ -1,14 +1,14 @@
 function M = gnx_build_mpss(P, opts)
-%GNX_BUILD_MPSS  MPSS = reflected quarter-domain half-peak (packet §4i).
+%GNX_BUILD_MPSS  Full-peak (MPSS) half-cell state = reflected quarter-domain half-peak (M. xanthus model).
 %
 %   M = GNX_BUILD_MPSS(P)
 %   M = GNX_BUILD_MPSS(P, opts)     opts passed to gnx_sweep_hpss
 %   Quarter sweep on ell_q = L/4 at quarter masses (half masses / 2, same
 %   densities, so the grid cell is unchanged), then for every accepted quarter
-%   a peak-to-peak reflection (build_mpss_branch.m:625-650 convention) onto
+%   a peak-to-peak reflection (same convention as build_mpss_branch.m) onto
 %   [0, L/2] and the MPSS record of gnx_validity('mpss'): quarter valid
 %   (positivity, orientation on the quarter, ...), seam slope, symmetry,
-%   dense mass doubling, peak fraction in (0.4, 0.6), relative contrast.
+%   densely resampled mass check (doubled quarter mass), peak fraction in (0.4, 0.6), relative contrast.
 %   An all-false MPSS result is a valid output.
 
 if nargin < 2 || isempty(opts), opts = struct(); end

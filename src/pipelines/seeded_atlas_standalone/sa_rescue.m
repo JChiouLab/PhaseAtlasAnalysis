@@ -1,5 +1,7 @@
 function varargout = sa_rescue(action, varargin)
-%SA_RESCUE  Rescue ladder for unreached nodes.
+%SA_RESCUE  Rescue ladder for unreached nodes: a retry of a grid point
+%   (node) that holds no quasi-steady state (root) with other starting
+%   profiles. A lineage is a chain of continuation steps from one cold call.
 %
 %   [ctx, added] = SA_RESCUE('run', ctx)
 %       After the continuation queue of the pass empties: every node of the
@@ -38,14 +40,15 @@ function varargout = sa_rescue(action, varargin)
 %       only, and no lineage holds roots at q-e and q-2e: cold and pass roots
 %       are never a secant basis) is not marked rescue_done; it records
 %       rescue_result 'no_basis' and stays eligible for the next closure
-%       pass. At most one ladder WITH calls per node, as before.
-%       Family fence (ctx.fence, sa_continuation): a root whose observed
+%       pass. At most one ladder WITH calls per node.
+%       Family fence (ctx.fence, sa_continuation; restricts the run to the
+%       selected sheets): a root whose observed
 %       family is outside the fence is never a rescue parent (diagonal,
 %       deep: sa_continuation node_parent offers only roots inside it; a
 %       refused edge from such a root is not resumed) and never a secant
 %       basis (a lineage pair at q-e, q-2e must both be inside it). A
 %       zero-call ladder that would have had a parent or basis without the
-%       fence records no_basis as before and is added to
+%       fence records no_basis and is added to
 %       Q.fence.rescue_withheld (reported in the fence section).
 %   g = SA_RESCUE('secant_guess', solP1, solP2 [, S])    the secant guess (test hook)
 

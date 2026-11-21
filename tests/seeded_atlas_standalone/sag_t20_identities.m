@@ -1,14 +1,14 @@
 function rows = sag_t20_identities(E)
-%SAG_T20_IDENTITIES  Packet 2C section 2c identities.
+%SAG_T20_IDENTITIES  Shift and velocity identities.
 %   (a) Algebraic, on the real right-hand side: DM*F(Rm'') + DC*F(Rc'') =
 %       -sigma for each half pool, on random states (the reaction cancels).
 %   (b) On a synthetic Hermite-exact candidate with nonzero seam slopes and
 %       shifts sigma = -J/Lh (sag_test_fixture 'poly'), the diagnostics give
 %       antisymmetry 0, velocity identity at round-off, the two velocity
-%       readings equal, and myxo's reading (4/L) J = -2 sigma.
-%   Deviation from the packet wording ("linear-reaction stub"): no exact
-%   solution of a linear stub BVP is constructed; (a) is the identity the
-%   integration rests on, (b) exercises the diagnostics that measure it.
+%       readings equal, and the reference script's reading (4/L) J = -2 sigma.
+%   No exact solution of a linear stub BVP is constructed here (see
+%   sag_t20b_linear_stub); (a) is the identity the integration rests on,
+%   (b) exercises the diagnostics that measure it.
 T = 'T20 identities';
 rows = struct('test', {}, 'assertion', {}, 'pass', {}, 'detail', {});
 M = sa_model('guzzo_noxa');
@@ -28,6 +28,6 @@ rows = sa_check(rows, T, '(b) synthetic: sigma_L = -sigma_R exactly, |J + Lh sig
     max(abs(D.vel_from_slope - D.vel_from_shift)) <= 1e-14 && D.s_max > 1e-3, ...
     sprintf('s_max %.3g antisym %.3g vel %.3g slope %s shift %s', D.s_max, D.antisym_max, ...
     D.vel_discrepancy_max, mat2str(D.vel_from_slope, 6), mat2str(D.vel_from_shift, 6)));
-rows = sa_check(rows, T, '(b) myxo reading (4/L) J_L equals -2 sigma_L', ...
+rows = sa_check(rows, T, '(b) reference reading (4/L) J_L equals -2 sigma_L', ...
     max(abs((4 / th.L) * D.J(1:2) + 2 * D.sigma(1:2))) <= 1e-14, '');
 end

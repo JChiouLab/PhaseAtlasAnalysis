@@ -1,6 +1,13 @@
 function varargout = sa_pilot_report(run_dir, varargin)
 %SA_PILOT_REPORT  The pilot report: a pure
-%   function of a run folder. Zero solves; rebuildable; deterministic; runs
+%   function of a run folder (a cost and diagnostic summary of a small run,
+%   used to plan a larger one).
+%   Terms: NMax-bound = the call reached the bvp4c mesh-point limit NMax;
+%   reach map = the lattice drawn by node class; frontier table = where each
+%   refused continuation step failed; MATLAB-h = MATLAB hours; edge = one
+%   continuation step between neighbouring grid points; ring = grid points
+%   outside the library's native range; cut_by_cap = refused on a mesh bound
+%   while the cold mesh cap was tighter than the run's solver. Zero solves; rebuildable; deterministic; runs
 %   on any stop reason (budget_calls, budget_wall, disk_floor, completed).
 %
 %   SA_PILOT_REPORT(run_dir)   writes <run_dir>/pilot_report.txt and the
@@ -18,7 +25,7 @@ function varargout = sa_pilot_report(run_dir, varargin)
 %   Sections (each also a CSV under pilot/): 1 settings (non-default leaves
 %   and source, stop reason, calls, process time); 2 validity and refusals
 %   by check (first-failing and all-failing per route class; ring split;
-%   no_return by guard; nodal-only positivity); 3 cost (corrector s per call for valid,
+%   no_return by guard; nodal-only positivity); 3 cost (solver s per call for valid,
 %   invalid and NMax-bound calls, median and p90; process s per live call;
 %   NMax share by route; MB per attempt file by class and per root shard;
 %   replay s per record); 4 returned mesh by call-chain depth (valid and
@@ -40,7 +47,7 @@ function varargout = sa_pilot_report(run_dir, varargin)
 %   a run that stopped before completing is marked PARTIAL, counts its
 %   pending region nodes as unreached and, while no refused node has been
 %   measured, charges each unreached node the per-node bound (2h + 1) +
-%   rescue.max_calls_per_node; after a resume the process/corrector factor
+%   rescue.max_calls_per_node; after a resume the process/solver factor
 %   is measured on the live calls only, with the replayed records' time
 %   (records x report.replay_s_per_record, a model setting) removed;
 %   section 1 shows the current segment's budget and checkpoint leaves
@@ -58,13 +65,14 @@ function varargout = sa_pilot_report(run_dir, varargin)
 %   and section 8's central_nine alternative carries the same caveat.
 %   Section 8's cold count is the per_seed seed count (the production
 %   default; census.seed_counts) unless the folder's policy is all_seedable
-%   or the folder predates the seed counts (then all_seedable, thinned).
+%   or the folder was written without the seed counts (then all_seedable,
+%   thinned).
 %   Repeated calls exclude the retry of an interrupted record: a call with
 %   retry_of set (or a killed retry, itself an interrupted record) whose
 %   earlier equal-fingerprint calls are all interrupted records is counted
 %   separately, never as a repeat.
 %
-%   Report-only, formula unchanged: section 2
+%   Report-only, no formula involved: section 2
 %   adds the reason class cut_by_cap per route (cold calls refused on a mesh
 %   bound under cold.mesh_cap); section 3 splits NMax-bound calls into "at
 %   the cold cap" and "at solver.nmax"; section 5 adds the per-root pass
@@ -77,7 +85,7 @@ function varargout = sa_pilot_report(run_dir, varargin)
 %   secant-only per-node bound is 2 x n_pools calls).
 %   The section-3 split uses the recorded
 %   largest proposed mesh P (P > the call's nmax) where present, and says
-%   for how many calls; legacy rows keep the convergence class.
+%   for how many calls; rows from older versions keep the convergence class.
 %   Older folders load through sa_settings('legacy_fill') (neutral values).
 %
 %   edge_large_change: d = d(parent, child) for a 1-call edge and
@@ -185,7 +193,7 @@ if X.resumes > 0
 end
 % replay seconds per stored record: the report leaf
 % report.replay_s_per_record (model layer);
-% a folder written before the leaf existed takes the current model layer's
+% a folder written without the leaf takes the current model layer's
 % value, else the package default
 [X.rate, X.rate_src] = replay_rate(X);
 X.pairs = {};
@@ -237,7 +245,7 @@ end
 
 function c = route_class(a)
 % cold | refinement | import | continuation | substep | rescue_<rung>
-% (substeps of a rescue edge are rescue_<rung>_substep; import: milestone 10)
+% (substeps of a rescue edge are rescue_<rung>_substep; import: the import route)
 if strcmp(a.kind, 'cold') || strcmp(a.kind, 'refinement') || strcmp(a.kind, 'import'), c = a.kind; return; end
 r = a.route; if isempty(r), r = a.kind; end
 if isfinite(a.fraction) && a.fraction < 1
@@ -420,10 +428,10 @@ R.s_valid = mean_or_nan(w(valid | inval | ~ret)); R.s_nmax = mean_or_nan(w(nmax)
 R.mb_valid = mean_or_nan(arrayfun(@(a) file_mb(X, a.attempt_id), A(~nmax)));
 R.mb_nmax = mean_or_nan(arrayfun(@(a) file_mb(X, a.attempt_id), A(nmax)));
 R.nmax_share = sum(nmax) / max(1, numel(A));
-% the process/corrector factor on this segment's LIVE calls:
+% the process/solver factor on this segment's LIVE calls:
 % after a resume the segment's process time also holds the replay of the
 % stored records, removed as records x report.replay_s_per_record (the
-% scheduler reads no clock during replay); never below the live corrector s
+% scheduler reads no clock during replay); never below the live solver s
 nrep = 0; if ~isempty(X.replay), nrep = X.replay; end
 live = numel(A) - nrep;
 wl = sum(w(nrep + 1:end), 'omitnan');
@@ -497,7 +505,7 @@ if isempty(X.replay)
     R.replay_s = NaN;
 else
     % the scheduler reads no clock during replay, so the replay cost is
-    % bounded from the segment: (process s - live corrector s) / replayed records
+    % bounded from the segment: (process s - live solver s) / replayed records
     R.replay_s = (X.process_s - wl) / max(1, X.replay);
     out{end+1} = sprintf(['  replay s per record <= %.3g (upper bound: last segment %.1f s minus %.1f s live corrector ' ...
         'time, over %d replayed records; includes set-up and live overhead); resumes %d; the setting ' ...
@@ -969,7 +977,7 @@ else
     cold_all = sum(cen.counts(fi)); cold_c9 = NaN;
 end
 % The cold count of the projected production run: per_seed (the production
-% default) when the census holds the seed counts (0.9 folders) and the
+% default) when the census holds the seed counts and the
 % folder's own policy is not all_seedable; else all_seedable (thinned)
 cold = cold_all; cold_pol = 'all_seedable';
 if isfield(cen, 'seed_counts') && ~strcmp(S.targets.policy, 'all_seedable')
@@ -1006,7 +1014,7 @@ if S.routes.rescue && isequal(S.rescue.rungs, {'secant'}) && nref == 0
 end
 per_node_cap = (S.continuation.max_lineages + 1) * S.continuation.max_edges_per_node * (2 * h + 1) + ...
     S.rescue.max_calls_per_node;
-% milestone 10: with the lineage slots at or above the number of box nodes
+% with the lineage slots at or above the number of box nodes
 % the per-node cap bounds nothing: the cap column is unbounded (Inf)
 nbox = nreg; if nbox == 0, nbox = N; end
 unbounded = S.continuation.max_lineages >= nbox;
@@ -1043,7 +1051,7 @@ end
 out{end+1} = sprintf(['  with central_nine cold instead: central %.0f, high %.0f (branch connected to the central nine ' ...
     'only; multiplicity not tested: coexisting roots elsewhere are not looked for)'], C(1) - cold + cold_c9, ...
     C(2) - cold + cold_c9);
-% hours: corrector s per call by the NMax share x the live process/corrector
+% hours: solver s per call by the NMax share x the live process/solver
 % factor + replay at report.replay_s_per_record
 sh = R.cost.nmax_share;
 if sh == 0, s_call = R.cost.s_valid; else, s_call = sh * R.cost.s_nmax + (1 - sh) * R.cost.s_valid; end

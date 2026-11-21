@@ -7,7 +7,7 @@ State vector u_vec = (u, q, v, w, p):
     w - phosphorylated cytosolic Gef
     p - cytosolic Pak1
 
-Reaction kinetics (paper's Eq. (2)-equivalent for this system):
+Reaction kinetics (equivalent of Eq. (2) of Dao et al. (2026) for this system):
 
     f1 = v*(a*u**2 + f) - b*u - c*u*p        # du/dt reaction part
     f2 = c*u*p - d*q                          # dq/dt
@@ -146,7 +146,7 @@ def solve_homogeneous_equilibrium(
     Returns
     -------
     list of ndarray, each shape (5,) -- one per physically valid (real, positive,
-    finite) equilibrium found. The paper's analogous derivation notes at most 3 real
+    finite) equilibrium found. The analogous derivation of Dao et al. (2026) notes at most 3 real
     positive roots occur in practice, though up to 4 are possible in principle.
     """
     a, b, c, d, e, f = params.a, params.b, params.c, params.d, params.e, params.f

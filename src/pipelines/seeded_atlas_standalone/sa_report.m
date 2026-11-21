@@ -9,7 +9,7 @@ function varargout = sa_report(action, varargin)
 %                                             summary.txt (atomic), stamped with
 %                                             the attempt count; the root store
 %                                             lives in per-node shards roots/
-%                                             written by the executor (= the
+%                                             written by sa_search (= the
 %                                             two actions below, full render)
 %   SA_REPORT('write_state', ctx)             the checkpoint files only:
 %                                             attempts.mat, process_time.mat,
@@ -20,7 +20,7 @@ function varargout = sa_report(action, varargin)
 %   tf = SA_REPORT('due', ctx)                the human-facing files are due
 %                                             (report.files_interval_s seconds
 %                                             since ctx.t_reports; checked by
-%                                             the executor after each live call)
+%                                             sa_search after each live call)
 %   [rep, t] = SA_REPORT('write_reports', ctx [, check])
 %                                             the human-facing files only:
 %                                             attempts.csv, summary.txt,
@@ -68,16 +68,16 @@ function varargout = sa_report(action, varargin)
 %                                             PARTIALLY TESTED; per_seed ->
 %                                             MULTIPLICITY NOT TESTED BY COLD
 %   summary.txt under per_seed adds the seed count and the seedable
-%   (family, node) pairs not called cold.
+%   (sheet, node) pairs not called cold.
 %   summary.txt: with a finite cold.mesh_cap, the line "cold calls cut
 %   by the cap (NMax = mesh_reject = c): n of m"; the search block prints
 %   the route defaults (rescue rungs, ring, root_pass.enabled), the
 %   no_basis count and the per-root pass rounds.
-%   summary.txt of an import run (milestone 10) counts import returns in the
+%   summary.txt of an import run counts import returns in the
 %   all-routes line and adds the Import section (sa_import 'report_lines').
 %   summary.txt of a focus run (no library) replaces the
 %   seedability census and the targets table by an Inputs section (the
-%   source of the field scale and the family lookup: path, settings file
+%   source of the field scale and the sheet (family label) lookup: path, settings file
 %   SHA-256, import identity, field scale, library types) and its own
 %   MULTIPLICITY NOT TESTED line.
 %   summary.txt says "mesh proposals recorded
@@ -113,7 +113,7 @@ function varargout = sa_report(action, varargin)
 %       one-line summary, the histogram of P, and the cap-loss curve at
 %       c = 3,601 / 5,000 / 10,000: cut calls and, among them, stored
 %       accepted returns, each marked exact or not). Calls without a trace
-%       are also classed by the cap-cut prediction rule (certain: NMax-bound or
+%       are also classed by the cap-cut prediction rule (certain: the call hit NMax or
 %       returned mesh >= c; possible: a no-return with wall_s above
 %       o.cut_time_s, default 0), labelled as a lower-bound prediction,
 %       never presented as exact. o.write (default true).
@@ -398,7 +398,7 @@ end
 
 function a = attempt_row(A, id)
 % the attempt row of id (ids are A###### = the row number; else a search,
-% the last match as the former id -> row map kept)
+% the last match)
 a = [];
 k = sscanf(id, 'A%d');
 if isscalar(k) && k >= 1 && k <= numel(A) && k == fix(k) && strcmp(A(k).attempt_id, id)
@@ -510,10 +510,10 @@ h = [strjoin(csv_cols(), ',') ',guess_fingerprint,guess_nodes,reason'];
 end
 
 function line = csv_line(a, cols, has, gnk, fpk, reason)
-% one attempts.csv row (has(c): the rows carry column c; legacy rows NaN)
+% one attempts.csv row (has(c): the rows carry column c; rows from older versions: NaN)
 parts = cell(1, numel(cols));
 for c = 1:numel(cols)
-    if has(c), v = a.(cols{c}); else, v = NaN; end   % legacy rows
+    if has(c), v = a.(cols{c}); else, v = NaN; end   % rows from older versions
     if ischar(v)
         parts{c} = ['"' strrep(v, '"', '""') '"'];
     elseif islogical(v)
@@ -579,7 +579,7 @@ for f = 1:numel(st.T.families)
 end
 L{end+1} = sprintf('Roots in store: %d (from %d accepted cold returns)', X.n_roots, ...
     sum(strcmp({cold.outcome}, 'accepted')));
-imp_on = sa_import('active', st);               % milestone 10: an import run
+imp_on = sa_import('active', st);               % an import run
 if imp_on
     L{end+1} = sprintf(['  all routes: %d accepted node returns (%d cold, %d import, %d continuation, ' ...
         '%d rescue); %d substep records; %d interrupted records'], ...
@@ -692,7 +692,7 @@ if ~isempty(st.pairs)
         rc.n_multi_route_roots, rc.n_cross_route_pairs);
     L{end+1} = '  similarity_tolerance remains PROVISIONAL.';
 end
-% the import section (milestone 10)
+% the import section
 if imp_on
     L = [L, sa_import('report_lines', st)];
 end
@@ -723,7 +723,7 @@ end
 
 function t = multiplicity_note(S)
 % Rule: multiplicity is tested only when the cold targets
-% are every seedable (family, node) pair (targets.policy 'all_seedable');
+% are every seedable (sheet, node) pair (targets.policy 'all_seedable');
 % for any other policy the roots found are those connected to the cold-
 % seeded nodes, so a node's root count is a lower bound. A focus run
 % has no cold targets: its own line.

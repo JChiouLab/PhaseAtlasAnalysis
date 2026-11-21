@@ -1,7 +1,7 @@
 function [m, x_at, k_at] = gnx_hermite_min(x, y, yp)
-%GNX_HERMITE_MIN  Exact minimum of bvp4c's piecewise cubic Hermite interpolant.
+%HERMITE_MIN  Exact minimum of bvp4c's piecewise cubic Hermite interpolant.
 %
-%   [m, x_at, k_at] = GNX_HERMITE_MIN(x, y, yp)
+%   [m, x_at, k_at] = HERMITE_MIN(x, y, yp)
 %   x (1 x n increasing), y and yp (1 x n) node values and slopes of one row.
 %   On each interval [x_k, x_k+1] deval (ntrp3h) evaluates
 %     p(s) = y_k + h*d*s^3 + h*c*s^2 + h*yp_k*s,  s in [0, 1],
@@ -10,7 +10,7 @@ function [m, x_at, k_at] = gnx_hermite_min(x, y, yp)
 %   Its minimum is the smaller of the end values and p at the real roots in
 %   (0, 1) of p'(s)/h-scaled = 3d s^2 + 2c s + yp_k (closed form, stable
 %   quadratic formula). Returns the global minimum m, its abscissa x_at and
-%   the interval index k_at (packet §4b, R2).
+%   the interval index k_at.
 
 x = x(:).'; y = y(:).'; yp = yp(:).';
 h = diff(x);

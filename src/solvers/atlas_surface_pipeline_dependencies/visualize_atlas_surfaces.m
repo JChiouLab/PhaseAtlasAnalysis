@@ -1,8 +1,7 @@
 function report = visualize_atlas_surfaces(opts)
-    % VISUALIZE_ATLAS_SURFACES  Surface visualization for the HSS/HPSS/MPSS
-    % branch-library files (branch_<TYPE>_latest.mat), the atlas-era successor to
-    % visualize_surfaces.m. visualize_surfaces.m is unchanged and still reads the
-    % legacy bvp_sweep/hss_sweep files; this reads the branch-library schema.
+    % VISUALIZE_ATLAS_SURFACES  Surface visualization for the half-cell library files
+    % (branch_<TYPE>_latest.mat; no-peak HSS, half-peak HPSS, full-peak MPSS).
+    % Part of the uncoupled approximation; not used for any figure of the paper.
     %
     % Old-style call is supported:
     %   visualize_atlas_surfaces(struct('interpolate_missing', true, 'show_markers', false))
@@ -10,10 +9,10 @@ function report = visualize_atlas_surfaces(opts)
     % What it plots (only for branch types whose file loads):
     %   * existence masks (always from the RAW mask -- never interpolated)
     %   * 3-D redistribution-flux surfaces v+w and p (from flux_values), mirrored
-    %     across the origin like visualize_surfaces.m, holes at failed cells
+    %     across the origin, holes at failed cells
     %   * scalar fields amp, peak_x, mass_residual (2-D), masked to existence
     %   * nullcline overlays ONLY if atlas sheet / vector-field files already
-    %     exist (data/outputs/sheet_*.mat); never fabricated from branch
+    %     exist (data/outputs/sheet_*.mat); never constructed from the library
     %     surfaces alone. If missing, prints a message and continues.
     %
     % Options (struct, optional):
@@ -25,11 +24,11 @@ function report = visualize_atlas_surfaces(opts)
     %   interp_method       - 'natural' (default) | 'linear' | 'nearest'
     %   show_markers        - overlay 'x' on failed cells and 'o' on unstable
     %                         solved cells (only where stability was computed) and
-    %                         '+' on HPSS UNKNOWN-morphology cells. Default true.
+    %                         '+' on half-peak cells of UNKNOWN shape class. Default true.
     %   plot_v_only         - plot v alone instead of v+w. Default false.
     %   fields              - cellstr of scalar fields to 2-D plot when present.
     %                         Default {'amp','peak_x','mass_residual'}.
-    %   hss_path/hpss_path/mpss_path - override the default branch_*_latest paths.
+    %   hss_path/hpss_path/mpss_path - override the default library (branch_*_latest) paths.
     %   out_dir             - where to look for sheet_*.mat (default data/outputs).
     %   save_dir            - if non-empty, export each figure as a PDF here
     %                         (for headless use). Default '' (interactive only).
@@ -71,7 +70,7 @@ function report = visualize_atlas_surfaces(opts)
         return;
     end
 
-    % ---- provenance printout (Invariant 11) ------------------------------
+    % ---- provenance printout ------------------------------
     for k = 1:3
         t = types{k};
         if loaded.(t)
@@ -200,7 +199,7 @@ function f = panel_scalar(B, loaded, present, fname, opts)
     for k = 1:numel(avail)
         t = avail{k}; d = B.(t);
         Z = double(d.(fname));
-        Z(~d.existence_mask) = NaN;      % show only where the branch exists
+        Z(~d.existence_mask) = NaN;      % show only where the library state exists
         nfill = 0;
         if opts.interpolate_missing
             [Z, nfill] = fill_nans_display(d.PAK_DIFF, d.GEF_DIFF, Z, opts.interp_method);
@@ -256,7 +255,7 @@ function f = flux_surface_figure(d, t, opts, col, vw_title)
 end
 
 function overlay_markers(d, Z)
-    % 'o' unstable (only where stability computed), '+' HPSS UNKNOWN morphology.
+    % 'o' unstable (only where stability computed), '+' half-peak UNKNOWN shape class.
     hold on;
     if isfield(d,'is_stable_computed') && isfield(d,'is_stable')
         comp = logical(d.is_stable_computed);
@@ -288,7 +287,7 @@ function [drawn, msg, f] = maybe_nullclines(opts, present, B, loaded)
     if isempty(all_sheets)
         msg = sprintf(['No atlas sheet / vector-field files found in %s (looked for ', ...
             'sheet_*.mat, atlas_*.mat, *vector_field*.mat). Nullclines require ', ...
-            'Packet 3/4 output (per-sheet U_flux/V_flux); not fabricating them from ', ...
+            'output of build_atlas_sheets (per-sheet U_flux/V_flux); not fabricating them from ', ...
             'branch surfaces alone. Continuing with surface plots only.'], opts.out_dir);
         fprintf('  %s\n', msg);
         return;
@@ -362,7 +361,7 @@ end
 
 function [Z, n_filled] = fill_nans_display(X, Y, Z, method)
     % DISPLAY-ONLY NaN fill (out-of-hull cells stay NaN). Never written back to
-    % any .mat. Mirrors visualize_surfaces.m's fill_nans.
+    % any .mat.
     nan_mask = isnan(Z); n_filled = 0;
     if ~any(nan_mask(:)) || all(nan_mask(:)), return; end
     valid = ~nan_mask;

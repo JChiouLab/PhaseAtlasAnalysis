@@ -1,6 +1,6 @@
 function rows = sa_t45_targets(E)
-%SA_T45_TARGETS  Milestone-4 T45 (packet v0.3 section 2b): central_nine centred
-%   on the node nearest d = 0 (equal to the M2/M3 block when the anchor is 0;
+%SA_T45_TARGETS  central_nine centred
+%   on the node nearest d = 0 (equal to the block around the anchor when the anchor is 0;
 %   ties by index distance to the anchor, then lattice order, on an offset
 %   lattice); missing members listed, never backfilled; non-seedable members
 %   policy-skipped; pilot_sample (7 x 7 over the native range, snapped,
@@ -13,7 +13,7 @@ L0 = lat([0 0], 0.15, [-13 -13], [13 13]);
 c = sa_modes('central_node', L0);
 [n9, miss] = sa_modes('central_nine', L0);
 old = find(all(abs(L0.index) <= 1, 2));
-rows = sa_check(rows, T, 'anchor at d = 0: central node = the anchor; central_nine = the M2/M3 block around index 0', ...
+rows = sa_check(rows, T, 'anchor at d = 0: central node = the anchor; central_nine = the 3 x 3 block around index 0', ...
     isequal(L0.index(c, :), [0 0]) && isequal(n9, old) && isempty(miss));
 L1 = lat([0.3 0.1], 0.2, [-8 -8], [8 8]);           % ties: axis 1 {-1,-2}, axis 2 {0,-1}
 c1 = sa_modes('central_node', L1);

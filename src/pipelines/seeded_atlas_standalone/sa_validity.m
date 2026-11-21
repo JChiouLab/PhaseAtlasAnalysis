@@ -36,7 +36,8 @@ function varargout = sa_validity(action, varargin)
 %     mesh                       returned mesh points < mesh_reject
 %     finite                     number of entries of sol.y, sol.parameters
 %                                and sol.yp (when present) that are non-finite
-%                                OR have a nonzero imaginary part == 0; every
+%                                OR have a nonzero imaginary part (the check
+%                                value is this count and must be 0); every
 %                                imaginary entry and every non-finite state or
 %                                parameter enters the guard that skips the
 %                                positivity, residual and module checks, so a
@@ -45,10 +46,10 @@ function varargout = sa_validity(action, varargin)
 %                                interval and every module concentration row,
 %                                of the EXACT minimum of bvp4c's cubic Hermite
 %                                interpolant (node values y, slopes yp,
-%                                interior critical points; sa_hermite_min, a
-%                                verbatim copy of gnx_hermite_min, source
-%                                SHA-256 10b230f7d82fcadbe81f8f369132ead5b80fa1614d94209915cd3804638ae39a);
-%                                must be > 0 and finite; non-finite y or yp in
+%                                interior critical points; computed by
+%                                sa_hermite_min);
+%                                must be > 0 and finite (the paper's positivity
+%                                criterion); non-finite y or yp in
 %                                a row gives NaN (refused)
 %     positivity_sampled (record only, not gating)  the earlier sampled
 %                                minimum (mesh nodes, interval fractions,
@@ -63,8 +64,8 @@ function varargout = sa_validity(action, varargin)
 %                                Lobatto IIIa midpoint Newton residual and the
 %                                two Lobatto points, max(|f|, AbsTol/RelTol),
 %                                sqrt(h/2 * sum)); value = max over intervals,
-%                                must be < opts.reltol. Gating since the
-%                                agreement test passed (residual_bvp4c_gating).
+%                                must be < opts.reltol. Gating
+%                                (residual_bvp4c_gating).
 %   MODULE checks come from M.diagnostics; their names must include
 %   M.required_checks.
 
@@ -82,9 +83,9 @@ end
 % =========================================================================
 
 function tf = residual_bvp4c_gating()
-% Adoption switch of the recomputed bvp4c residual as a gate: adopted after
-% |recomputed - stats.maxres| = 0 held on every accepted record tested; now
-% a gate and a required shared check.
+% Switch that makes the recomputed bvp4c residual a gate: it is on, because
+% |recomputed - stats.maxres| = 0 held on every accepted record tested; it
+% is a gate and a required shared check.
 tf = true;
 end
 
@@ -111,7 +112,7 @@ checks(end+1) = rec('residual', NaN, S.validity.residual_flag_factor * opts.relt
 checks(end+1) = rec('residual_bvp4c', NaN, opts.reltol, '<', residual_bvp4c_gating());
 
 if ~isempty(sol)
-    % ---- convergence (classifier copied with the corrector) -------------
+    % ---- convergence (classifier shared with the coupled solve) -------------
     Cv = M.convergence(sol, opts, R.warning_id, R.warning_msg);
     V.convergence_class = Cv.class;
     checks = setv(checks, 'convergence_maxres', Cv.stats_maxres);

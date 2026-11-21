@@ -1,12 +1,12 @@
 function [name, sha8, canon] = gnx_run_name(P)
-%GNX_RUN_NAME  Product run-folder name for a Guzzo_noXA parameter set (packet §2c).
+%GNX_RUN_NAME  Run-folder name for an M. xanthus (Guzzo_noXA) parameter set.
 %
 %   [name, sha8, canon] = GNX_RUN_NAME(P)     P = gnx_model('parameters', ...)
 %   name = guzzo_noxa_L<L>_s<s>_dba<f>_rR<rho_R>_rB<rho_B>_h<h>_res<res>_<sha8>,
 %   numbers printed with %g, '.' -> 'p', '-' -> 'm'; sha8 = first 8 hex of the
 %   SHA-256 of the canonical normalized struct (every field, in order,
 %   'name=%.17g' joined by ';'), so an unlisted parameter change changes the
-%   name. The original pattern starts with 'a' (atlas_run_name) and cannot
+%   name. The fission yeast folder pattern starts with 'a' (atlas_run_name) and cannot
 %   collide.
 
 f = fieldnames(P);

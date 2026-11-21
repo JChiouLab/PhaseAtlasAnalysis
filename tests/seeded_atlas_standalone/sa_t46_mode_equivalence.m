@@ -1,5 +1,5 @@
 function rows = sa_t46_mode_equivalence(E)
-%SA_T46_MODE_EQUIVALENCE  Milestone-4 T46 (packet v0.3 section 2a): with every
+%SA_T46_MODE_EQUIVALENCE  With every
 %   mode-layer leaf set explicitly, the mode changes only the reports, never
 %   the calls: smoke, pilot and production stub runs are strictly equivalent
 %   (sa_m3_equiv: units, sol, validity, opts, attempt rows, shards) and only

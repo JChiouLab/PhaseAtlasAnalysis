@@ -1,5 +1,5 @@
 function rows = sa_t67_reports(E)
-%SA_T67_REPORTS  Milestone-6 T67 (packet v0.2 sections 2.3, 6): the report
+%SA_T67_REPORTS  The report
 %   lines of the mesh trace. Zero solves (stub correctors).
 %   - summary.txt: "mesh proposals recorded for n of m calls";
 %   - the cut-by-cap line says "count exact" when every cold call's

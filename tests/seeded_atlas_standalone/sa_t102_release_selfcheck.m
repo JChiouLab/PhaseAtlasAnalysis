@@ -1,5 +1,5 @@
 function rows = sa_t102_release_selfcheck(E)
-%SA_T102_RELEASE_SELFCHECK  Milestone-9 T102 (packet v0.2 section 7.3): the
+%SA_T102_RELEASE_SELFCHECK  The
 %   release self-check on synthetic "other release" toolboxes. Fake toolbox
 %   folders are built in scratch from this MATLAB's toolbox files (deleted
 %   after; never shipped) and sa_bvp4c_setup('generate', <scratch out>,

@@ -1,12 +1,13 @@
 function H = gnx_sweep_hss(P)
-%GNX_SWEEP_HSS  Uniform (HSS) roots on the (dn_R, dn_B) grid (zero bvp4c calls).
+%GNX_SWEEP_HSS  Uniform no-peak (HSS) roots on the (dn_R, dn_B) grid (zero bvp4c calls; M. xanthus model).
+%   dn_R, dn_B are density differences (n_left - n_right)/(L/2); the paper's fraction is dn/(2*rho).
 %
 %   H = GNX_SWEEP_HSS(P)     P = gnx_model('parameters', ...)
 %   Grid dn = linspace(-h, h, res); rows i index dn_B, columns j index dn_R;
-%   half-domain densities rho + dn/2 (run_stage2_noxa.m:58-78). Per cell:
+%   half-domain densities rho + dn/2. Per cell:
 %   gnx_hss_roots, all roots kept; the representative (1 x 4 [Rm Rc Bm Bc])
 %   exists only when the validity record passes (one root, both routes agree,
-%   residual, positivity); otherwise none (fail closed).
+%   residual, positivity); otherwise none (no root is reported when a check fails).
 
 res = P.res;
 dn = linspace(-P.dn_half_range, P.dn_half_range, res);

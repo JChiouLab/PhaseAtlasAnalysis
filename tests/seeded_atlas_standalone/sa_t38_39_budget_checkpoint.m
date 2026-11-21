@@ -1,5 +1,5 @@
 function rows = sa_t38_39_budget_checkpoint(E)
-%SA_T38_39_BUDGET_CHECKPOINT  Milestone-3 T38-T39.
+%SA_T38_39_BUDGET_CHECKPOINT  Budget stops and checkpoints.
 %   T38 a budget stop in the middle of an edge leaves its node 'unfinished';
 %       resuming with a raised budget completes the run equal to the
 %       uninterrupted one, the raised budget recorded in resume_1.mat.

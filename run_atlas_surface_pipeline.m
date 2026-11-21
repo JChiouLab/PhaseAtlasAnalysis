@@ -1,23 +1,34 @@
 % run_atlas_surface_pipeline.m
-% Driver for the HSS/HPSS/MPSS atlas workflow. Runs Stages 1-12 in order:
-%   1-3  build the HPSS/HSS/MPSS branch libraries
-%   4-7  visualize the static atlas (branch surfaces, per-sheet flux plots,
-%        combined 3-D surfaces + nullclines)
-%   8-9  run one atlas-seeded PDE trajectory and classify it against all 9 sheets
+% Driver for the uncoupled half-cell workflow (fission yeast model; for the
+% M. xanthus model it only builds the half-cell libraries). Runs Stages 1-12:
+%   1-3  build the half-cell steady-state libraries on a grid of the
+%        (Delta n_PAK, Delta n_GEF) plane: no-peak (HSS), half-peak (HPSS) and
+%        full-peak (MPSS) states of an isolated half cell with no flux at the middle
+%   4-7  plot the libraries (surfaces, per-sheet flux plots, combined 3-D
+%        surfaces + nullclines)
+%   8-9  run one pdepe trajectory started from a library profile and classify
+%        it against all 9 sheets
 %   10-12 plot the classified trajectory (phase-plane pages, classification
 %        summary) and render it to a movie
 %
+% Role in the paper: the half-cell libraries (Stages 1-3) are the starting
+% profiles used by the coupled-atlas pipeline (src/pipelines/seeded_atlas_standalone/).
+% The rest of this script (stitched sheets, the approximate flux
+% -2*Dc*(trough difference), phase-plane plots, pdepe traces) is an earlier
+% approximation and is not used for any figure of the paper, which computes
+% the coupled quasi-steady states directly.
+%
 % Each stage reuses its existing output file unless forced to rebuild (Stages
 % 1-3,5) or auto-detects a settings change (Stages 8-9); Stages 4,6,7,10-12
-% always run (display only). See docs/atlas_pipeline.md for the full reference.
+% always run (display only).
 %
-% Related tools NOT run here: infer_atlas_transitions/plot_atlas_transitions
-% (transition events), run_atlas_pde_survey (batched trajectories), and
-% debug_atlas_point (single-cell inspection) -- call those directly.
+% Related tools not part of this repository: transition inference and a
+% batched-trajectory survey.
 
 %% ---- model parameters ----------------------------------------------------
-% Reaction rates a..f, slow/fast diffusion, domain length, two conserved-pool
-% masses, and grid resolution. See CLAUDE.md for parameter sets.
+% Reaction rates a..f (a = kgg, b = dg, c = kpg, d = dgp, e = k*, f = kg of
+% Table 2; the unrounded values are used), membrane/cytosolic diffusion, cell
+% length, total GEF and PAK amounts (M_BG, M_P), and grid resolution.
 % Resolve bundled solvers and results relative to this file rather than the
 % MATLAB current folder.  Distribute this file together with
 % src/solvers/atlas_surface_pipeline_dependencies/.
@@ -30,7 +41,7 @@ end
 addpath(solver_dir);
 model = 'original_polarity';            % 'original_polarity' | 'guzzo_noxa'
 if strcmp(model, 'guzzo_noxa')
-    addpath(fullfile(pipeline_dir, 'src', 'models', 'guzzo_noxa'));   % shared (R4)
+    addpath(fullfile(pipeline_dir, 'src', 'models', 'guzzo_noxa'));   % reference M. xanthus model files
     addpath(fullfile(solver_dir, 'models', 'guzzo_noxa'));
     gnx_run_libraries(gnx_model('parameters', struct('L', 6, 'r_speed', 0.35, ...
         'dba_factor', 1, 'rho_R', 1, 'rho_B', 1, 'res', 25, 'dn_half_range', 1.8)), ...
@@ -41,11 +52,13 @@ end
 p.a = 2.38/4; p.b = 0.185; p.c = 151.6/2;
 p.d = 0.552;  p.e = 0.828; p.f = 1.0;
 p.Dm = 0.05; p.Dc = 5.0;
-p.L = 7.94;
+p.L = 7.94;      % ships at 7.94; the paper uses L = 7 (Table 2). Set p.L = 7 to match it.
 p.M_BG = 2*p.L;
-p.M_P  = 2*0.246*p.L;    % M_P scan sweet spot: static HPSS present at centre (nP=3, amp~10, well
-                 % inside the branch -> best atlas coverage) AND sustained boundary-to-boundary
-                 % shuttle. M_P>=8 is past the HPSS fold (nP~4.0) -> no static branch.
+p.M_P  = 2*0.246*p.L;    % M_P = 2*rho*L with rho = 0.246 (Table 2 rounds rho to 0.25). At this
+                 % M_P a static half-peak state exists at the grid centre (nP about 3, amplitude
+                 % about 10, well inside its branch) and the full model oscillates with a peak
+                 % moving from pole to pole. M_P >= 8 is past the fold of the half-peak branch
+                 % (nP about 4.0), so no static half-peak state exists there.
 p.res = 50;
 
 % Solver options -- only consulted when a sweep/branch stage actually rebuilds.
@@ -53,14 +66,15 @@ p.seeding_mode   = 'auto';           % 'auto' (headless) or 'interactive'
 p.use_parallel   = true;
 p.skip_stability = true;             % true = skip the HPSS eigenvalue stability check
 p.mpss_strategy  = 'continuation';   % MPSS construction strategy
-p.phase0_construct = true;           % Phase 0 Tier-0: seed HPSS by constructed edge-peak BVP
-                                     % (no PDE relaxation) -- reaches the dynamically-unstable
-                                     % static half-peak this oscillatory regime lives on.
+p.phase0_construct = true;           % start half-peak solves from a constructed edge-peak BVP guess
+                                     % (no PDE relaxation); reaches the unstable
+                                     % static half-peak state of this oscillatory regime.
 
 % Oscillatory-regime settings. This parameter set drives sustained PDE
-% oscillation on the half-domain (measured: L=7 oscillates with period ~65;
-% the quarter/small-L domains do not). Without these the PDE-relaxation
-% fallback never settles and burns its whole budget per cell (hours at res=50).
+% oscillation on the half-domain (L = 7 oscillates with period about 65; the
+% quarter-domain and small-L cases do not). Without these settings the
+% PDE-relaxation fallback never settles and uses its whole budget per cell
+% (hours at res = 50).
 p.osc_fallback   = true;             % oscillation-aware fallback: bounded relax + snapshot/mean bvp4c seeds
 % Short CHUNK length is the key bound: it makes the oscillation-detected
 % early-stop (3 chunks) fast (~4s at L=7) while spanning ~30 oscillation
@@ -72,15 +86,15 @@ p.pde_max_chunks = 12;               % caps the fallback at ceil(12/2)=6 chunks 
                                      % non-oscillatory seed/cold-start relaxations converge and
                                      % early-stop well before this, so they are unaffected.
 p.pde_T_end      = 1e5;              % seed / cold-start budget
-p.pde_fallback_T = 1e4;              % Phase-2 / quarter continuation fallback budget
+p.pde_fallback_T = 1e4;              % fallback budget for the second sweep phase and the quarter-domain continuation
 
 %% ---- rebuild flags --------------------------------------------------------
 % Each stage reuses its existing output unless forced true (or the file is
 % missing). Set true when parameters change or to rebuild from scratch.
-force_hpss   = false;    % Stage 1: reuse saved M_P=6 HPSS (just rebuilt w/ construct-seed)  [restore to true for a full rebuild]
-force_hss    = false;    % Stage 2: reuse saved M_P=6 HSS  [restore to true for a full rebuild]
-force_mpss   = false;     % Stage 3: branch_MPSS_latest.mat
-force_sheets = false;     % Stage 5: atlas_sheets_latest.mat
+force_hpss   = false;    % Stage 1: reuse the saved half-peak library  [set true for a full rebuild]
+force_hss    = false;    % Stage 2: reuse the saved no-peak library  [set true for a full rebuild]
+force_mpss   = false;     % Stage 3: full-peak library branch_MPSS_latest.mat
+force_sheets = false;     % Stage 5: sheets file atlas_sheets_latest.mat
 % force_trace unconditionally rebuilds the trace + classification. Rarely
 % needed: Stages 8-9 auto-detect staleness, so editing any trace_* setting
 % below already triggers the rebuild. Use only to force a rerun with no
@@ -159,7 +173,7 @@ atlas_sheets_path = fullfile(out_dir, 'atlas_sheets_latest.mat');
 % per-IC subfolder data/<params>/<sheet>_<i>_<j>/ so that different ICs at the
 % SAME parameters never overwrite each other (e.g. HSS_HSS_25_26). Change the
 % trace_sheet/trace_cell settings at the top and you get a fresh IC folder,
-% while the expensive shared branch libraries/atlas are reused as-is.
+% while the expensive shared half-cell libraries/sheets are reused as-is.
 ic_name = sprintf('%s_%d_%d', trace_sheet, trace_cell(1), trace_cell(2));
 ic_dir  = fullfile(run_dir, ic_name);
 if ~exist(ic_dir, 'dir'), mkdir(ic_dir); end
@@ -206,10 +220,10 @@ else
 end
 
 %% ---- Stage 2b: HSS dispersion-relation stability atlas -------------------
-% Linear stability of the per-cell homogeneous steady state by dispersion
-% relation: WHERE the HSS is Turing-unstable across (Dn_PAK, Dn_GEF), and the
+% Linear stability of the per-cell no-peak (homogeneous) state by dispersion
+% relation: WHERE the no-peak state is Turing-unstable across (Dn_PAK, Dn_GEF), and the
 % fastest-growing ONSET wavelength expressed as spatial periods on the
-% half-domain (0.5 = one half-peak = HPSS morphology). Onset only, NOT the
+% half-domain (0.5 = one half-peak). Onset only, NOT the
 % coarsened attractor peak count. Display-only, cheap; reads branch_HSS.
 fprintf('\n=== HSS dispersion-relation stability atlas ===\n');
 if exist(branch_hss_path, 'file')

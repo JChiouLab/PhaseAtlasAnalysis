@@ -19,7 +19,7 @@ function varargout = sa_identity(action, varargin)
 %       on the comparison mesh; 'comparison': deval directly on that
 %       mesh, 'dense': the kernel's linear interpolation of the dense grid),
 %       relative-sup over the identity fields and
-%       over all states (dedup_roots.py convention: per component
+%       over all states (per component
 %       max|a-b| / max(max|a|, max|b|), maximum over components, on a common
 %       uniform grid of identity.relsup_nodes points), and their ratio.
 %   a = SA_IDENTITY('amplification', profile, field_scale)

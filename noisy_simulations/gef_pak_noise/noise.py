@@ -1,9 +1,9 @@
-"""Ornstein-Uhlenbeck active noise field, following the paper's Eqs. (2)-(4) and (A1).
+"""Ornstein-Uhlenbeck active noise field, following Eqs. (2)-(4) and (A1) of Dao et al. (2026).
 
-The paper parameterizes the noise by the integrated noise strength
+Dao et al. (2026) parameterize the noise by the integrated noise strength
     A = sigma_eta**2 * tau_c
 (Eq. 3) and treats A, rather than sigma_eta, as the primary control parameter, since
-A is what they show actually controls the transition between dynamical regimes.
+A is what actually controls the transition between dynamical regimes.
 
 The noise field's own SDE (Eq. 4):
     d eta / dt = -eta / tau_c + sqrt(2 A / tau_c) * xi(l, t)
@@ -12,14 +12,13 @@ is discretized with Euler-Maruyama (Eq. A1):
 where xi_i(t) are iid standard Gaussians, independent across grid points i and
 across the two noisy species (u, q) here.
 
-Numerical implementation note (flagging an interpretation rather than resolving it
-silently): the paper's Appendix A is terse about exactly when the noise increment is
+Numerical implementation note (an interpretation, not a settled fact): Appendix A of Dao et al. (2026) is terse about exactly when the noise increment is
 applied relative to the Crank-Nicolson sub-step for the deterministic reaction-diffusion
 terms. Here, eta is advanced once per step *before* the fixed-point iteration (since it
 does not depend on u/v/... at all), and enters the Crank-Nicolson right-hand side with
 trapezoidal averaging (eta^n + eta^{n+1})/2, consistent with how the reaction term phi
-is treated in Eqs. (A5)-(A6). If exact fidelity to the reference implementation's
-operator-splitting order matters, this is the piece to revisit.
+is treated in Eqs. (A5)-(A6). If exact fidelity to the operator-splitting order of Dao et al. (2026)
+matters, this is the piece to revisit.
 """
 
 from dataclasses import dataclass

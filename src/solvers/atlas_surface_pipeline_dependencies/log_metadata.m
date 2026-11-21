@@ -1,5 +1,5 @@
 function log_metadata(id, filename, purpose, par, L, M_BG, M_P, rho_GEF, rho_PAK, notes)
-    % LOG_METADATA Appends an entry to metadata_log.csv
+    % LOG_METADATA Appends an entry to metadata_log.csv in the current folder
     log_file = 'metadata_log.csv';
     
     % Ensure directory exists

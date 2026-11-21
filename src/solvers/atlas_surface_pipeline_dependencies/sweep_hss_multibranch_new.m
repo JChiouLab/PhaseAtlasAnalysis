@@ -1,11 +1,11 @@
 function sweep_hss_multibranch_new(p_in)
     % SWEEP_HSS_MULTIBRANCH_NEW
-    % Multi-branch HSS sweep with continuity-tracked branch labels.
+    % Multi-branch sweep of the no-peak (homogeneous steady state, HSS) half-cell library on the
+    % (Delta n_PAK, Delta n_GEF) grid (fission yeast model), with continuity-tracked branch labels.
     %
-    % This version keeps the generic multistart fsolve architecture, but it
-    % separates root discovery from branch labelling:
+    % It uses a generic multistart fsolve and separates root discovery from branch labelling:
     %   1. At each (Delta n_PAK, Delta n_GEF) cell, discover all real-positive
-    %      HSS roots using multistart fsolve plus neighbour-seeded guesses.
+    %      no-peak roots using multistart fsolve plus neighbour-seeded guesses.
     %   2. Store roots in roots_cell{i,j} without assigning branch indices.
     %   3. Assign global branch IDs by nearest-neighbour continuity in the
     %      full HSS state [u q v w p], not by local u-rank.
@@ -20,7 +20,7 @@ function sweep_hss_multibranch_new(p_in)
     %                                     branch label, ranked by coverage.
     %   n_branches_grid                 - res x res count of STORED branches
     %                                     per cell (non-NaN slices in
-    %                                     U_hss_branches after Stage 3
+    %                                     U_hss_branches after the Stage 3 below
     %                                     pruning to the top max_branches by
     %                                     coverage). Use n_raw_roots_grid for
     %                                     the raw discovered-root count,
@@ -55,7 +55,7 @@ function sweep_hss_multibranch_new(p_in)
 
     % --- 1. Parameters ---
     if nargin < 1
-        % V7 Gold Standard
+        % built-in default parameters (not the paper's set; see run_atlas_surface_pipeline.m / docs/MODELS.md)
         p.a = 0.59; p.b = 0.13; p.c = 21.0;
         p.d = 1.3;  p.e = 33.0; p.f = 1.9;
         p.Dm = 0.001; p.Dc = 1.0;
@@ -209,7 +209,7 @@ function sweep_hss_multibranch_new(p_in)
     % ------------------------------------------------------------------
     % If every cell has exactly one accepted positive root, there is no
     % branch-assignment ambiguity: the connected parameter grid carries one
-    % unique HSS representative everywhere.  Applying a finite log-distance
+    % unique no-peak representative everywhere.  Applying a finite log-distance
     % cutoff in that case can split a steep-but-unique surface into artificial
     % IDs; subsequent max_branches pruning then creates false nonexistence
     % seams.  Bypass tracking only in this unambiguous all-unique case.
@@ -293,7 +293,7 @@ function sweep_hss_multibranch_new(p_in)
         end
     end
 
-    % n_branches_grid (as saved) must reflect what's ACTUALLY stored, not
+    % n_branches_grid (as saved) must reflect what is actually stored, not
     % the raw pre-pruning discovery count set during Stage 1 -- otherwise a
     % cell whose only root belongs to a pruned (low-coverage) branch reports
     % a nonzero branch count while every slice at that cell is NaN. The raw
@@ -428,7 +428,7 @@ function branch_id_cell = track_hss_branches(roots_cell, track_tol)
                 end
             end
 
-            % Greedy minimum-distance matching. Number of HSS roots per cell is
+            % Greedy minimum-distance matching. Number of no-peak roots per cell is
             % small, so this is sufficient and avoids a toolbox dependency.
             assigned_roots = false(n_roots, 1);
             blocked_candidates = false(n_candidates, 1);

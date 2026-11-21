@@ -1,14 +1,14 @@
 function varargout = sag_test_fixture(action, varargin)
-%SAG_TEST_FIXTURE  Synthetic 24-row candidates and run settings for the 2C tests.
+%SAG_TEST_FIXTURE  Synthetic 24-row candidates and run settings for the Guzzo_noXA tests.
 %
-%   p = SAG_TEST_FIXTURE('params', f)        owner-setting parameters at signal f
-%   s = SAG_TEST_FIXTURE('settings', run_dir) commissioning settings (packet 2C)
+%   p = SAG_TEST_FIXTURE('params', f)        M. xanthus parameters at signal f
+%   s = SAG_TEST_FIXTURE('settings', run_dir) test settings
 %   [sol, tgt] = SAG_TEST_FIXTURE('poly', theta, slope, n)
 %       A Hermite-exact synthetic candidate: every concentration is a cubic
 %       c(x) = a + b q(x) + e r(x) on [0, Lh] (q = 3(x/Lh)^2 - 2(x/Lh)^3,
 %       r = x^3/(3 Lh^2)), so c'(0) = 0 (pole no flux) and c'(Lh) = e. The
 %       right half has e_R = -e_L (seam flux match) and a b_R making the seam
-%       continuous; shifts sigma = -J/Lh per half (so the section 2c
+%       continuous; shifts sigma = -J/Lh per half (so the shift/velocity
 %       identities hold); accumulators are the exact quartic integrals and the
 %       targets their end values. slope = 0 gives zero seam slopes and zero
 %       shifts. yp holds the exact derivatives (conc: c', deriv: c'', acc:

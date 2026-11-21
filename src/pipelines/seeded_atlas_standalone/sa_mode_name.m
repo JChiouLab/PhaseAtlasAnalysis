@@ -1,13 +1,17 @@
 function varargout = sa_mode_name(action, varargin)
-%SA_MODE_NAME  Mode names: the family label of a coupled root, per half.
+%SA_MODE_NAME  Mode names: the shape label of a coupled root (a quasi-steady
+%   state), per half.
+%
+%   Labels: 0 = no-peak half; 1+ / 1- = half-peak at a pole (left / right
+%   end); 2- = full-peak (peak in the middle of the half).
 %
 %   A root is named '<left>/<right>' from its main variable (sa_main_variable)
 %   on the two halves. Each half is read in its DRAWN left-to-right
-%   orientation on the full cell (left half: outer pole -> seam; right half:
-%   seam -> outer pole). A half is
+%   orientation on the full cell (left half: outer pole -> cell middle, the
+%   'seam'; right half: seam -> outer pole). A half is
 %     '0'   flat: (max - min) / ref < model_options.shape_flat_tol, where ref
-%           is the main variable's value in the uniform (HSS) state at the
-%           anchor ('reference');
+%           is the main variable's value in the uniform no-peak (HSS) half-cell
+%           state at the anchor ('reference');
 %     'n+'  / 'n-' otherwise: n = the number of monotone runs, where a turn
 %           counts only when the profile moves back by at least
 %           shape_turn_frac x (max - min of the half) (hysteresis); '+' when
@@ -18,7 +22,7 @@ function varargout = sa_mode_name(action, varargin)
 %   peak in the left half, 0/1- one in the right half, 1-/1+ a single peak
 %   at the cell middle, 2-/0 a middle peak in the left half.
 %
-%   The seam (cell middle). Let mx be the largest value within
+%   The seam (the cell middle, x = L/2). Let mx be the largest value within
 %   shape_edge_frac of the seam on either side (the seam window) and th
 %   = shape_turn_frac x (max - min of the whole cell). The seam is a PEAK
 %   when the cell is not flat and, on each side, scanning along the whole
@@ -55,13 +59,13 @@ function varargout = sa_mode_name(action, varargin)
 %       The uniform-state value of the main variable at the anchor: the sum
 %       of fs.anchor_hss_values(index) (field_scale's library HSS values
 %       interpolated bilinearly to the anchor itself), in the order given.
-%       A field scale written before software 0.11 carries only hss_values
+%       A field scale written by an older version carries only hss_values
 %       (the HSS of the native cell nearest the anchor, raw, not floored);
 %       they are used then, and src says so ('anchor' | 'nearest_cell').
 %       Refused unless finite and > 0.
 %   fam = SA_MODE_NAME('library_family', lab, types, map)
-%       The library family 'A_B' (A, B in types: the model's library_types)
-%       a root of name lab corresponds to, from the module's mode_families
+%       The library family 'A_B' (A, B in types: the model's library_types;
+%       a family names a sheet) a root of name lab corresponds to, from the model's mode_families
 %       map (map.left / map.right: n x 2 cells {half mode name, library
 %       type}; both models: the flat half, the pole peak of mode 1 (left
 %       1+, right 1-) and the middle peak 2- have a library type). A name
@@ -81,7 +85,7 @@ function varargout = sa_mode_name(action, varargin)
 %   t = SA_MODE_NAME('file_tag', lab)
 %       A file-name-safe form of a family name: '+' -> p, '-' -> m,
 %       '/' -> _ (1+/0 -> 1p_0, 2-/1- -> 2m_1m); a name made of letters,
-%       digits and '_' only (HPSS_HSS) is unchanged.
+%       digits and '_' only (a library family name such as HPSS_HSS) is unchanged.
 
 switch action
     case 'label',          [varargout{1}, varargout{2}] = label(varargin{:});

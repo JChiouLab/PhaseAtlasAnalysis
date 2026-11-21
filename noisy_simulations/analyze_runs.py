@@ -1,17 +1,20 @@
 """Classify every Fig-4 run (one npz per (A, rep)) and write a summary table.
 
-Criterion (documented in figures/fig4/README.md):
+Criterion:
   polarity state  s(t) = +1 if dG > +H, -1 if dG < -H, else keep the previous state
                   (hysteresis H = 0.10 on the atlas coordinate dG = n_G,L - n_G,R);
   reversal        a change of s between +1 and -1;
   dwell           time between consecutive reversals (the first dwell starts at the
                   first time |dG| > H, the last one ends at T);
-  epoch label     a dwell longer than T_LONG = 3 x the deterministic half-period
-                  (median A = 0 settled dwell) is a monopolar epoch M, otherwise an
-                  oscillation epoch O; consecutive equal labels are merged.
+  epoch label     a dwell longer than T_LONG is a monopolar epoch M (the same pole stays
+                  high), otherwise an oscillation epoch O; consecutive equal labels are
+                  merged. Default T_LONG = 3 x the noise-free half-period (median settled
+                  dwell of the A = 0 run; 141 s, so 423 s, for the Fig. 4 runs; 275 s is
+                  assumed if no A = 0 run is given). The environment variable
+                  FIG4_T_LONG (seconds) overrides it; Fig. 4C uses 300 s (5 min).
   oscillating                : epochs == O
   damped_to_monopolar        : epochs == M, or O then M with M starting before T_SETTLE
-                               (the initial transient rings down into one pole, stays)
+                               (the initial transient rings down into one pole and stays)
   oscillating_then_monopolar : O then M, M starting after T_SETTLE (one late switch)
   switching                  : any other sequence (>= 2 switches, or M then O)
   other_never_polarized      : |dG| never exceeds H
@@ -105,7 +108,7 @@ def main():
         r = rev[rev >= T_SETTLE]
         hp += list(np.diff(r))
     half = float(np.median(hp)) if hp else 275.0
-    t_long = 3.0 * half
+    t_long = float(os.environ["FIG4_T_LONG"]) if os.environ.get("FIG4_T_LONG") else 3.0 * half
     rows = []
     for fn in sorted(glob.glob(os.path.join(runs, "A*_rep*.npz"))):
         meta, d = load(fn)

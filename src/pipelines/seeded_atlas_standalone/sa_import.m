@@ -1,12 +1,12 @@
 function varargout = sa_import(action, varargin)
-%SA_IMPORT  Roots of an earlier run as seeds ("import"; milestone 10).
+%SA_IMPORT  Roots of an earlier run as starting profiles ("import").
 %
 %   A new run reads a finished run folder (the SOURCE, settings
 %   import.source_dir). Each source root goes to the nearest node of the new
 %   lattice and is solved there ONCE from its stored iterate (route, kind
 %   and phase 'import'; S.solver, no cold cap, no halving, no retry); an
 %   accepted import is a starting root like a cold root. Optionally the
-%   mirror image of each source root is imported too (module member
+%   mirror image of each source root is imported too (model member
 %   reflection; sa_model). Zero solves here: the calls are made by
 %   sa_search's import stage through the one executor.
 %
@@ -97,12 +97,12 @@ function varargout = sa_import(action, varargin)
 %       flipped (1+/0 <-> 0/1-, 2-/1- <-> 1+/2-); 'A_B' -> 'B_A'
 %   f = SA_IMPORT('mirror_family', family)  'A_B' -> 'B_A'
 %   n = SA_IMPORT('counter' [, 'reset'])   plan builds in this MATLAB
-%       session (T106: a resume does not list the source again)
+%       session (checked by the portable tests: a resume does not list the source again)
 %   d = SA_IMPORT('distance', Pa, Pb, fs)  scaled_rms_v1 of two comparison
 %       profiles (identity rows on one comparison mesh)
 %   [FI, M, S, SRC] = SA_IMPORT('focus_inputs', S, M [, SRC])
 %       Focus without a library: a focus run uses no
-%       uncoupled library; it takes the identity field scale and the family
+%       half-cell (uncoupled) library; it takes the identity field scale and the family
 %       lookup from the source run. Zero solves; reads only the source's
 %       internal/settings_effective.mat (written once per run, never
 %       rewritten, also not by a resume of a killed source).
@@ -126,7 +126,7 @@ function varargout = sa_import(action, varargin)
 %       SA:IMPORT:E_FOCUS_SOURCE when the source lacks a stored item
 %       (store_settings.field_scale, field_scale.values, model.library_types;
 %       field_scale.anchor_hss_values when the module's shape_label reads
-%       the field scale, i.e. a source written before software 0.11), when
+%       the field scale, i.e. a source written by an older version), when
 %       the stored items disagree, when a settings leaf the field-scale
 %       rule reads (module member field_scale_settings; default
 %       lattice.anchor and identity.field_scale_floor) differs between this
@@ -593,7 +593,7 @@ top = src;
 [up, nm] = fileparts(regexprep(src, '[\\/]+$', ''));
 if strcmp(nm, 'internal') && exist(fullfile(src, 'settings_effective.mat'), 'file') == 2, top = up; end
 if strcmp(sa_layout('layout', top), 'flat')
-    error('SA:IMPORT:E_SOURCE', ['import refused: %s is a flat folder written by software 0.5 or earlier; ' ...
+    error('SA:IMPORT:E_SOURCE', ['import refused: %s is a flat folder written by an early version of this package; ' ...
         'import reads the internal/ layout only.'], src);
 end
 D = sa_layout('state', top);
@@ -691,7 +691,7 @@ for f = {'guess_mesh', 'guess_nodes', 'step_rule'}
     end
 end
 if ~strcmp(v0, v1)
-    % a refusal depends on the corrector and solver code (owner ruling)
+    % a refusal depends on the corrector and solver code, so a changed version blocks reuse
     why{end+1} = 'the model version differs (corrector or solver code)';
 end
 end
@@ -909,7 +909,7 @@ for k = 1:numel(E)
     e = E(k);
     if e.calls <= 0 || isempty(e.parent_root) || ~isKey(K.src2new, e.parent_root), continue; end
     % a secant rescue edge's guess is extrapolated from two lineage roots, not stepped from the parent's
-    % iterate: its refusal says nothing about an edge from that parent (G22 finding at V1; L = 30 has 161)
+    % iterate: its refusal says nothing about an edge from that parent
     if strcmp(e.kind, 'rescue_secant'), continue; end
     if ~isKey(ctx.node_of, e.q_key) || ~isKey(ctx.node_of, e.p_key), continue; end
     np = K.src2new(e.parent_root);
@@ -967,11 +967,11 @@ if ~(isfield(E0, 'model') && isstruct(E0.model) && isfield(E0.model, 'library_ty
 end
 uses_fs = abs(nargin(M.shape_label)) >= 4;      % the label's flatness reference is the field scale's
 if uses_fs && isfield(E0, 'field_scale') && isstruct(E0.field_scale) && ~isfield(E0.field_scale, 'anchor_hss_values')
-    miss{end+1} = 'field_scale.anchor_hss_values (written before software 0.11)';
+    miss{end+1} = 'field_scale.anchor_hss_values (written by an older version)';
 end
 if ~isempty(miss)
     error(eid, ['focus refused: the source run %s lacks the stored item(s) a focus run takes instead of an ' ...
-        'uncoupled library: %s (internal/settings_effective.mat). Use a source written by a newer software, or ' ...
+        'uncoupled library: %s (internal/settings_effective.mat). Use a source written by a newer version, or ' ...
         'run mode production with a library.'], src, strjoin(miss, ', '));
 end
 v = E0.field_scale.values(:);

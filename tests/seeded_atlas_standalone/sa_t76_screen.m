@@ -1,5 +1,5 @@
 function rows = sa_t76_screen(E)
-%SA_T76_SCREEN  Milestone 7c items 1 and 3: bvp4c's mesh-limit warning stays
+%SA_T76_SCREEN  bvp4c's mesh-limit warning stays
 %   enabled and recorded but is not printed (report.solver_warnings brings it
 %   back); other solve output is printed unchanged; progress stage and
 %   status lines; neither changes what is solved or the order. Zero bvp4c

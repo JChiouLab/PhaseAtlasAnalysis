@@ -1,8 +1,8 @@
 function varargout = sa_progress(action, varargin)
 %SA_PROGRESS  Progress lines and solver output on the screen (display only).
 %
-%   Nothing here enters a solve, a record, a key or the order of work: it
-%   only prints. The state is per MATLAB process (persistent) and is cleared
+%   Nothing here enters a solve, a stored record, a key or the order of work:
+%   it only prints. The state is per MATLAB process (persistent) and is cleared
 %   when the outermost caller closes it.
 %
 %   SA_PROGRESS('begin', interval_s)
@@ -22,13 +22,13 @@ function varargout = sa_progress(action, varargin)
 %       The current stage's kind (the code the caller passed in info.kind).
 %   SA_PROGRESS('solver_text', txt, show_all)
 %       Print the text one solve wrote to the command window (captured by
-%       the executor). show_all = true (report.solver_warnings): everything,
-%       verbatim. Otherwise every bvp4c mesh-limit warning block
+%       the search driver sa_search). show_all = true (report.solver_warnings):
+%       everything, verbatim. Otherwise every bvp4c mesh-limit warning block
 %       ("Unable to meet the tolerance without using more than N mesh
 %       points ...") is left out and anything else is printed unchanged; the
 %       first time a block is left out a one-line note says where the
 %       warning is recorded. The warning itself is recorded per call by the
-%       corrector in every case (warning_id, warning_msg).
+%       coupled bvp4c solve in every case (warning_id, warning_msg).
 %   n = SA_PROGRESS('hidden')
 %       Mesh-limit warning blocks left out since the outermost open.
 %   txt = SA_PROGRESS('strip', txt)

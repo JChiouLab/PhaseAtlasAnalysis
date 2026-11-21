@@ -1,5 +1,5 @@
 function [sol, srec] = gnx_solve(solinit, par, nR, nB, opts)
-%GNX_SOLVE  One bvp4c call on the Guzzo_noXA BVP, counted (packet §4g, §8).
+%GNX_SOLVE  One bvp4c call on the M. xanthus (Guzzo_noXA) half-cell BVP, counted.
 %
 %   [sol, srec] = GNX_SOLVE(solinit, par, nR, nB)
 %   [sol, srec] = GNX_SOLVE(solinit, par, nR, nB, opts)
@@ -8,12 +8,13 @@ function [sol, srec] = gnx_solve(solinit, par, nR, nB, opts)
 %       bvp_fun (default @bvp4c; tests inject a stub). Every invocation of
 %       bvp_fun increments the process counter by exactly one.
 %       sol is whatever bvp4c returned ([] on a caught exception); a return
-%       is NOT convergence: srec.converged applies the gate
+%       is not convergence: srec.converged applies the gate
 %         stats present, stats.maxres < RelTol, stats.nmeshpoints <= NMax,
 %         numel(x) <= NMax, no RelTolNotMet / IllCondJac / SingJac warning
 %       (lastwarn reset before the call; warnings are never suppressed).
 %       srec.reason: '' | 'bvp4c_error' | 'singularity_guard' |
 %       'not_converged' | 'no_stats'.
+%   (RelTol 1e-8 here; the fission yeast core run_bvp_v7.m uses 1e-6.)
 %   n = GNX_SOLVE('count')          bvp_fun invocations in this process
 %   n = GNX_SOLVE('nmax_count')     invocations whose mesh reached NMax
 %   GNX_SOLVE('reset')              zero both counters

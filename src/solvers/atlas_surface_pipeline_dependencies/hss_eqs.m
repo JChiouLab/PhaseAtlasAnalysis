@@ -1,7 +1,5 @@
-% hss_eqs  --  shared V7 per-point BVP core (extracted 2026-07-09, Packet 1B).
-% Single source of truth for run_hybrid_sweeper_pdefb.m AND build_mpss_branch.m.
-% Extracted verbatim from run_hybrid_sweeper_pdefb.m; do not fork. Equations, BCs,
-% tolerances, and mass conventions are unchanged.
+% hss_eqs  --  algebraic equations for the uniform state at given total GEF (TG) and PAK (TP) amounts.
+% Shared by run_hybrid_sweeper_pdefb.m and build_mpss_branch.m; keep a single copy.
 function F = hss_eqs(y, par, L, TG, TP)
     u = y(1); pv = y(2);
     q = (par.c/par.d)*u*pv;

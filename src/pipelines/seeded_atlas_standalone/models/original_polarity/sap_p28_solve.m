@@ -1,11 +1,13 @@
 function [sol, info] = sap_p28_solve(th, guess, tgt, opts)
-%CHA_P28_SOLVE  ONE invocation of the 28-state forced paired-half corrector.
+%SAP_P28_SOLVE  ONE call of the coupled S. pombe BVP (28 states, both halves).
 %
-%   Exactly one bvp4c call per invocation; the caller counts calls against the
-%   Packet-3 cap of 8 (DESIGN_LOCAL_P3 section 7). Applies the frozen gates
-%   G1, G2, G3a, G4, G5, G6a, G6b, G9 of DESIGN_LOCAL_P3 section 6.
+%   Exactly one bvp4c call per invocation; the caller counts calls against its
+%   budget. Applies the checks recorded in the info.flag_G* fields: G1 the
+%   solver returned; G2 positivity; G3a source antisymmetry; G4 concentration
+%   continuity at the middle; G5 flux match at the middle; G6a accumulator mass;
+%   G6b dense mass; G9 velocity consistency.
 %
-%   G3b (zero forcing), G7 (profile distance) and G8 (full-domain steady
+%   G3b (all sources zero), G7 (profile distance) and G8 (full-domain steady
 %   residual) are ROOT-ONLY and are applied by the caller: opts.zero_forcing_root
 %   = true adds G3b here; G7/G8 stay with the caller because they need a target
 %   profile. A forced off-root solution is a constrained quasi-steady state, not
@@ -16,7 +18,7 @@ opts = defaults(opts);
 info = init_info(opts, tgt);
 
 t0 = tic; sol = [];
-% Packet-5D-D: capture, never suppress, the bvp4c convergence warnings.
+% Capture, never suppress, the bvp4c convergence warnings.
 prevw = warning;
 warning('on','MATLAB:bvp4c:RelTolNotMet'); warning('on','MATLAB:bvp4c:IllCondJac');
 warning('off','backtrace'); lastwarn('');
@@ -32,13 +34,12 @@ try
             info.rejected_n_mesh = numel(s.x);
         catch
         end
-        % CA0-R3(i)+(ii), 2026-08-22 (CA-1 addendum section 6): RECORDING ONLY.
-        % Placed OUTSIDE the try above so the statistics land even when the
-        % diagnostics call throws -- that was exactly CA-0 limitation 3.
+        % Recording only. Placed OUTSIDE the try above so the statistics land even
+        % when the diagnostics call throws.
         info = ca0r3_record(info, s, opts);
     elseif any(~isfinite(s.y(:)))
         info.reason = 'non-finite solution';
-        info = ca0r3_record(info, s, opts);      % CA0-R3(i)+(ii), recording only
+        info = ca0r3_record(info, s, opts);      % recording only
     else
         sol = s;
     end
@@ -53,7 +54,7 @@ D = sap_forced28('diagnostics', sol, th, tgt);
 info.diag = D;
 info.n_mesh = D.n_mesh;
 
-% ---- frozen gates -------------------------------------------------------
+% ---- validity checks ----------------------------------------------------
 info.flag_G1  = true;
 info.flag_G2  = D.all_positive;
 info.antisym_gate = max(opts.antisym_abs, opts.antisym_rel*D.s_max);
@@ -88,22 +89,14 @@ info.bc_max_abs = D.bc_max_abs;
 core = info.flag_G1 && info.flag_G2 && info.flag_G3a && info.flag_G4 && ...
        info.flag_G5 && info.flag_G6a && info.flag_G6b && info.flag_G9;
 if opts.zero_forcing_root, core = core && info.flag_G3b; end
-% CP-9B-R0 (Amendment A5.1 item 1), 2026-08-19: MATLAB's `lastwarn` returns
-% [MESSAGE, IDENTIFIER] -- verified empirically, not from the doc page. This line
-% previously read `[wid_, wmsg_] = lastwarn;`, which stored the message as the
-% identifier and vice versa, so sap_bvp_convergence's identifier tests for
-% MATLAB:bvp4c:RelTolNotMet and MATLAB:bvp4c:IllCondJac could never fire. The
-% stats-based gates (maxres < RelTol, nmeshpoints <= NMax) were unaffected, which
-% is why the four A4 classifications do not move -- regression-tested in
-% cha_cp9b_r0('regression'). Pre-fix text preserved at
-% sap_p28_solve.m.bak_cp9br0_20260819_pre_lastwarn_fix (sha-256 a4b1f846f0152c0f...).
+% MATLAB's `lastwarn` returns [MESSAGE, IDENTIFIER].
 [wmsg_, wid_] = lastwarn;
 info.convergence = sap_bvp_convergence(sol, opts, wid_, wmsg_);
 info.bvp_converged = info.convergence.converged;
 info.returned_n_mesh = info.convergence.returned_n_mesh;
 info.stats_nmeshpoints = info.convergence.stats_nmeshpoints;
 info.stats_maxres = info.convergence.stats_maxres;
-core = core && info.bvp_converged;   % Packet-5D-D: convergence is now required
+core = core && info.bvp_converged;   % convergence is required
 info.accepted_core = core;
 info.zero_forcing_root = opts.zero_forcing_root;
 
@@ -121,34 +114,25 @@ else
     if ~info.flag_G9,  r{end+1} = sprintf('G9 velocity %.3g (gate %.3g)', D.vel_discrepancy_max, info.vel_gate); end
     info.reason = strjoin(r, '; ');
     info.class = 'REJECTED';
-    % CA0-R3(i)+(ii), 2026-08-22 (CA-1 addendum section 6): RECORDING ONLY. The
-    % returned-but-rejected path also ships its statistics and its iterate, so
-    % that EVERY refusal -- not only the mesh_reject one -- is artifact-sourced.
+    % Recording only. The returned-but-rejected path also ships its statistics
+    % and its iterate, so that every refusal, not only the mesh_reject one, can
+    % be inspected afterwards.
     info = ca0r3_record(info, sol, opts);
 end
 end
 
 % -------------------------------------------------------------------------
-% CA0-R3 RECORDING-ONLY INSTRUMENT REPAIR -- added 2026-08-22 under the CA-1
-% dated addendum section 6 (mandatory), which adopts PM ruling CA0-R3 items
-% (i) and (ii) of coupled_half_domain_atlas_ca0_review.md.
+% Recording-only helper: it stores the solver statistics (stats.maxres and the
+% proposed mesh size) and the rejected iterate of a refused call, so that a
+% refusal can be inspected afterwards.
 %
-% Pre-edit bytes preserved at
-%   sap_p28_solve.m.bak_ca1_20260822_pre_ca0r3_recording
-%   sha-256 99089a4f8f056a17bcaa811b435bacde4d49b45e5a73d6a3a11f5a7724757a27
-% (the same bytes CP-9B content-addressed as
-%  outputs/cp9b/src_snapshots/99089a4f8f056a17__cha_p28_solve.m), following the
-% CP-9B-R0 `lastwarn` precedent recorded above.
+% It must be a part of this function, not a wrapper: on the mesh_reject path
+% this function sets sol = [] and the rejected iterate `s` is discarded inside
+% the function, so it is unreachable from any caller.
 %
-% WHY IT CANNOT BE A WRAPPER: on the mesh_reject path this function sets
-% sol = [] and the rejected iterate `s` is discarded INSIDE the function, so it
-% is unreachable from any caller. CA-0 limitations 2 and 3 are exactly that.
-%
-% WHAT IT DOES NOT DO: it changes no equation, boundary condition, gate,
-% tolerance, NMax, mesh_reject, acceptance expression or `defaults` value, and
-% nothing it writes is ever read by an acceptance decision. A coded structural
-% diff control (cha_ca1) re-checks that claim against the .bak at S0, and is
-% itself made discriminating by a planted altered-`core` counter-example.
+% It changes no equation, boundary condition, check, tolerance, NMax,
+% mesh_reject, acceptance expression or `defaults` value, and nothing it
+% writes is ever read by an acceptance decision.
 % -------------------------------------------------------------------------
 function info = ca0r3_record(info, s, opts)
 D = struct('has_stats',false,'stats_maxres',NaN,'stats_nmeshpoints',NaN, ...
@@ -169,9 +153,9 @@ if isfield(info,'rejected_diag') && isstruct(info.rejected_diag)
 else
     info.rejected_diag = D;
 end
-info.rejected_sol = s;                 % CA0-R3(ii): the iterate is RETAINED
+info.rejected_sol = s;                 % the iterate is retained
 info.rejected_retained = true;
-info.ca0r3_recording = ['CA0-R3(i)+(ii) recording only: stats.maxres and the proposed mesh ' ...
+info.ca0r3_recording = ['Recording only: stats.maxres and the proposed mesh ' ...
     'persisted in info.rejected_diag, and the rejected iterate retained in info.rejected_sol. ' ...
     'No solver policy, tolerance, gate or acceptance is affected.'];
 end

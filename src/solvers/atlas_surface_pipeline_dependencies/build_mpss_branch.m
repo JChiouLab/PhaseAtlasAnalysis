@@ -1,51 +1,39 @@
 function report = build_mpss_branch(p, out_dir)
-    % BUILD_MPSS_BRANCH  MPSS branch-library constructor (Packet 1/1B/1C).
+    % BUILD_MPSS_BRANCH  Full-peak (MPSS) half-cell library constructor.
     %
-    % MPSS = quarter-domain HPSS solve + peak-to-peak reflection (NOT a direct
-    % interior-peak BVP). See docs/ai_handoff/mpss_constructor_spec.md for the
-    % fixed design; the numerical convention there (L_quarter=L_total/4, quarter
-    % masses = half/2, peak-to-peak reflection, flux at the outer trough on the
-    % half-domain interface) is UNCHANGED by this pass. Failed quarter solves /
-    % failed reflection checks are MASKED, never fabricated (Invariant 2).
-    % Stability is annotation only and never gates existence (Invariant 3).
+    % Full-peak half-cell state = quarter-domain half-peak (HPSS) solve + peak-to-peak reflection
+    % (not a direct interior-peak BVP): L_quarter = L_total/4, quarter masses = half masses/2, flux
+    % taken at the outer trough on the half-domain interface. Failed quarter solves and failed
+    % reflection checks are masked, never filled in. Stability is an annotation only and never gates
+    % existence.
     %
-    % --- 2026-07-09 Packet 1C: production-scale batching/checkpointing --------
-    % Adds, around the UNCHANGED per-cell math (quarter_hpss_solve,
-    % reflect_stitch, classify_mpss_profile, and the shared BVP core):
-    %  * PARALLEL execution: each pending cell is an independent parfeval task
-    %    (cells have no cross-cell dependency, unlike the sweeper's neighbour-
-    %    seeded HPSS rescue -- so unlike that rescue's multi-pass design, MPSS
-    %    submits one wave over all pending cells and streams results back).
-    %  * per-cell TIMEOUT via fetchNext + cancel (same pattern as
-    %    run_hybrid_sweeper_pdefb.m Phase 4; Invariant 8). Timed-out cells are
-    %    masked with fail_reason="timeout", never fabricated.
-    %  * CHECKPOINTING every p.checkpoint_every resolved cells, to
-    %    checkpoint_mpss_<computation_id>.mat (Invariant 8).
-    %  * RESUME via p.resume_from = a checkpoint path: already-resolved cells
-    %    (existence_mask true OR a definitive fail_reason) are never
-    %    resubmitted; the SAME computation_id is continued.
-    %  * BATCHING via p.max_cells_this_run: bound how many pending cells one
-    %    call attempts, so a run can be deliberately split across calls.
-    %  * SAFE OUTPUT: branch_MPSS_<id>.mat is always written with whatever was
-    %    resolved (honest partial record); branch_MPSS_latest.mat is updated
-    %    only if the run is complete (every cell at least attempted) or the
-    %    caller explicitly sets p.accept_partial=true.
-    % Nothing in quarter_hpss_solve, reflect_stitch, classify_mpss_profile
-    % (acceptance thresholds/order), or the shared BVP core was changed.
+    % Execution features:
+    %  * parallel execution: each pending cell is an independent parfeval task (cells have no
+    %    cross-cell dependency in the 'independent' strategy; one wave over all pending cells,
+    %    results streamed back).
+    %  * per-cell timeout via fetchNext + cancel (same pattern as run_hybrid_sweeper_pdefb.m);
+    %    timed-out cells are masked with fail_reason="timeout", never filled in.
+    %  * checkpointing every p.checkpoint_every resolved cells, to
+    %    checkpoint_mpss_<computation_id>.mat.
+    %  * resume via p.resume_from = a checkpoint path: already-resolved cells (existence_mask true
+    %    or a definitive fail_reason) are never resubmitted; the same computation_id is continued.
+    %  * batching via p.max_cells_this_run: bound how many pending cells one call attempts, so a
+    %    run can be split across calls.
+    %  * safe output: branch_MPSS_<id>.mat is always written with whatever was resolved (an honest
+    %    partial record); branch_MPSS_latest.mat is updated only if the run is complete (every cell
+    %    at least attempted) or the caller sets p.accept_partial=true.
     %
-    % --- SHARED BVP CORE (Packet 1B refactor, 2026-07-09) --------------------
-    % The per-point BVP core (run_bvp_v7, ode_sys_v7, bc_aug_v7,
+    % Shared BVP core: the per-point BVP code (run_bvp_v7, ode_sys_v7, bc_aug_v7,
     % construct_bvp_guess_v7, run_pde_chunked, pde_eq_v7, pde_bc_v7, pde_ic_local,
-    % get_hss_local, hss_eqs, validate_halfwave) lives as STANDALONE files in
-    % src/solvers/, extracted verbatim from run_hybrid_sweeper_pdefb.m. Both this
-    % constructor and the sweeper call those single-source-of-truth files.
+    % get_hss_local, hss_eqs, validate_halfwave) lives in standalone files shared with
+    % run_hybrid_sweeper_pdefb.m.
     %
-    % Output: data/outputs/branch_MPSS_<computation_id>.mat (+ branch_MPSS_latest.mat
+    % Output: branch_MPSS_<computation_id>.mat in out_dir (+ branch_MPSS_latest.mat
     % when the run is complete or p.accept_partial=true), plus
-    % data/outputs/checkpoint_mpss_<computation_id>.mat. Never writes to or
-    % modifies any canonical source .mat.
+    % checkpoint_mpss_<computation_id>.mat. Never writes to or
+    % modifies any source .mat file.
 
-    % ---- parameters (default: V7 Golden Standard, L_total=4 -> L_quarter=1) --
+    % ---- parameters (built-in default parameters, not the paper's set; see run_atlas_surface_pipeline.m / docs/MODELS.md) --
     if nargin < 1 || isempty(p)
         p.a = 0.59; p.b = 0.13; p.c = 21.0;
         p.d = 1.3;  p.e = 33.0; p.f = 1.9;
@@ -59,29 +47,29 @@ function report = build_mpss_branch(p, out_dir)
     if ~isfield(p, 'pde_T_end'),      p.pde_T_end   = 2e6;  end
     if ~isfield(p, 'pde_T_chunk'),    p.pde_T_chunk = 1e6;  end
     if ~isfield(p, 'pde_max_chunks'), p.pde_max_chunks = 12; end
-    if ~isfield(p, 'slope_tol'),      p.slope_tol = 1e-2;   end  % C1 seam-slope tol
+    if ~isfield(p, 'slope_tol'),      p.slope_tol = 1e-2;   end  % seam-slope tol
     if ~isfield(p, 'sym_tol'),        p.sym_tol   = 1e-6;   end  % symmetry tol
-    if ~isfield(p, 'mass_tol'),       p.mass_tol  = 1e-4;   end  % mass-doubling tol
+    if ~isfield(p, 'mass_tol'),       p.mass_tol  = 1e-4;   end  % mass tol of the reflected profile
     if ~isfield(p, 'max_res_warn'),   p.max_res_warn = 8;   end  % serial-mode guideline
-    % --- Packet 1C options ---
+    % --- parallel / checkpoint options ---
     if ~isfield(p, 'use_parallel'),      p.use_parallel = true;  end
     if ~isfield(p, 'checkpoint_every'),  p.checkpoint_every = 5; end  % cells per checkpoint
     if ~isfield(p, 'cell_timeout'),      p.cell_timeout = 60;    end  % seconds, parallel only
     if ~isfield(p, 'resume_from'),       p.resume_from = '';     end  % checkpoint_mpss_*.mat path
     if ~isfield(p, 'accept_partial'),    p.accept_partial = false; end
     if ~isfield(p, 'max_cells_this_run'), p.max_cells_this_run = Inf; end
-    % --- Packet 1D: search strategy ---
+    % --- search strategy ---
     %   'continuation' (default) -> run_quarter_hpss_sweeper_for_mpss (center
-    %       seed + predictor-corrector column/row continuation + neighbour rescue),
-    %       then reflect/stitch each solved quarter-HPSS profile into an MPSS.
-    %   'independent'            -> legacy per-cell cold solve (Packet 1C path).
+    %       seed + column/row continuation from solved neighbours + retry of failed cells),
+    %       then reflect/stitch each solved quarter half-peak profile into a full-peak profile.
+    %   'independent'            -> independent cold solve of every cell.
     if ~isfield(p, 'mpss_strategy'),       p.mpss_strategy = 'continuation'; end
     if ~isfield(p, 'quarter_resume_from'), p.quarter_resume_from = '';       end
 
     if ~p.use_parallel && p.res > p.max_res_warn
         warning(['build_mpss_branch: res=%d exceeds the serial-mode guideline (%d) with ', ...
                  'use_parallel=false. Serial mode has no per-cell timeout and may be slow ', ...
-                 'at this resolution -- see project_invariants.md Invariant 8, or set ', ...
+                 'at this resolution -- or set ', ...
                  'p.use_parallel=true (default) for parfeval + timeout + checkpointing.'], ...
                 p.res, p.max_res_warn);
     end
@@ -99,9 +87,9 @@ function report = build_mpss_branch(p, out_dir)
     deln_G   = linspace(-0.95, 0.95, res) * p.M_BG;
     [PAK_DIFF, GEF_DIFF] = meshgrid(deln_pak, deln_G);
 
-    % Packet 1D: continuation mode manages its own quarter-sweep checkpoint/resume
+    % Continuation mode manages its own quarter-sweep checkpoint/resume
     % (p.quarter_resume_from); the per-cell MPSS resume path below is only for the
-    % legacy independent strategy. Force a fresh MPSS array init in continuation.
+    % independent strategy. Force a fresh MPSS array init in continuation.
     if strcmpi(p.mpss_strategy, 'continuation') && ~isempty(p.resume_from)
         warning(['build_mpss_branch: p.resume_from is ignored in continuation mode. ', ...
                  'Use p.quarter_resume_from to resume the quarter sweep.']);
@@ -117,7 +105,7 @@ function report = build_mpss_branch(p, out_dir)
         if ck.res ~= res || ck.M_BG ~= p.M_BG || ck.M_P ~= p.M_P || ck.L_total ~= p.L
             error(['build_mpss_branch: checkpoint grid (res=%d,M_BG=%g,M_P=%g,L=%g) does not ', ...
                    'match the requested grid (res=%d,M_BG=%g,M_P=%g,L=%g). Refusing to resume ', ...
-                   '-- grids must match exactly (Invariant 5/11).'], ...
+                   '-- grids must match exactly.'], ...
                    ck.res, ck.M_BG, ck.M_P, ck.L_total, res, p.M_BG, p.M_P, p.L);
         end
         computation_id = ck.computation_id;   % continue under the SAME id
@@ -149,7 +137,7 @@ function report = build_mpss_branch(p, out_dir)
     end
 
     t_start = tic;
-    fprintf('=== build_mpss_branch (Packet 1C/1D) ===\n');
+    fprintf('=== build_mpss_branch ===\n');
     fprintf('L_total=%.3f  L_half=%.3f  L_quarter=%.3f  res=%d  strategy=%s  use_parallel=%d\n', ...
             L_total, L_half, L_quarter, res, p.mpss_strategy, p.use_parallel);
 
@@ -160,12 +148,12 @@ function report = build_mpss_branch(p, out_dir)
 
     if strcmpi(p.mpss_strategy, 'continuation')
         % ================================================================
-        % Packet 1D: continuation-based quarter-domain HPSS sweep, then
-        % reflect/stitch/classify each solved quarter profile into an MPSS.
-        % run_quarter_hpss_sweeper_for_mpss replaces the fragmented per-cell
+        % Continuation-based quarter-domain half-peak sweep, then
+        % reflect/stitch/classify each solved quarter profile into a full-peak profile.
+        % run_quarter_hpss_sweeper_for_mpss replaces a per-cell
         % cold-solve search. The reflect_stitch + classify_mpss_profile math
-        % (acceptance thresholds/order) is UNCHANGED; only the *source* of the
-        % quarter profiles changed: independent cold solves -> continuation.
+        % (acceptance thresholds and order) is the same in both strategies; only the source of the
+        % quarter profiles differs: independent cold solves or continuation.
         % ================================================================
         qres = run_quarter_hpss_sweeper_for_mpss(p, out_dir);
         quarter_source = sprintf('quarter_hpss_for_mpss_%s.mat', qres.computation_id);
@@ -197,7 +185,7 @@ function report = build_mpss_branch(p, out_dir)
 
     else
     % Only cells with NO recorded outcome at all are eligible for (re)attempt.
-    % A "timeout" IS a recorded outcome (Invariant 8: bounded per-cell work),
+    % A "timeout" is a recorded outcome (per-cell work is bounded),
     % so timed-out cells are not auto-retried on resume -- rerun explicitly
     % with a fresh computation_id (no resume_from) if a longer timeout is wanted.
     pending_mask = ~existence_mask & (fail_reason == "");
@@ -316,15 +304,15 @@ function report = build_mpss_branch(p, out_dir)
     end   % strategy switch (continuation vs. independent)
     wall_time = toc(t_start);
 
-    % ---- stability: annotation only, never computed for constructed MPSS ----
-    is_stable          = false(res, res);   % no MPSS stability check exists
+    % ---- stability: annotation only, never computed for the constructed full-peak states ----
+    is_stable          = false(res, res);   % no stability check is computed for full-peak states
     is_stable_computed = false(res, res);
     stability_source   = 'not_computed';
 
-    % ---- diagnostic masks (mirror Packet 2 style) ----
+    % ---- diagnostic masks (same style as build_branch_library.m) ----
     mask_quarter_failed = (fail_reason == "hss") | (fail_reason == "pde") | ...
                           (fail_reason == "bvp") | (fail_reason == "not_polarized") | ...
-                          (fail_reason == "quarter_sweep_failed");   % Packet 1D continuation
+                          (fail_reason == "quarter_sweep_failed");   % continuation strategy
     mask_not_halfpeak   = (fail_reason == "not_halfpeak") | (fail_reason == "orientation");
     mask_kinked_seam    = (fail_reason == "kinked_seam");
     mask_mass_fail      = (fail_reason == "mass_doubling_fail");
@@ -336,7 +324,7 @@ function report = build_mpss_branch(p, out_dir)
 
     run_complete = ~any(mask_never_attempted(:));   % every cell at least attempted
 
-    % ---- Level 1/2 checks (validation_protocol.md; mirrors build_branch_library.m) ----
+    % ---- consistency checks (as in build_branch_library.m) ----
     checks = struct();
     checks.grid_shape_matches = isequal(size(PAK_DIFF), [res res]) && ...
                                 isequal(size(GEF_DIFF), [res res]);
@@ -490,15 +478,15 @@ end
 
 
 %% ========================================================================
-%  PER-CELL WORKER  (calls the UNCHANGED per-cell math; parfeval-callable)
+%  PER-CELL WORKER  (calls the per-cell math; parfeval-callable)
 %  ========================================================================
 
 function result = mpss_cell_worker(nG_half, nP_half, L_quarter, par, D, p)
     % One MPSS cell, end to end: quarter solve -> reflect -> classify. Single
     % struct output so it can be dispatched with parfeval(pool, @mpss_cell_worker,
     % 1, ...). No side effects; safe to run on any worker. The three calls below
-    % (quarter_hpss_solve, reflect_stitch, classify_mpss_profile) are the exact
-    % same functions used by the original small-grid prototype -- unchanged.
+    % (quarter_hpss_solve, reflect_stitch, classify_mpss_profile) are the same
+    % functions used by the continuation strategy.
     result = struct('ok', false, 'why', "", 'sol', [], 'peak_x', NaN, 'amp', NaN, ...
                      'mass_residual', NaN, 'seam_slope', NaN, 'sym_residual', NaN, ...
                      'flux_values', nan(1,5));
@@ -560,7 +548,7 @@ end
 
 
 %% ========================================================================
-%  CHECKPOINTING  (Invariant 8: bounded, resumable, no growing broadcast)
+%  CHECKPOINTING  (bounded, resumable, no growing broadcast)
 %  ========================================================================
 
 function ckpt_path = save_mpss_checkpoint(out_dir, computation_id, PAK_DIFF, GEF_DIFF, ...
@@ -584,8 +572,7 @@ end
 
 
 %% ========================================================================
-%  MPSS-SPECIFIC LOGIC  (UNCHANGED math -- quarter solve, reflection, and
-%  acceptance criteria are byte-identical to the validated prototype)
+%  FULL-PEAK-SPECIFIC LOGIC  (quarter solve, reflection and acceptance criteria)
 %  ========================================================================
 
 function [sol_q, ok, why] = quarter_hpss_solve(L_q, nG_q, nP_q, par, D, p)
@@ -610,7 +597,7 @@ function [sol_q, ok, why] = quarter_hpss_solve(L_q, nG_q, nP_q, par, D, p)
     if ~okb, why = "bvp"; return; end
     if ~validate_halfwave(sol), why = "not_halfpeak"; return; end
 
-    % Force peak-at-x=0 orientation (spec §3). The cos IC boosts u at x=0 so this
+    % Force peak-at-x=0 orientation. The cos IC boosts u at x=0 so this
     % is normally already true; guard anyway.
     if sol.y(1,1) < sol.y(1,end)
         % spatially reverse the 5 species onto the same increasing mesh
@@ -626,12 +613,12 @@ function [x_mpss, y_mpss, seam_du] = reflect_stitch(sol_q)
     % Pure peak-to-peak reflection of a quarter-domain HPSS (peak at x=0).
     % Returns the stitched MPSS on [0, 2*L_quarter] = [0, L_half] as a 5-row
     % species profile y_mpss = [u;q;v;w;p], and the |du/dx| at the seam (from the
-    % quarter's peak-end derivative) for the C1 check.
+    % quarter's peak-end derivative) for the slope-continuity check at the seam.
     x_q  = sol_q.x(:).';                 % 1 x N, [0 .. L_q], peak at column 1
     yq5  = sol_q.y([1,3,5,7,9], :);      % 5 x N
     L_q  = x_q(end);
 
-    % C1 seam slope: du/dx at the quarter peak end (x_q=0). Prefer the BVP's own
+    % Seam slope (should be about 0 for a smooth join): du/dx at the quarter peak end (x_q=0). Prefer the BVP's own
     % derivative channel if present (row 2); else finite-difference.
     if size(sol_q.y,1) >= 2 && any(sol_q.y(2,:) ~= 0)
         seam_du = abs(sol_q.y(2,1));
@@ -652,12 +639,10 @@ end
 
 function [ok, why, this_amp, pk_x, mass_res, sym_res] = ...
         classify_mpss_profile(xm, ym, seam_du, nG_half, nP_half, p)
-    % Pure validation of a stitched MPSS profile against spec Sec 2 & 4 -- the
-    % single source of truth for MPSS acceptance criteria (identical formulas,
-    % order, and tolerances as the original inline version; only extracted for
-    % reuse/testability, per the 2026-07-09 generalization pass). ym rows =
+    % Pure validation of a stitched full-peak profile; the
+    % single definition of the acceptance criteria. ym rows =
     % [u;q;v;w;p]. Returns ok=false with a reason string on the first failing
-    % check (Invariant 2: mark, don't fabricate); the scalars are still
+    % check (mark the cell, never fill it in); the scalars are still
     % computed so the caller can log/inspect them even on failure.
     ok = false; why = "";
     u = ym(1,:);
@@ -669,7 +654,7 @@ function [ok, why, this_amp, pk_x, mass_res, sym_res] = ...
     % quarter_mass_res): a plain trapz on the stitched profile's non-uniform mesh
     % conflates mesh-discretization error (~1e-4) with true mass error (~1e-13).
     % pchip-densify onto a uniform fine mesh before trapz -> ~1e-6. This is an
-    % accuracy fix, NOT a tolerance change (Invariant 4); without it, genuinely
+    % accuracy fix, not a tolerance change; without it, genuinely
     % on-mass MPSS profiles were falsely rejected as mass_doubling_fail.
     xf = linspace(xm(1), xm(end), 4000);
     uf_ = interp1(xm, ym(1,:), xf, 'pchip');   qf_ = interp1(xm, ym(2,:), xf, 'pchip');
@@ -734,8 +719,8 @@ end
 
 
 %% ========================================================================
-%  BVP CORE: standalone files in src/solvers/ (Packet 1B, 2026-07-09) --
+%  BVP CORE: standalone files in this folder --
 %  run_bvp_v7, ode_sys_v7, bc_aug_v7, construct_bvp_guess_v7, run_pde_chunked,
 %  pde_eq_v7, pde_bc_v7, pde_ic_local, get_hss_local, hss_eqs, validate_halfwave.
-%  Shared single source of truth with run_hybrid_sweeper_pdefb.m; not duplicated here.
+%  Shared with run_hybrid_sweeper_pdefb.m; not duplicated here.
 %  ========================================================================

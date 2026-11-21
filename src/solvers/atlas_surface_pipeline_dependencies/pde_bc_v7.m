@@ -1,7 +1,5 @@
-% pde_bc_v7  --  shared V7 per-point BVP core (extracted 2026-07-09, Packet 1B).
-% Single source of truth for run_hybrid_sweeper_pdefb.m AND build_mpss_branch.m.
-% Extracted verbatim from run_hybrid_sweeper_pdefb.m; do not fork. Equations, BCs,
-% tolerances, and mass conventions are unchanged.
+% pde_bc_v7  --  no-flux boundary conditions of the pdepe half-cell PDE (fission yeast model).
+% Shared by run_hybrid_sweeper_pdefb.m and build_mpss_branch.m; keep a single copy.
 function [pl,ql,pr,qr] = pde_bc_v7(~,~,~,~,~)
     pl = zeros(5,1); ql = ones(5,1);
     pr = zeros(5,1); qr = ones(5,1);

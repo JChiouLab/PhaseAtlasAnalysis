@@ -1,5 +1,5 @@
 function rows = sag_t20b_linear_stub(E) %#ok<INUSD>
-%SAG_T20B_LINEAR_STUB  Milestone-3 T20' (2C F-5): the noxa shift/velocity
+%SAG_T20B_LINEAR_STUB  The Guzzo_noXA shift/velocity
 %   identities on a SOLVED linear-stub BVP. The reaction is replaced by the
 %   linear exchange s = k1*Rm - k2*Rc (per half pool), for which the coupled
 %   24-state BVP (sag_coupled24 structure: DM Rm'' = -(s + sigma),
@@ -8,11 +8,11 @@ function rows = sag_t20b_linear_stub(E) %#ok<INUSD>
 %     u = DM Rm + DC Rc = u0 - sigma xi^2/2,  s = A cos(kappa xi) - k1 sigma/(DM kappa^2),
 %     kappa^2 = k1/DM + k2/DC; right half sigma_R = -sigma_L, A_R = -A_L,
 %     u0_R = u0_L - sigma_L Lh^2, A_L cos(kappa Lh) = k1 sigma_L/(DM kappa^2).
-%   sigma is NOT built from J (unlike the 2C fixture, F-5): J + Lh sigma = 0
+%   sigma is NOT built from J (unlike sag_test_fixture): J + Lh sigma = 0
 %   holds only because the profile solves the equations. Checked: the stub
 %   ODE and the module's boundary conditions hold at round-off; the module
 %   diagnostics then give antisymmetry 0 and |J + Lh sigma| at round-off, and
-%   myxo's reading (4/L) J = -2 sigma.
+%   the reference M. xanthus script's reading (4/L) J = -2 sigma.
 T = 'T20'' linear-stub BVP';
 rows = struct('test', {}, 'assertion', {}, 'pass', {}, 'detail', {});
 M = sa_model('guzzo_noxa');
@@ -59,7 +59,7 @@ rows = sa_check(rows, T, 'diagnostics on the solved BVP: antisymmetry 0, |J + Lh
     D.antisym_max <= 1e-15 && D.vel_discrepancy_max <= 1e-10 * max(1, D.J_max) && D.s_max > 1e-3 && ...
     max(abs(D.vel_from_slope - D.vel_from_shift)) <= 1e-10, ...
     sprintf('s_max %.3g antisym %.3g |J+Lh s| %.3g J %s', D.s_max, D.antisym_max, D.vel_discrepancy_max, mat2str(D.J, 6)));
-rows = sa_check(rows, T, 'myxo reading (4/L) J_L = -2 sigma_L', max(abs((4 / th.L) * D.J(1:2) + 2 * D.sigma(1:2))) <= 1e-10, '');
+rows = sa_check(rows, T, 'reference reading (4/L) J_L = -2 sigma_L', max(abs((4 / th.L) * D.J(1:2) + 2 * D.sigma(1:2))) <= 1e-10, '');
 end
 
 function m = mass(z, H, k1, k2, DM, DC, kap, den)

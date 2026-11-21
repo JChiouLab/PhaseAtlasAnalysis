@@ -1,12 +1,12 @@
 function theta = sap_normalize(p)
-%SAP_NORMALIZE  Dimensional parameters -> the corrector's normalized theta.
+%SAP_NORMALIZE  Dimensional parameters -> the normalized theta of the coupled solve.
 %
-%   theta = SAP_NORMALIZE(p) for the original five-field model. Required
+%   theta = SAP_NORMALIZE(p) for the S. pombe five-field model. Required
 %   fields of p (dimensional, as in the uncoupled library's `par`):
 %     a b c d e f    reaction rates
 %     Dm Dc          membrane / cytosolic diffusion
 %     L              FULL domain length (the half domain is L/2)
-%     M_BG M_P       total GEF-pool and PAK-pool masses
+%     M_BG M_P       total GEF and PAK masses (paper MG, MP)
 %   Unknown fields are rejected; every value must be finite and positive.
 %
 %   Transformations (concentration unit C0 = M_BG/L, time unit
@@ -14,7 +14,7 @@ function theta = sap_normalize(p)
 %     alpha = a (M_BG/L)^2 / f     gamma = c (M_BG/L) / f
 %     beta = b/f  delta = d/f  epsilon = e/f
 %     rho = M_P / M_BG             (masses are (1, rho))
-%   The corrector forms mu = D/(f L^2) itself from Dm, Dc, f and L, so those
+%   The coupled solve forms mu = D/(f L^2) itself from Dm, Dc, f and L, so those
 %   are carried dimensionally. C0 is carried for the library adapter.
 
 need = {'a','b','c','d','e','f','Dm','Dc','L','M_BG','M_P'};

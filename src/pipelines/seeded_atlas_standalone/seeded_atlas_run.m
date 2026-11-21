@@ -1,12 +1,13 @@
 function result = seeded_atlas_run(parameters, library_manifest, settings, corrector)
-%SEEDED_ATLAS_RUN  Standalone seeded coupled atlas: cold, continuation, rescue,
-%   restart.
+%SEEDED_ATLAS_RUN  Standalone phase atlas (coupled quasi-steady states over the
+%   plane): cold, continuation, rescue, restart.
 %
 %   result = SEEDED_ATLAS_RUN(parameters, library_manifest, settings)
 %   result = SEEDED_ATLAS_RUN(..., corrector)
 %
 %   parameters        the model's dimensional parameters (module 'normalize')
-%   library_manifest  where the uncoupled seed library lives (module 'load');
+%   library_manifest  where the half-cell library (uncoupled steady states used as
+%                     starting profiles) lives (module 'load');
 %                     for the original model struct('directory', <outputs dir>);
 %                     ignored in mode focus (no library; struct() will do)
 %   settings          see sa_settings; settings.model and settings.run_dir are
@@ -14,7 +15,7 @@ function result = seeded_atlas_run(parameters, library_manifest, settings, corre
 %   corrector         OPTIONAL injected corrector with the copied corrector's
 %                     signature [sol, info] = f(theta, guess, target, opts).
 %                     Tests inject stubs. When omitted the module's real
-%                     corrector is called (real solves need numerical authority).
+%                     corrector is called (real solves call the model's bvp4c corrector).
 %
 %   Path: parameters + library + settings -> theta, lattice, seedability
 %   census, declared targets -> the scheduler sa_search (cold pass,
@@ -61,14 +62,14 @@ function result = seeded_atlas_run(parameters, library_manifest, settings, corre
 %   preconditions, reconciliation, zero-solve replay of every stored attempt
 %   with re-derived verdicts and checkpoint comparison, then live.
 %   Without resume an existing non-empty run_dir is refused.
-%   Import (milestone 10; settings import.source_dir): a new run builds the
+%   Import (settings import.source_dir): a new run builds the
 %   import plan (sa_import 'plan', zero solves) after the inputs and BEFORE
 %   the run folder is prepared, so a refusal or a kill during the plan
 %   leaves no folder; the plan is stored as effective.import (an inactive
 %   plan when no import is set) and placed in ctx.import. On resume the
 %   stored plan is loaded (sa_resume 'prepare' returns it), never rebuilt;
 %   the source stamp is compared (E_IMPORT).
-%   Mode focus (selected roots of an earlier run as seeds): the plan keeps
+%   Mode focus (selected roots of an earlier run as starting profiles): the plan keeps
 %   only the roots selected by import.root_ids / import.families; the
 %   family fence in force (sa_import 'fence': continuation.families, or
 %   for 'selected' the plan's list) goes into ctx.fence, from the stored
@@ -225,7 +226,7 @@ else
     effective.started_at = datestr(now, 'yyyy-mm-ddTHH:MM:SS'); %#ok<DATST,TNOW1>
     effective.provenance = prov;
     effective.code_hashes = hashes;
-    effective.import = IMP;                      % milestone 10 (inactive plan when no import)
+    effective.import = IMP;                      % the import plan (inactive when no import)
     if focus
         % focus: no library, census or targets; where the field
         % scale and the family lookup came from
@@ -424,7 +425,7 @@ end
 
 function R = runtime_evidence(M, corrector)
 % What actually ran: the MATLAB path, the working folder and the file each
-% entry point and corrector resolved to (no campaign path).
+% entry point and corrector resolved to.
 R = struct();
 R.path_entries = strsplit(path, pathsep);
 R.pwd = pwd;

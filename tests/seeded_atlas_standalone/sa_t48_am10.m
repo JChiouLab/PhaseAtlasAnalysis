@@ -1,6 +1,6 @@
 function rows = sa_t48_am10(E)
-%SA_T48_AM10  Milestone-4 T48 (packet v0.3 AM-10, RC-4.2): R3 resumes the
-%   refused edge. Stub with the M3 refusal pattern: every call within 0.4 of
+%SA_T48_AM10  Rescue rung R3 resumes the
+%   refused edge. Stub with a refusal wall: every call within 0.4 of
 %   a lattice step of the wall node q* = [2 0] (coordinate [1.3 0]) is
 %   refused, so every continuation, R1 and R2 attempt at q* fails and R3
 %   runs. Asserts: R3 starts at the resumed edge's last valid fraction with
@@ -10,7 +10,7 @@ function rows = sa_t48_am10(E)
 %   fingerprint = guess bits + coordinate + options) and none coincides with
 %   an R1 call; the bound (<= 10 calls at h = 4) by exhaustive enumeration
 %   of the step rule (validated against the realised edges); the fallback
-%   (no refused cardinal edge into q: the v0.4 rule from the parent); a kill
+%   (no refused cardinal edge into q: the plain step rule from the parent); a kill
 %   inside R3, resumed, equals the uninterrupted run.
 T = 'T48 AM-10 R3 resumes the refused edge';
 rows = struct('test', {}, 'assertion', {}, 'pass', {}, 'detail', {});
@@ -70,7 +70,7 @@ for e = [cand, e3]
     end
     agree = agree && n == numel(a) && max(abs(fr - [a.fraction])) == 0;
 end
-ends = edge_ends(4);                      % every refused v0.4 end state (pos, s_fail), h = 4
+ends = edge_ends(4);                      % every refused end state (pos, s_fail), h = 4
 worst = 0; nstates = 0;
 for k = 1:size(ends, 1)
     pos = ends(k, 1); s = ends(k, 2) / 2;
@@ -128,7 +128,7 @@ end
 end
 
 function E = edge_ends(h)
-% every (pos, s_fail) at which a v0.4 adaptive edge (from pos 0, s 1) is refused
+% every (pos, s_fail) at which an adaptive edge (from pos 0, s 1) is refused
 E = zeros(0, 2);
 stack = {[0 1 0]};
 while ~isempty(stack)

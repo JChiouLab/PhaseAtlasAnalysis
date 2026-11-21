@@ -11,8 +11,8 @@ function P = sa_post_model(id, main_variable)
 %   main variable (sa_main_variable; '' = the module's default). Only a
 %   module whose factory takes the argument has a main variable (then P
 %   also carries main_variable, legacy_main_variable and
-%   legacy_dn2_variable, the label's and dn2's variables before software
-%   0.10); asking another module for one is refused (SA:POST:E_MAIN_VARIABLE).
+%   legacy_dn2_variable, the variables of an older default used to redraw
+%   older run folders); asking another module for one is refused (SA:POST:E_MAIN_VARIABLE).
 %
 %   Members of P
 %     id, n_fields, field_names           the half-domain fields
@@ -23,11 +23,11 @@ function P = sa_post_model(id, main_variable)
 %     coord_labels                        {c1 c2 c3} axis labels (plot order)
 %     lattice_axes                        [a1 a2]: lattice axis of c1 and c2
 %     mass_pairs                          k x 2 field pairs (a, b) whose sum is
-%                                         one pool (the cos perturbation)
+%                                         one conserved quantity (the cos perturbation)
 %     full_profile(theta, xi, YL, YR, nx) -> struct x, eta, Y, im: the full
 %                                         domain from the two halves (left at
 %                                         x = xi, right at x = L - xi; pchip;
-%                                         the seam node from the left half)
+%                                         the middle node from the left half)
 %     observables(theta, x, Y)            -> struct c (1 x 3), masses (1 x 2),
 %                                         umax (1 x 2, the first field per
 %                                         half)
@@ -73,10 +73,10 @@ end
 % =========================================================================
 
 function o = family_order(f)
-% The legend order: the family names written before software 0.11
-% (HPSS_HSS, ...) in their fixed order; then mode names (sa_mode_name) by
-% total mode (the two halves' mode numbers added, 0 for a flat half), then
-% by name; then any other label alphabetically.
+% The legend order: the older family names (HPSS_HSS, ...; found in run
+% folders written by older versions) in their fixed order; then mode names
+% (sa_mode_name) by total mode (the two halves' mode numbers added, 0 for a
+% flat half), then by name; then any other label alphabetically.
 fixed = {'HPSS_HSS', 'HSS_HPSS', 'HSS_HSS', 'HPSS_HPSS', 'HSS_MPSS', 'MPSS_HSS', 'HPSS_MPSS', ...
     'MPSS_HPSS', 'MPSS_MPSS'};
 rest = setdiff(f, fixed);                        % sorted by name
@@ -93,9 +93,9 @@ end
 
 function c = family_colour(name)
 % One colour per family name, the same in every model. A mode name that
-% corresponds to a family name written before software 0.11 keeps that
+% corresponds to an older family name keeps that
 % family's colour (1+/0 = HPSS_HSS, 0/1- = HSS_HPSS, 0/0 = HSS_HSS, the
-% three Fig 3 superfamily colours; 2-/0 = MPSS_HSS, 0/2- = HSS_MPSS, 1+/2- =
+% three superfamily colours of the atlas plots; 2-/0 = MPSS_HSS, 0/2- = HSS_MPSS, 1+/2- =
 % HPSS_MPSS, 2-/1- = MPSS_HPSS, 1+/1- = HPSS_HPSS, 2-/2- = MPSS_MPSS); a
 % single peak at the cell middle (1-/1+) is gold, 'unlabelled' grey; any
 % other name gets a generated colour (generated_colour).

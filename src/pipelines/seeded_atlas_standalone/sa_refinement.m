@@ -1,9 +1,10 @@
 function ctx = sa_refinement(ctx, ~)
 %SA_REFINEMENT  Refinement check, declared before any solve.
 %
-%   Sample: in each selected family, the accepted cold return with the largest
-%   stats.maxres (ties: earliest attempt); fewer if a family has none.
-%   Re-solve from that root's own returned profile with RelTol =
+%   Sample: in each selected sheet (family label), the accepted cold-call
+%   return (solve started from a half-cell library profile) with the largest
+%   stats.maxres (ties: earliest attempt); fewer if a sheet has none.
+%   Re-solve from that quasi-steady state's own returned profile with RelTol =
 %   validity.refine_reltol, AbsTol = validity.refine_abstol and
 %   NMax = mesh_reject = solver.mesh_reject. The refined return must pass the
 %   whole validity boundary; the report gives the identity distance
@@ -12,12 +13,12 @@ function ctx = sa_refinement(ctx, ~)
 %   boundary is reported as "refinement not achieved", never dropped; a sample
 %   the budget does not reach is "not attempted (<budget reason>)".
 %   Refinement calls count against budget.max_calls; refined returns never
-%   enter the root store. Every call goes through the executor
-%   sa_search('call') (journal, replay on resume).
+%   enter the root store. Every call goes through sa_search('call'), which
+%   journals it so that a resumed run replays it.
 %   The parent's sol is loaded from its attempt file by attempt id
 %   (sa_search 'get_sol'), live and on resume alike (a MAT round trip is
-%   lossless); no cold sol is kept in memory. A second argument (the former
-%   in-memory sols cache) is accepted and ignored.
+%   lossless); no cold sol is kept in memory. A second argument is accepted
+%   and ignored.
 
 S = ctx.S; M = ctx.M;
 cold = ctx.attempts(strcmp({ctx.attempts.kind}, 'cold') & strcmp({ctx.attempts.outcome}, 'accepted'));
@@ -52,7 +53,7 @@ for f = 1:numel(ctx.T.families)
     sol0 = sa_search('get_sol', ctx, A.attempt_id);
     guess = struct('x', sol0.x, 'y', sol0.y);
     [ctx, A2, R] = sa_search('call', ctx, u, tg, guess, sa_search('solver_for', S, 'refinement'));
-    if isempty(A2)                          % the executor refused (stop)
+    if isempty(A2)                          % sa_search refused (stop)
         r.status = sprintf('not attempted (%s)', ctx.stop_reason);
         rows(end+1) = r; %#ok<AGROW>
         ctx.stop = false;                   % a refinement refusal is not a stop

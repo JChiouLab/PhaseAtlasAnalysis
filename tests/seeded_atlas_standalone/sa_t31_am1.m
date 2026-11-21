@@ -1,5 +1,5 @@
 function rows = sa_t31_am1(E)
-%SA_T31_AM1  Milestone-3 T31 (AM-1 / F3, RC-2): a record written under the
+%SA_T31_AM1  A record written under the
 %   current software version, MATLAB version and thread mode is re-derived
 %   and must equal its stored checks: a tampered value, tolerance,
 %   comparison or opts is an integrity failure. An older-version record

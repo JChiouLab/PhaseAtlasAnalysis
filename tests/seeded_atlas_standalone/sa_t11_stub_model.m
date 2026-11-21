@@ -1,5 +1,5 @@
 function rows = sa_t11_stub_model(E)
-%SA_T11_STUB_MODEL  RC-11: the whole shared path (settings, lattice,
+%SA_T11_STUB_MODEL  The whole shared path (settings, lattice,
 %   seedability, targets, validity, root store, outputs, refinement) runs on a
 %   stub second model with 4 fields, 2 pools, an 8-row state, domain [0, 1.5]
 %   and shifts as bvp4c parameters. Any hard-coded 28/10/[0,0.5]/y(21:24) in
@@ -45,20 +45,20 @@ ref = res.refinement;
 rows = sa_check(rows, T, 'refinement ran per family and reports distance 0 for an identical return', ...
     ~isempty(ref) && all(strcmp({ref.status}, 'refined')) && all([ref.scaled_rms] == 0), ...
     sprintf('%d refinement rows', numel(ref)));
-% milestone 3: roots.mat is replaced by per-node shards roots/<node>.mat, and
-% the run folder gains journal.txt and queue.mat (packet 2d, 2e)
+% roots are stored as per-node shards roots/<node>.mat, and
+% the run folder holds journal.txt and queue.mat
 need = {'settings_effective.mat','attempts.mat','attempts.csv','summary.txt','identity_pairs.csv', ...
     'journal.txt','queue.mat'};
-have = cellfun(@(f) exist(fullfile(d, f), 'file') == 2 || exist(fullfile(sa_layout('state', d), f), 'file') == 2, need);   % M7a: state files in internal/
+have = cellfun(@(f) exist(fullfile(d, f), 'file') == 2 || exist(fullfile(sa_layout('state', d), f), 'file') == 2, need);   % state files are in internal/
 rows = sa_check(rows, T, 'all outputs written', all(have) && exist(fullfile(sa_layout('state', d), 'roots'), 'dir') == 7, ...
     strjoin(need(~have), ','));
 Sh = sa_store_io('load_run_shards', sa_layout('state', d), M);
 nr = sum(cellfun(@(k) numel(Sh(k).roots), Sh.keys));
-rows = sa_check(rows, T, 'root shards reload and re-validate (AM-1 re-derivation)', nr == res.n_roots);
+rows = sa_check(rows, T, 'root shards reload and re-validate (re-derivation)', nr == res.n_roots);
 Eff = load(fullfile(sa_layout('state', d), 'settings_effective.mat'));
 rows = sa_check(rows, T, 'effective settings saved with software and model versions', ...
     isfield(Eff.settings, 'software_version') && strcmp(Eff.model.id, 'stub_two_pool'));
-% F2 / AM-5: the summary counts cross-route identity from root MEMBERSHIP
+% The summary counts cross-route identity from root MEMBERSHIP
 % (roots whose discoveries span >= 2 routes; different-route discovery pairs
 % inside one root); refinement returns are never discoveries. Cold-only: 0.
 P = res.pairs;
@@ -74,9 +74,9 @@ for k = Sh.keys
     end
 end
 txt = fileread(fullfile(d, 'summary.txt'));
-% M7b amended (D-M7a-1): the summary wording has no development labels
+% the summary wording carries no development labels
 tok = regexp(txt, 'cross-route identity by root membership: (\d+) root\(s\)[^;]*; (\d+) different-route', 'tokens', 'once');
-rows = sa_check(rows, T, ['summary AM-5 membership counts = independent counts ' ...
+rows = sa_check(rows, T, ['summary membership counts = independent counts ' ...
     '(refinement pairs excluded); tolerance remains provisional; no "is met"'], ...
     ~isempty(tok) && str2double(tok{1}) == nmulti && str2double(tok{2}) == npairs && ...
     contains(txt, 'remains PROVISIONAL') && ~contains(txt, 'is met'), ...
@@ -101,7 +101,7 @@ end
 
 function [sol, info] = stub_corrector(th, guess, target, opts) %#ok<INUSD>
 k = pi / th.Lh;
-x = linspace(0, th.Lh, 2001);         % milestone 3: fine enough for the AM-3(a) residual gate
+x = linspace(0, th.Lh, 2001);         % fine enough for the residual gate
 A = target.n(:);
 Bamp = 0.2 * ones(4, 1);
 if all(target.d == 0) && guess.y(1, 1) == 2            % left type Y at the anchor

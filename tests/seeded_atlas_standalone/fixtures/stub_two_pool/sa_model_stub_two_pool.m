@@ -1,10 +1,10 @@
 function M = sa_model_stub_two_pool()
-%SA_MODEL_STUB_TWO_POOL  Test-only second model (RC-11). Never solves.
+%SA_MODEL_STUB_TWO_POOL  Test-only second model. Never solves.
 %
 %   Differs from the original model wherever shared code could hard-code it:
 %   4 fields (not 10 concentrations), 8 states (not 28), 2 pools named R and B,
-%   half domain [0, 1.5] (not [0, 0.5]), library types X and Y (not
-%   HSS/HPSS/MPSS), shifts held as bvp4c `parameters` (not states 21:24),
+%   half domain [0, 1.5] (not [0, 0.5]), library types X and Y (not the
+%   no-peak/half-peak/full-peak types HSS/HPSS/MPSS), shifts held as bvp4c `parameters` (not states 21:24),
 %   identity on 4 rows, field scale of ones. Its "library" lives in memory.
 %   State: [c1 c1' c2 c2' c3 c3' c4 c4']; ODE c_j'' = -k^2 (c_j - s_j),
 %   k = pi / Lh, s = sol.parameters.
@@ -94,7 +94,7 @@ end
 function R = solve(theta, guess, target, solver, mo, corrector) %#ok<INUSD>
 opts = struct('reltol', solver.reltol, 'abstol', solver.abstol, 'nmax', solver.nmax, ...
     'mesh_reject', solver.mesh_reject);
-% M6: the mesh trace as the real adapters do (reset before the corrector,
+% The mesh trace as the real adapters record it (reset before the corrector,
 % take after it; a stub corrector that notes nothing gives NaN)
 tok = sa_mesh_trace('reset');
 t0 = tic;
@@ -106,7 +106,7 @@ catch ME
 end
 w = toc(t0);
 tr = sa_mesh_trace('take', tok, opts.nmax);
-reason = '';   % M6 tests only: an explicit reason_m6 passes through (no other stub sets it)
+reason = '';   % an explicit reason_m6 passes through (only the mesh-trace tests set it)
 if isfield(info, 'reason_m6'), reason = info.reason_m6; end
 R = struct('sol', sol, 'opts', opts, 'warning_id', info.warning_id, 'warning_msg', '', ...
     'corrector_class', info.class, 'corrector_reason', reason, 'wall_s', w, ...
