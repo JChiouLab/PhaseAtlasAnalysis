@@ -16,9 +16,11 @@
 %      folder whose settings or parameters differ is refused (choose a new
 %      run_dir), never overwritten
 %   3. the 3-D root plot (the 3-D atlas, as in Fig. 3B), plots/roots_3d.fig, and the
-%      2-D sheets, plots/sheets_2d/<family>.fig and all_families.fig (zero solves; the
-%      root files are read one at a time, so a production run plots in
-%      about the memory of one root file plus the plotted roots)
+%      2-D sheets as PDFs in the style of Fig. 5, plots/sheets_2d/<family>.pdf and
+%      all_families.pdf, drawn by Python (post/sa_plot_sheets.py; needs numpy,
+%      matplotlib and contourpy; set the environment variable SA_PYTHON to choose
+%      the Python) (zero solves; the root files are read one at a time, so a
+%      production run plots in about the memory of one root file plus the plotted roots)
 %   4. the traces (full-model simulations) listed below; rerunning reuses every
 %      unchanged trace and integrates only new or changed entries
 % Rerunning on a completed run solves and replays nothing (steps 3-4 only).

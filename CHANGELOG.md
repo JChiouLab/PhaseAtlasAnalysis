@@ -1,12 +1,21 @@
 # Changelog
 
-## Unreleased
+## 1.0.0-rc3
 
+- **2-D sheets as PDFs in the style of Fig. 5.** `seeded_atlas_plot` (and so every run) now draws
+  `plots/sheets_2d/<sheet>.pdf` and `all_families.pdf` instead of `.fig` files. Each sheet shows the grid points with
+  a quasi-steady state, unit flux arrows from each state's sources, the nullclines and an example profile as an
+  inset. The drawing is done by Python (`post/sa_plot_sheets.py`; numpy, matplotlib, contourpy) from
+  `sheets_2d_roots.csv` and `sheets_2d.json`, which are always written. Without Python the command that draws the
+  PDFs is printed; choose the Python with `opts.python` or `SA_PYTHON`. The 3-D `roots_3d.fig` is unchanged. New
+  test `sa_t87_sheet_pdfs`.
 - **`noisy_simulations/`** (Python): the code of the Fig. 4 noisy simulations: the noise package `gef_pak_noise/`,
   the run driver `noise_driver.py` with the mass-conserving noise, the batch script, the run classifier and a test
   that reproduces the first 40 s of two stored runs exactly.
-- Documentation rewritten for readers of the paper: a "Paper ↔ code" table and a figure map in `README.md`; the
-  models in the paper's notation in `docs/MODELS.md`.
+- Documentation rewritten for readers of the paper: worked examples of the paper's three atlases, a figure map and
+  a "Paper ↔ code" appendix in `README.md`; the models in the paper's notation in `docs/MODELS.md`.
+- Run folders written by 1.0.0-rc2 or earlier cannot be resumed with this version (the software version and code
+  hashes differ); they can still be plotted, traced and used as `import_from` sources.
 
 ## 1.0.0-rc2
 

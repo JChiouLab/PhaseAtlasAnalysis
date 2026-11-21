@@ -356,7 +356,7 @@ end
 % =========================================================================
 
 function v = software_version()
-v = 'seeded_atlas_standalone/1.0.0-rc2';
+v = 'seeded_atlas_standalone/1.0.0-rc3';
 end
 
 function P = provenance()

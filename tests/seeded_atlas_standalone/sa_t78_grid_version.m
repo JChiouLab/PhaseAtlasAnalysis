@@ -10,8 +10,8 @@ rows = struct('test', {}, 'assertion', {}, 'pass', {}, 'detail', {});
 addpath(E.stub);
 d0 = sa_m3_testdir(E, 't78');
 v = sa_settings('version');
-rows = sa_check(rows, T, 'software version is seeded_atlas_standalone/1.0.0-rc2 (plain version string)', ...
-    strcmp(v, 'seeded_atlas_standalone/1.0.0-rc2'), v);
+rows = sa_check(rows, T, 'software version is seeded_atlas_standalone/1.0.0-rc3 (plain version string)', ...
+    strcmp(v, 'seeded_atlas_standalone/1.0.0-rc3'), v);
 
 % ---- the shipped script --------------------------------------------------------------------------------------
 w = fileread(fullfile(E.root, 'run_seeded_atlas.m'));

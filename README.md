@@ -18,31 +18,10 @@ Two MATLAB pipelines and one Python package:
 
 Version: see `VERSION` and `CHANGELOG.md`. Licence: see `LICENSE`.
 
-## Paper ↔ code
-
-| paper | code |
-|---|---|
-| the M. xanthus model (Eqs. 1-4, Table 1) | `guzzo_noxa` (Guzzo et al. 2018 without MglA: "noXA"); fields `Rm Rc Bm Bc` = rm rc bm bc; `Aeff` = a_eff; `KA` = Ka; `DM`, `DC` = Dm, Dc |
-| the S. pombe (fission yeast) model (Eq. 5, Table 2) | `original_polarity`; fields `u q v w p` as in the paper |
-| no-peak / half-peak / full-peak half | library families `HSS` / `HPSS` / `MPSS`; shape labels `0` / `1+` (left half) or `1-` (right half) / `2-` |
-| sheet, named left/right | family label `<left>/<right>`: `1+/0` = half-peak/no-peak, `0/1-` = no-peak/half-peak, `2-/0` = full-peak/no-peak, `2-/1-` = full-peak/half-peak, `1+/1-` = half-peak/half-peak, `0/0` = no-peak/no-peak; `1-/1+` = one peak at mid-cell |
-| quasi-steady state at a point of the plane | a *root* at a lattice *node* (grid point) |
-| starting profiles from isolated halves | the *seed library* (`branch_HSS/HPSS/MPSS_latest.mat`) |
-| sources s_L, s_R of Eq. (8) | the shifts (`sigma`, `s_GL` ...) stored in each solution; the flux J of Eq. (9) follows from them |
-| S. pombe coordinates ΔGEF/MG, ΔPAK/MP | `d_G` = ΔGEF/MG; `d_P` = ΔPAK/MG, so ΔPAK/MP = `d_P`/ρ |
-| M. xanthus coordinates ΔRomR/MR, ΔMglB/MB | `dn_R`, `dn_B` = (n_left − n_right)/(L/2), a density difference; Δn/M = `dn`/(2ρ) with ρ = `rho_R` or `rho_B` (1 in the paper) |
-| shape axis Δn2 (Eq. 10) | `dn2` = ∫₀¹ cos(2πη) m dη on the rescaled cell η = x/L, in the model's own concentration units; m = `u` (S. pombe) or `Bm` (M. xanthus) by default (`model_options.main_variable`). M. xanthus: Δn2 = L · `dn2`. S. pombe (concentrations scaled so that MG = 1): Δn2 = MG · `dn2` = 2L · `dn2` |
-| Table 2: kgg, dg, kpg, dgp, k*, kg | `a`, `b`, `c`, `d`, `e`, `f` (unrounded: `2.38/4`, `0.185`, `151.6/2`, `0.552`, `0.828`, `1`) |
-| Table 2: MG = 2L, MP = 2ρL | `M_BG = 2*L`, `M_P = 2*0.246*L`: the code uses ρ = 0.246, which Table 2 rounds to 0.25; Ashbya set ρ = 0.246/3 |
-| Table 1: kr, krb, dr | `r_speed` × `kR`, `kRB`, `dR`; Table 1 lists the products at `r_speed = 0.35` |
-| signal × f | `dba_factor` (multiplies `dBA`) |
-| full-model simulation | a *trace* (`seeded_atlas_trace`) |
-
 ## Paper figures
 
-Which computation underlies each figure. Plotting and panel-assembly scripts are **not** part of this repository:
-the nullcline contours and arrows drawn from the computed fluxes, the fixed points located from them, the two-box
-comparison of Figs. S2 and S4, and the full-model steady states and their stability by Newton's method (Fig. S4A).
+Which computation underlies each figure. The code's names for the paper's quantities are in the appendix
+("Paper ↔ code").
 
 - **Fig. 2, 2E, S2 (M. xanthus):** the planes in the paper were computed with the authors' first M. xanthus
   implementation of the same coupled boundary value problem (its 24-state form is kept here as
@@ -69,6 +48,10 @@ for M. xanthus). Other simulation set-ups are not included.
 - Toolboxes: Optimization (`fsolve`), Signal Processing (`findpeaks`) and Parallel Computing (`parfor`, `parfeval`)
   are needed only to build the S. pombe half-cell library and to run the half-cell pipeline's other stages. The
   M. xanthus library, the phase-atlas runs, plots and simulations need base MATLAB only.
+- The 2-D sheet PDFs: Python 3 with numpy, matplotlib and contourpy
+  (`src/pipelines/seeded_atlas_standalone/post/requirements_sheets.txt`). MATLAB runs `python3` from the system path;
+  set the environment variable `SA_PYTHON` to use another. Without them the runs and all other outputs are unchanged,
+  and the command that draws the PDFs later is printed.
 - `noisy_simulations/`: Python 3 (see its `requirements.txt`).
 
 ## Setup
@@ -93,8 +76,9 @@ These files are not tracked by git; no MathWorks file is in this repository. `ru
    block's comment with `res = 11;` instead of 25). When the library folder is empty the script first builds the
    half-cell library (the S. pombe build opens a parallel pool and can take an hour or more). It prints every path
    before any work.
-2. **Plot.** The run saves `plots/roots_3d.fig` (the atlas in three dimensions) and the 2-D sheets; redraw with
-   `seeded_atlas_plot(run_dir)`.
+2. **Plot.** The run saves `plots/roots_3d.fig` (the atlas in three dimensions, rotatable) and the 2-D sheets as
+   PDFs in the style of Fig. 5, `plots/sheets_2d/<sheet>.pdf` and `all_families.pdf` (existence, flux arrows,
+   nullclines and an example profile); redraw with `seeded_atlas_plot(run_dir)`.
 3. **One simulation.** A full-model simulation started from one quasi-steady state:
    `seeded_atlas_trace(run_dir, struct('name', 'T1', 'root', '<a root_id from roots_index.csv>'))`, or list it in
    the script's `traces` block.
@@ -140,7 +124,7 @@ The run takes about 1,700 solver calls and 8 minutes and finds 431 quasi-steady 
 needs base MATLAB only. The results are in
 `data/standalone_runs/guzzo_noxa_production_L6_rspeed0p35_dbafactor0p02_rhoR1_rhoB1_dnhalfrange1p8_res25_step0p15_<hash>/`:
 `roots_index.csv` lists every state with its coordinates and sheet, `plots/roots_3d.fig` is the 3-D atlas and
-`plots/sheets_2d/` holds the 2-D sheets. For the other signal levels of Fig. 2E, change `dba_factor`.
+`plots/sheets_2d/` holds the sheet PDFs. For the other signal levels of Fig. 2E, change `dba_factor`.
 
 ### Example 2: a large atlas with simulations (S. pombe, L = 7, Fig. 3, S3, S4)
 
@@ -291,3 +275,23 @@ simulations.
 
 Pipeline and documentation: J.-G. Chiou, with AI assistance as declared in the paper. Reduced M. xanthus model and
 its reference script `Guzzo_noXA.m`: W.-H. Wang. Noise package `gef_pak_noise`: C. Hinds.
+
+## Appendix: paper ↔ code
+
+| paper | code |
+|---|---|
+| the M. xanthus model (Eqs. 1-4, Table 1) | `guzzo_noxa` (Guzzo et al. 2018 without MglA: "noXA"); fields `Rm Rc Bm Bc` = rm rc bm bc; `Aeff` = a_eff; `KA` = Ka; `DM`, `DC` = Dm, Dc |
+| the S. pombe (fission yeast) model (Eq. 5, Table 2) | `original_polarity`; fields `u q v w p` as in the paper |
+| no-peak / half-peak / full-peak half | library families `HSS` / `HPSS` / `MPSS`; shape labels `0` / `1+` (left half) or `1-` (right half) / `2-` |
+| sheet, named left/right | family label `<left>/<right>`: `1+/0` = half-peak/no-peak, `0/1-` = no-peak/half-peak, `2-/0` = full-peak/no-peak, `2-/1-` = full-peak/half-peak, `1+/1-` = half-peak/half-peak, `0/0` = no-peak/no-peak; `1-/1+` = one peak at mid-cell |
+| quasi-steady state at a point of the plane | a *root* at a lattice *node* (grid point) |
+| starting profiles from isolated halves | the *seed library* (`branch_HSS/HPSS/MPSS_latest.mat`) |
+| sources s_L, s_R of Eq. (8) | the shifts (`sigma`, `s_GL` ...) stored in each solution; the flux J of Eq. (9) follows from them |
+| S. pombe coordinates ΔGEF/MG, ΔPAK/MP | `d_G` = ΔGEF/MG; `d_P` = ΔPAK/MG, so ΔPAK/MP = `d_P`/ρ |
+| M. xanthus coordinates ΔRomR/MR, ΔMglB/MB | `dn_R`, `dn_B` = (n_left − n_right)/(L/2), a density difference; Δn/M = `dn`/(2ρ) with ρ = `rho_R` or `rho_B` (1 in the paper) |
+| shape axis Δn2 (Eq. 10) | `dn2` = ∫₀¹ cos(2πη) m dη on the rescaled cell η = x/L, in the model's own concentration units; m = `u` (S. pombe) or `Bm` (M. xanthus) by default (`model_options.main_variable`). M. xanthus: Δn2 = L · `dn2`. S. pombe (concentrations scaled so that MG = 1): Δn2 = MG · `dn2` = 2L · `dn2` |
+| Table 2: kgg, dg, kpg, dgp, k*, kg | `a`, `b`, `c`, `d`, `e`, `f` (unrounded: `2.38/4`, `0.185`, `151.6/2`, `0.552`, `0.828`, `1`) |
+| Table 2: MG = 2L, MP = 2ρL | `M_BG = 2*L`, `M_P = 2*0.246*L`: the code uses ρ = 0.246, which Table 2 rounds to 0.25; Ashbya set ρ = 0.246/3 |
+| Table 1: kr, krb, dr | `r_speed` × `kR`, `kRB`, `dR`; Table 1 lists the products at `r_speed = 0.35` |
+| signal × f | `dba_factor` (multiplies `dBA`) |
+| full-model simulation | a *trace* (`seeded_atlas_trace`) |

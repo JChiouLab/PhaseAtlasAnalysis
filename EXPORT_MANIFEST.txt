@@ -1,17 +1,17 @@
 # EXPORT_MANIFEST: file list of this repository with SHA-256 checksums (version: see VERSION).
 # Most files were exported from the authors' development repository; files written only for this repository are marked.
 # columns: sha256  bytes  path  origin
-# 213 files (EXPORT_MANIFEST.txt itself not listed)
+# 216 files (EXPORT_MANIFEST.txt itself not listed)
 705fd4d6451a31d36b3df7de96f83f30ac976c9b4a6d1e51671d8e2f33e2d0da  8  .gitattributes  written for this repository
 e83168b890b3ad27143b29207c33a1007931b2174db5befe78d756fe0d860ddb  307  .gitignore  written for this repository
-a6edbc158e3b024244ca98553b298ff34c6a930ba83f1dc2c09755d9bb7f2339  2105  CHANGELOG.md  written for this repository
+abc739aead4dd9c07514c388b9541a92966f72b4470f3dbf38ae2490deb99603  3037  CHANGELOG.md  written for this repository
 719784e14e8e08ddc55afbab2e7a4ee7c890ad3e6a0f1019e5caaf74d7580a87  317  LICENSE  written for this repository
-28d8177608dd7d0aed7230709b0e06c6cbc96eefb06f6b588db85f95cd248d55  19733  README.md  written for this repository
-01c0f7d03b9babc6fef8d759c4202fdd1b0235a589c798e3b8e37accb06ad5ce  10  VERSION  written for this repository
+019c98e1156a2583cd78bdd54958554fcbded5bdcbb5b6e094083ce00ede09a4  20044  README.md  written for this repository
+a0b84d2f768d5b8ee3badb9ab623a95938e7ae273cf4cba611f219eb34fcd287  10  VERSION  written for this repository
 b482ca72f646978edceee79b0eb1d191646a0a9935f893a6270f89eda9d57c07  6786  docs/MODELS.md  written for this repository
 666fbdea3992b4832f08fc76fb9eccc3107fb788452fcd937e67823cfd858319  4528  docs/SPEC.md  written for this repository
 4b2078f7998309c72ff93d157850bc436825eec48c995854624714457cf9c214  19897  docs/UNCOUPLED_GUIDE.md  written for this repository
-5e3f271cf61df3194f6d97c031288010b46708d074feb687b8010df1a40f0ac7  47293  docs/USER_GUIDE.md  written for this repository
+3d96784e2eb336e0d7fe16a62dbf4c79f05b6452aebf67da2e12ebf3d59a2427  48319  docs/USER_GUIDE.md  written for this repository
 263203f4de98e2cbaf30ea797c55b6f63b8af89880ed2991bd2b6ca7fbd72c99  4561  noisy_simulations/README.md  written for this repository
 b5836aed5dc982fb39387864d50803b8e1385182d84e555449745747973af012  6496  noisy_simulations/analyze_runs.py  written for this repository
 a58ca5ab8a6c347a44d3530e200f2e25a34556f4106816816bf3385ee19be31c  93  noisy_simulations/gef_pak_noise/__init__.py  written for this repository
@@ -26,7 +26,7 @@ e0b6511997d726600913903bc01caa6d3f81623568f910b39e16b37de229f2db  28  noisy_simu
 5bd0b3291d3cdff36fa7bd6796dbf436cccedca7e0e3a852a7483877cb85fc10  41835  noisy_simulations/tests/reference_first40s.npz  written for this repository
 c033b68fcb8519e2119d0bdfe200e84364c0363d5bc490ff5837b4c2e6143710  1772  noisy_simulations/tests/test_reproduce.py  written for this repository
 9860c1719628554fff5ec61000df7db6074fa87c2ae201653f5f99a3fbe3a906  26393  run_atlas_surface_pipeline.m  exported
-49653e1b31d3172df04ce46f4ee49c534cec7682b9b6235f4b5214dc2b7a2c76  13749  run_seeded_atlas.m  exported
+ba4a0fb3f00a8b4e769285edb2a4952cc00fdaf720701af80be25255117069ed  13936  run_seeded_atlas.m  exported
 7a13a48c474bf5d60b68f71c51436bba3bd53b6bdc7eb0f2c0563aea259e029c  3912  setup_atlas.m  exported
 a4236f08af84bf5dc8539279039883f5f967aa958885b537a38c53542e5d0ade  967  src/models/guzzo_noxa/gnx_jacobian.m  exported
 9fae560a93894d3d88b616ebd1f528553e3f87f0dbb6062bda56dd733de29186  6370  src/models/guzzo_noxa/gnx_model.m  exported
@@ -54,11 +54,13 @@ a1af9c52a3e040f38b15b5c7c55329c446383b47770dbd5323924011bfc41a25  2309  src/pipe
 bfd3f61ad4c7e95e9ab0c4a6f7633b6fcf4ea21eaaf41a7ae91a1e8fe6589f67  7122  src/pipelines/seeded_atlas_standalone/models/original_polarity/sap_seed_shape.m  exported
 60333efe24923b62f383d5e0f1044de26fdc574faa7e1dce2dd50f5a5898d0c5  3309  src/pipelines/seeded_atlas_standalone/models/original_polarity/sap_solve.m  exported
 c35341ca7cd8bb557a5fab1139cd3193bda02ed33332d47173b5bd3a7f5a943a  12868  src/pipelines/seeded_atlas_standalone/post/guzzo_noxa/Guzzo_noXA.m  exported
-fa4eec382f8c315ebf931a4b928cb71935b9c172dd62716988806213607c0b55  7153  src/pipelines/seeded_atlas_standalone/post/guzzo_noxa/sag_post.m  exported
+9f5961d2dad4bbe53d99ef8352cd615aa2a1a33139539efd1c158d61a4fd2b7e  7358  src/pipelines/seeded_atlas_standalone/post/guzzo_noxa/sag_post.m  exported
 2246f2fdd9fe18face4624121f2f23d3a4657c9e08c9a6157fe53bfeda7acd5f  4383  src/pipelines/seeded_atlas_standalone/post/original_polarity/fpeq_model.m  exported
-e58871b010251507581775bfa4d9c753d1352cf14ed607d333909f9ccc7c68ad  7640  src/pipelines/seeded_atlas_standalone/post/original_polarity/sap_post.m  exported
+e8485eb5a58c0d8d71b421145c357430ed4cfe85a8bfd1726b4f29d66485b750  7812  src/pipelines/seeded_atlas_standalone/post/original_polarity/sap_post.m  exported
 23bba18dd8b3ee694cb7afef1c10579ba47ffbb841371235d3366aff1e562e8c  1643  src/pipelines/seeded_atlas_standalone/post/original_polarity/sca_v_obs.m  exported
+ea1ac5a46251013a8255bf2557aae718c14ffb2b1a1244519afdaecda05d2c3f  43  src/pipelines/seeded_atlas_standalone/post/requirements_sheets.txt  written for this repository
 9b664d1ada5343cc7d9720ec0321744826f19da25185cc4849926f886586721d  3035  src/pipelines/seeded_atlas_standalone/post/sa_code_digest.m  exported
+ee7d9e913ab8fdc654eb2750b63760b2b7577050de880f60a65bd6b66ef7d3be  11105  src/pipelines/seeded_atlas_standalone/post/sa_plot_sheets.py  written for this repository
 37adf0acad4fb376dab5bb8093c64aaf4e37afe81503c5dff6febbd185acb4f7  6849  src/pipelines/seeded_atlas_standalone/post/sa_post_model.m  exported
 eeb2fc22da1d87999dc1fc1e72234195dd276d22d27e70fa25bd7867a918a2c8  663  src/pipelines/seeded_atlas_standalone/private/deval.m  exported
 6a91ced23dc3d3187ba695fe381513ba5e7732d0da7b539002cc45732c45accc  38326  src/pipelines/seeded_atlas_standalone/sa_continuation.m  exported
@@ -86,7 +88,7 @@ ef84093e3cc00e0d953b965ffc032d62b44443b20c9f0d1940350270894b7ae4  20727  src/pip
 835f8e6661245710a0e7cae9644c5e4345c1796b1485053747850e11c8928449  29431  src/pipelines/seeded_atlas_standalone/sa_search.m  exported
 534f58922578b160fcb8485b6cc71a805c11ca17b15d68ac73d26cfc835b408a  7545  src/pipelines/seeded_atlas_standalone/sa_seed_modes.m  exported
 6242cc4e0251bcc53c2b20cd98431f122a4640ad206887169f5c5fe17f00330c  3266  src/pipelines/seeded_atlas_standalone/sa_seedability.m  exported
-5786f8a8b0d3d4180830d58c3f0c0268d65489f9b8bbfc5629097ad36608ebf1  64334  src/pipelines/seeded_atlas_standalone/sa_settings.m  exported
+05b848db91b40d3f41441cc74ba66d440bcca9820edf76060923e876fe5b60d2  64334  src/pipelines/seeded_atlas_standalone/sa_settings.m  exported
 42c72f411c39d7af6b0bbc4d25ffe3415e22e0c46e6231618cdcfb7171d6d89d  569  src/pipelines/seeded_atlas_standalone/sa_sha256.m  exported
 655b06cf16f7285571e6b306f29e8501d761c1790fd1c2dc649da42c6cb88f72  18720  src/pipelines/seeded_atlas_standalone/sa_store_io.m  exported
 add2b0e4445dd441add8262cd49f13ebe6df195af1270daa01d9f89fac2b36ab  10770  src/pipelines/seeded_atlas_standalone/sa_targets.m  exported
@@ -94,7 +96,7 @@ add2b0e4445dd441add8262cd49f13ebe6df195af1270daa01d9f89fac2b36ab  10770  src/pip
 a9094aabc1d21793bd6c382039bd55ebfb3fd324c17fe7868d6c047c42317c8c  1232  src/pipelines/seeded_atlas_standalone/sa_write.m  exported
 3b1bf4498f247255ad3f98e66247cdc993e8abfad2d8a87894c42f6118d6d801  9331  src/pipelines/seeded_atlas_standalone/seeded_atlas_compact.m  exported
 571c9b6c79031ea2fffb7a05a89f0d5855ee0e6015ea4eaa388b48c418f62f7c  9502  src/pipelines/seeded_atlas_standalone/seeded_atlas_compare.m  exported
-82d2d97de5fa1062849d6a02576a9ca788eddf528ac327dae4c309e0c70cf987  23110  src/pipelines/seeded_atlas_standalone/seeded_atlas_plot.m  exported
+6883dcb5599054d1b0078748bb56707544b220a1d5cc35012dc9d30934cd173b  27798  src/pipelines/seeded_atlas_standalone/seeded_atlas_plot.m  exported
 2baa723bae10d5d073c0cc974ec8c4e3b98f8afde0e2b64547bd140da90c4200  7071  src/pipelines/seeded_atlas_standalone/seeded_atlas_roots.m  exported
 ab048d47711d4449aa7bbb811ed6c23efa2246ffd97175e86deefae6ab2a2548  26084  src/pipelines/seeded_atlas_standalone/seeded_atlas_run.m  exported
 05013a7c313847e1c93d56fc769642714b8af1ce7028a9d71281e45713a7c4f9  17251  src/pipelines/seeded_atlas_standalone/seeded_atlas_trace.m  exported
@@ -152,7 +154,7 @@ d31b2d44dfab5b3e12e2d6141f4cbb9a017cb50c2b090e5d96f334802540b93e  332  src/solve
 af32962a8ce576aaa189990b1eff672b491f7d0e8ab533744f0881c422d8e47e  597  tests/seeded_atlas_standalone/fixtures/stub_two_pool/sa_model_stub_asym.m  exported
 0bf7e72fc41228c22e187023c3580bb079e4609419a98adf9ae6a7081bc99a61  5161  tests/seeded_atlas_standalone/fixtures/stub_two_pool/sa_model_stub_two_pool.m  exported
 7d07a9910b48e9459205b5213656ab323f40b9b8666be256d98991d4da4aa21e  2351  tests/seeded_atlas_standalone/fixtures/stub_two_pool/sa_post_stub_two_pool.m  exported
-21ed2c85e0d9444850c0cc72712a95ca8775aed2adc07556e01e07def375fc94  4775  tests/seeded_atlas_standalone/run_portable_tests.m  exported
+bde36f9117934955e6e23e0adb1faf3c57b986b7f093671456a48653e0ab0528  4796  tests/seeded_atlas_standalone/run_portable_tests.m  exported
 425d7d328f6c90ffeff2ad70fb9a33cd4871cc088ec9baede276c2874831f041  276  tests/seeded_atlas_standalone/sa_check.m  exported
 4ca7951435a2d47140c5931a8aaac17dfbabd26781c68cd83d260dc006826485  6067  tests/seeded_atlas_standalone/sa_m3_equiv.m  exported
 25347eeaf0ec6c4eaf02a0e8564d355ba5f719cbb75d1a96472ee52401e4a461  822  tests/seeded_atlas_standalone/sa_m3_mc_run.m  exported
@@ -198,13 +200,14 @@ affb910e1c980084e79375728fdfac72612e19d3fd854e21609ac2d11132895a  10022  tests/s
 9ee5f9ca47a61f93288becf705c7194a5182244ebb5e403592c5cd7680fe270d  12047  tests/seeded_atlas_standalone/sa_t71_traces.m  exported
 0b474457952c986a8c517ba3cefc6a67cdfcf4bc0d8d6425ea7b5b2e3532418a  9635  tests/seeded_atlas_standalone/sa_t76_screen.m  exported
 eb019fd40e536da240306027c1dc95a945e3a6214133ee8dc5203c9e2bd88a35  7835  tests/seeded_atlas_standalone/sa_t77_trace_at.m  exported
-4f53cf241711784f8d5e1f91bce7791a9dd1fc278beaa882ab1033f730fad744  8760  tests/seeded_atlas_standalone/sa_t78_grid_version.m  exported
+57869ee50cb9dac0e4b3bc38d8ae8d78ee2ef6037ca5eddc14040a8b12e94f5d  8760  tests/seeded_atlas_standalone/sa_t78_grid_version.m  exported
 929e7173901778ebc2b59e904d3d5fc3c4f5587e653250a741c77b23fde2bf44  8442  tests/seeded_atlas_standalone/sa_t79_name_roots.m  exported
 497d1fee2e23057415aa88be2e394edd8036e7bea61e659ee395186693387e39  7562  tests/seeded_atlas_standalone/sa_t80_render_cache.m  exported
 d733d2d8143b7361b8accbbfed68862101e03ff24e2a49876791c18534e294be  8674  tests/seeded_atlas_standalone/sa_t81_shard_repair.m  exported
 ff648b5893d9b65fdcf9590f81d37edf342615d1e332351d01ebce185e03140c  15807  tests/seeded_atlas_standalone/sa_t82_tmp_files.m  exported
 70f4e4572882b5181ff482304a70c3eb44fb75635d7b8eb050a79e5b89ee81fd  14367  tests/seeded_atlas_standalone/sa_t83_start_lookups.m  exported
 7a9cd3b9e9a08011b408f9115d04a67129e7c82969c805de64c91fa3edd13ded  6924  tests/seeded_atlas_standalone/sa_t86_wrapper_root.m  exported
+59a569e4a291089f6dbb8476b13be128f8d53ef71dc76fdd323e5ddf49f03f98  3160  tests/seeded_atlas_standalone/sa_t87_sheet_pdfs.m  written for this repository
 9f265862dffe20cdca34ee00e518c819e175e65069075b0247f527c12c2337ac  2388  tests/seeded_atlas_standalone/sa_test_env.m  exported
 bd41b2c421436d00663503fdfc1dafa5ce597aeacf8d842d7f8b1c92d98785a7  10850  tests/seeded_atlas_standalone/sag_compare_runs.m  exported
 82b76a8568bcd4f41d7630f287fe728bf0481e69a4f12f9d09d6703f0c2072e9  2738  tests/seeded_atlas_standalone/sag_myxo_compare.m  exported

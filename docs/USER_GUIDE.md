@@ -281,7 +281,7 @@ lost; 7 identity and multiplicity; 8 the production projection (calls, MATLAB-ho
 <run_dir>/
   README.txt  summary.txt  roots_index.csv  attempts.csv  settings_effective.txt  [pilot_report.txt]
   plots/      roots_3d.fig, roots_3d.csv, roots_3d_key.mat
-              sheets_2d/<family>.fig, all_families.fig, sheets_2d_key.mat
+              sheets_2d/<family>.pdf, all_families.pdf, sheets_2d_roots.csv, sheets_2d.json, sheets_2d_key.mat
               (relabelled copies: roots_3d_mv-<variable>.*, sheets_2d_mv-<variable>/)
   traces/     <name>/trace.mat, roots_3d_trace.fig, trace_summary.txt, roots_3d_trace_key.mat
   compare/    (after seeded_atlas_compare)
@@ -334,9 +334,17 @@ lost; 7 identity and multiplicity; 8 the production projection (calls, MATLAB-ho
 - **Plot.** `plots/roots_3d.fig` (open with `openfig`; rotate with the figure toolbar): one colour per family, the two
   plane coordinates plus `dn2` = ∫₀¹ cos(2πη) m dη of the main variable m (S. pombe `d_G`, `d_P`, `dn2`, with the
   view and axis stretch of Fig. 3B; M. xanthus `dn_R`, `dn_B`, `dn2`). The conversion to the paper's axes is in the
-  README's "Paper ↔ code" table. `plots/sheets_2d/` holds the same roots in the plane: one `<family>.fig` per family
-  and `all_families.fig` with all of them. File names spell `+` as `p`, `-` as `m` and `/` as `_` (`1+/0` →
-  `1p_0.fig`). Colours are fixed per label (`1+/0` blue, `0/1-` orange, `0/0` teal, as in Fig. 3A). Coordinates are
+  table in the README's appendix ("Paper ↔ code"). `plots/sheets_2d/` holds the sheets in the plane as PDFs, drawn as in Fig. 5: one
+  `<family>.pdf` per family and `all_families.pdf` with all of them. Each shows the grid points with a root (darker
+  where several roots of the sheet share a point), unit arrows of the flux (from each root's sources: S. pombe
+  −`s_GL`, −`s_PL`; M. xanthus the recorded `velocity_R_slope`, `velocity_B_slope`; at a point with several roots,
+  the one with the highest `dn2`), the nullclines (solid: the second coordinate's rate is zero, dashed: the
+  first's) and, as an inset, the main variable's profile at one grid point of the sheet (circled). File names spell
+  `+` as `p`, `-` as `m` and `/` as `_` (`1+/0` → `1p_0.pdf`). The PDFs are drawn by Python
+  (`post/sa_plot_sheets.py`, packages in `post/requirements_sheets.txt`) from `sheets_2d_roots.csv` (one row per
+  root: grid point, coordinates, `dn2`, flux) and `sheets_2d.json`, which the plot writes first. When Python or a
+  package is missing, the two files are still written and the command that draws the PDFs is printed; choose the
+  Python with `struct('python', '/path/to/python3')` or the environment variable `SA_PYTHON`. Colours are fixed per label (`1+/0` blue, `0/1-` orange, `0/0` teal, as in Fig. 3A). Coordinates are
   computed from each root's stored profile; `plots/roots_3d.csv` holds them. The plot is a display, not evidence: it
   reads the root files without re-verifying them and makes no solve.
   `seeded_atlas_plot(run_dir)` redraws the plots when the roots or the plot code changed; `struct('verify', true)`

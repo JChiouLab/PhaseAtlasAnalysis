@@ -1,16 +1,23 @@
 function out = seeded_atlas_plot(run_dir, opts)
-%SEEDED_ATLAS_PLOT  The root plots of a run folder: a rotatable 3-D .fig and 2-D sheets.
+%SEEDED_ATLAS_PLOT  The root plots of a run folder: a rotatable 3-D .fig and the 2-D sheets as PDFs.
 %
 %   out = SEEDED_ATLAS_PLOT(run_dir)
 %   out = SEEDED_ATLAS_PLOT(run_dir, opts)
 %
 %   Writes <run_dir>/plots/roots_3d.fig and roots_3d.csv (or into opts.out), and
 %   the redraw key roots_3d_key.mat beside them (a trace figure: the .fig and
-%   its key only); and the 2-D sheets plots/sheets_2d/<family>.fig (one per
+%   its key only); and the 2-D sheets plots/sheets_2d/<family>.pdf (one per
 %   observed family; the file name is sa_mode_name 'file_tag' of the
-%   family: '+' -> p, '-' -> m, '/' -> _, so 1+/0 is 1p_0.fig and 2-/1- is
-%   2m_1m.fig) and plots/sheets_2d/all_families.fig (every family
-%   overlaid, with a legend), with their key sheets_2d_key.mat.
+%   family: '+' -> p, '-' -> m, '/' -> _, so 1+/0 is 1p_0.pdf and 2-/1- is
+%   2m_1m.pdf) and plots/sheets_2d/all_families.pdf (every family on one
+%   plane, with a legend), with their key sheets_2d_key.mat. The sheets are
+%   drawn in the style of the paper's Fig. 5 by post/sa_plot_sheets.py
+%   (Python 3 with numpy, matplotlib and contourpy) from
+%   sheets_2d_roots.csv and sheets_2d.json, which are written first: the
+%   grid points with a root, unit flux arrows from each root's recorded
+%   sources (the post module's velocity records), the nullclines (zero
+%   contours of the two flux components) and one example profile per sheet
+%   as an inset.
 %   Zero solves, no deval: roots come from seeded_atlas_roots (decoded
 %   shards, read one at a time; opts.verify = true re-derives every verdict
 %   first), loaded once for the 3-D plot and the sheets. Each root's
@@ -56,12 +63,11 @@ function out = seeded_atlas_plot(run_dir, opts)
 %   and edge alpha 0.5) so overlapping sheets show, colours fixed per family
 %   name; legend 'FAMILY (n)'. 3-D: view(50, 18) (= matplotlib elevation 18,
 %   azimuth -40, in the display frame); orthographic, no grid, no box;
-%   fission yeast uses the Fig. 3B stretch dG : 3.6 dP : 1.4 dn2. 2-D sheets:
-%   the phase plane (the 3-D plot's x and y, the same stretch). The
-%   titles give the run folder, the software version, the root count, the
-%   main variable and PARTIAL RUN (<stop reason>) unless the run completed.
-%   Saved with savefig only (no raster or PDF export); each figure is built
-%   invisible with a CreateFcn that shows it on openfig.
+%   fission yeast uses the Fig. 3B stretch dG : 3.6 dP : 1.4 dn2. The
+%   titles (the sheets: a footnote) give the run folder, the software
+%   version, the root count, the main variable and PARTIAL RUN (<stop
+%   reason>) unless the run completed. The 3-D figure is saved with savefig
+%   only; it is built invisible with a CreateFcn that shows it on openfig.
 %
 %   opts
 %     verify   false (default) | true    seeded_atlas_roots verification
@@ -71,6 +77,10 @@ function out = seeded_atlas_plot(run_dir, opts)
 %     main_variable  '' (default: the run's own) | a '+'-sum of the model's
 %              fields: relabel for plotting (above)
 %     sheets   true (default without a trace) | false: the 2-D sheets
+%     python   the Python that draws the sheet PDFs (default: the environment
+%              variable SA_PYTHON, else python3 on the system path). Without
+%              it the sheets' CSV and JSON are written and the command that
+%              draws them is printed
 %     trace    a trace.mat file: overlay the trace (line, start circle, end
 %              square); default file name roots_3d_trace; no sheets
 %     file     output file name without extension (default roots_3d)
@@ -82,14 +92,15 @@ function out = seeded_atlas_plot(run_dir, opts)
 %   gap_max (1 x 2), label, main_variable, relabelled, sheets (the sheet
 %   files), sheets_redrawn.
 %
-%   Data tips: clicking a root in any figure shows two rows, "at" (the
+%   Data tips: clicking a root in the 3-D figure shows two rows, "at" (the
 %   root's plotted 3-D coordinates as [x y z], ready to paste into a trace
 %   entry's at field) and "root" (its root_id).
 %
 %   The figure keys (plots/<file>_key.mat, sheets_2d/sheets_2d_key.mat): the
 %   root set (SHA-256 of every shard), the plot code digest
 %   (seeded_atlas_plot.m and the model's post/ files, comment-free tokens;
-%   relabelled: also the model module), the main variable, the relabel
+%   relabelled: also the model module; and the SHA-256 of
+%   post/sa_plot_sheets.py), the main variable, the relabel
 %   options, the trace key (when overlaid) and the options; a figure set is
 %   redrawn when any part changed or one of its files is missing.
 
@@ -137,10 +148,13 @@ if ~isempty(V.note), fprintf('%s\n', V.note); end
 sh = sa_store_io('shard_files', D);              % skips sa_write temporary files
 names = sort({sh.name});
 shas = cellfun(@(n) sa_sha256(fullfile(D, 'roots', n)), names, 'UniformOutput', false);
+py = getf(opts, 'python', getenv('SA_PYTHON'));
+if isempty(py), py = 'python3'; end
 key = struct('roots', {[names; shas]}, ...
     'code', sa_code_digest('files', [{fullfile(here, 'seeded_atlas_plot.m')}, P.files, V.files]), ...
     'verify', logical(verify), 'nx', nx, 'trace', struct(), 'software_version', sa_settings('version'), ...
-    'main_variable', V.text, 'relabel', V.relabel, 'relabel_options', V.mo);
+    'main_variable', V.text, 'relabel', V.relabel, 'relabel_options', V.mo, ...
+    'sheet_script', sa_sha256(fullfile(here, 'post', 'sa_plot_sheets.py')));
 if ~isempty(trace_file)
     Zt = load(trace_file, 'key');
     key.trace = Zt.key;
@@ -249,9 +263,9 @@ if need3
 end
 
 if needS
-    out.sheets = draw_sheets(sheets_dir, skeyf, key, C, R, fam, P, tt, ud);
-    out.sheets_redrawn = true;
-    fprintf('sheets %s: %d files\n', sheets_dir, numel(out.sheets));
+    [out.sheets, okS] = draw_sheets(sheets_dir, skeyf, key, R, lat, C, fam, P, E, D, nx, tt, stop, py);
+    out.sheets_redrawn = okS;
+    if okS, fprintf('sheets %s: %d PDF files\n', sheets_dir, numel(out.sheets)); else, out.sheets = {}; end
 end
 out.n_roots = n; out.gap_max = gap_max; out.label = label;
 out.coord = C; out.family = fam; out.root_id = {R.root_id};
@@ -375,16 +389,24 @@ for f = 1:numel(order)
 end
 end
 
-function files = draw_sheets(sd, skeyf, key, C, R, fam, P, tt, ud)
-% The 2-D sheets: one figure per observed family and one with all of them,
-% in the phase plane (the 3-D plot's x and y, its stretch). Sheet
-% files of an earlier drawing that are no longer drawn are removed. The key
-% file stores base names only, resolved against sd, so a copied run folder
-% never reads or deletes the original folder's sheets.
+function [files, ok] = draw_sheets(sd, skeyf, key, R, lat, C, fam, P, E, D, nx, tt, stop, py)
+% The 2-D sheets as PDF files, one per observed family and one with all of
+% them (post/sa_plot_sheets.py, the style of the paper's Fig. 5). Writes the
+% script's inputs into sd: sheets_2d_roots.csv (one row per root: family,
+% grid indices and lattice coordinates in plot order, dn2 and the flux vx,
+% vy read from the representative attempt's recorded sources, P.velocity;
+% NaN when the model records none) and sheets_2d.json (lattice, labels,
+% colours and one example profile per family, the inset). Then runs
+% <py> sa_plot_sheets.py sd. When Python or its packages are missing, the
+% inputs stay, the command is printed and ok is false (no key is written,
+% so the next call tries again). Sheet files of an earlier drawing that are
+% no longer drawn (including the .fig sheets of older versions) are
+% removed. The key file stores base names only, resolved against sd, so a
+% copied run folder never reads or deletes the original folder's sheets.
 if exist(sd, 'dir') ~= 7, mkdir(sd); end
 order = P.family_order(unique(fam));
 names = [order, {'all_families'}];
-base = cellfun(@(f) [sa_mode_name('file_tag', f) '.fig'], names, 'UniformOutput', false);
+base = cellfun(@(f) [sa_mode_name('file_tag', f) '.pdf'], names, 'UniformOutput', false);
 files = cellfun(@(f) fullfile(sd, f), base, 'UniformOutput', false);
 if exist(skeyf, 'file') == 2
     try
@@ -397,25 +419,87 @@ if exist(skeyf, 'file') == 2
     catch
     end
 end
-ok = all(isfinite(C(:, 1:2)), 2);
-a = [1 1 1];
-if any(ok), a = P.aspect(C(ok, :)); end
-for k = 1:numel(names)
-    if strcmp(names{k}, 'all_families'), m = true(size(fam)); what = 'all families';
-    else, m = strcmp(fam, names{k}); what = names{k};
+n = numel(R);
+ax = P.lattice_axes;
+% ---- the flux of every root, from its representative attempt's records ----
+V2 = nan(n, 2);
+if isfield(P, 'velocity')
+    for k = 1:n
+        Z = load(fullfile(D, 'attempts', [R(k).representative_attempt_id '.mat']), 'validity');
+        nm = {Z.validity.checks.name};
+        for c = 1:2
+            j = find(strcmp(nm, P.velocity.records{c}), 1);
+            if ~isempty(j), V2(k, c) = P.velocity.sign * Z.validity.checks(j).value; end
+        end
     end
-    [fig, ax, h, leg] = family_figure(C(m, :), R(m), fam(m), P, 2);
-    if ~isempty(h), legend(ax, h, leg, 'Location', 'northeastoutside', 'Interpreter', 'none'); end
-    xlabel(ax, P.coord_labels{1}); ylabel(ax, P.coord_labels{2});
-    grid(ax, 'off'); box(ax, 'on');
-    set(ax, 'DataAspectRatio', [a(1) a(2) 1]);
-    title(ax, sprintf('%s | sheet: %s', tt, what), 'Interpreter', 'none', 'FontWeight', 'normal', 'FontSize', 9);
-    ud.sheet = what;
-    fig.UserData = ud;
-    savefig(fig, files{k});
-    close(fig);
 end
-sa_write('mat', skeyf, struct('key', key, 'files', {base}));
+lines = {'root_id,family,ix,iy,x,y,dn2,vx,vy'};
+for k = 1:n
+    lines{end+1} = sprintf('"%s",%s,%d,%d,%.17g,%.17g,%.17g,%.17g,%.17g', R(k).root_id, fam{k}, ...
+        R(k).index(ax(1)), R(k).index(ax(2)), lat(k, :), C(k, 3), V2(k, :)); %#ok<AGROW>
+end
+sa_write('text', fullfile(sd, 'sheets_2d_roots.csv'), [strjoin(lines, newline) newline]);
+% ---- the inset of every family: the Fig. 5 rule --------------------------------
+% the grid point nearest (centroid + 0.15 x the extent along the principal
+% axis, towards +x), in coordinates scaled by the lattice's span on each
+% axis; there, the root with the highest dn2
+Lat = E.lattice;
+steps = Lat.steps(ax); imin = Lat.index_min(ax); imax = Lat.index_max(ax);
+span = (imax - imin + 1) .* steps;
+L = NaN;
+if isfield(E.parameters, 'L'), L = E.parameters.L; end
+insets = containers.Map('KeyType', 'char', 'ValueType', 'any');
+if isfield(P, 'main_variable') && isfinite(L)
+    mv = sa_main_variable('parse', P.main_variable, P.field_names, 'main_variable');
+    for f = 1:numel(order)
+        m = find(strcmp(fam, order{f}));
+        X = lat(m, :) ./ span;
+        c = mean(X, 1);
+        if numel(m) >= 2
+            [W, ev] = eig(cov(X - c));
+            [~, i] = max(diag(ev)); v = W(:, i).';
+            if v(1) < 0 || (v(1) == 0 && v(2) < 0), v = -v; end
+            pr = (X - c) * v.';
+            tgt = c + 0.15 * (max(pr) - min(pr)) * v;
+        else
+            tgt = c;
+        end
+        d = hypot(X(:, 1) - tgt(1), X(:, 2) - tgt(2));
+        near = m(d <= min(d) + 1e-12);
+        [~, i] = max(C(near, 3)); r = near(i);
+        Y = R(r).representative_profile;
+        F = P.full_profile(E.theta, R(r).comparison_mesh, Y(P.profile_rows(1, :), :), Y(P.profile_rows(2, :), :), nx);
+        insets(order{f}) = struct('root_id', R(r).root_id, 'at', lat(r, :), 'x', F.eta(:).' * L, ...
+            'm', sa_main_variable('sum', F.Y, mv.index));
+    end
+end
+cols = containers.Map('KeyType', 'char', 'ValueType', 'any');
+fn = containers.Map('KeyType', 'char', 'ValueType', 'any');
+for f = 1:numel(order)
+    cols(order{f}) = sprintf('#%02x%02x%02x', round(255 * P.family_colour(order{f})));
+    fn(order{f}) = base{f};
+end
+fn('all_families') = base{end};
+mvt = '';
+if isfield(P, 'main_variable'), mvt = P.main_variable; end
+meta = struct('title', tt, 'version', sa_settings('version'), 'stop_reason', stop, ...
+    'labels', {P.coord_labels(1:2)}, 'main_variable', mvt, 'L', L, 'step', steps, ...
+    'anchor', Lat.anchor(ax), 'index_min', imin, 'index_max', imax, 'order', {order}, ...
+    'colours', cols, 'files', fn, 'insets', insets);
+sa_write('text', fullfile(sd, 'sheets_2d.json'), jsonencode(meta, 'PrettyPrint', true));
+% ---- draw ----------------------------------------------------------------------------
+script = fullfile(fileparts(mfilename('fullpath')), 'post', 'sa_plot_sheets.py');
+cmd = sprintf('"%s" "%s" "%s"', py, script, sd);
+[st, msg] = system(cmd);
+ok = st == 0 && all(cellfun(@(p) exist(p, 'file') == 2, files));
+if ok
+    sa_write('mat', skeyf, struct('key', key, 'files', {base}));
+else
+    fprintf(['sheets %s: the PDFs were not drawn (%s). Their inputs are written; with Python 3 and ' ...
+        'numpy, matplotlib and contourpy installed (requirements_sheets.txt), run\n  %s\nor pass ' ...
+        'opts.python (or set the environment variable SA_PYTHON) to the Python to use.\n'], sd, ...
+        strtrim(msg), cmd);
+end
 end
 
 function same = key_equal(keyf, key, need)
@@ -447,10 +531,11 @@ end
 
 function n = sheet_names(stored)
 % bare sheet file names; a key written by an older version stored full paths, of
-% which only the name is kept; anything that is not a plain name.fig is dropped
+% which only the name is kept; anything that is not a plain name.pdf (or the
+% .fig of older versions) is dropped
 [~, b, e] = cellfun(@fileparts, stored, 'UniformOutput', false);
 n = strcat(b, e);
-n = n(~cellfun(@isempty, regexp(n, '^[A-Za-z0-9_]+\.fig$', 'once')));
+n = n(~cellfun(@isempty, regexp(n, '^[A-Za-z0-9_]+\.(fig|pdf)$', 'once')));
 end
 
 function r = axis_range(C, P)
