@@ -16,7 +16,8 @@ Two MATLAB pipelines and one Python package:
   phase-atlas pipeline (see `docs/UNCOUPLED_GUIDE.md`);
 - **`noisy_simulations/`** (Python): the noisy simulations of Fig. 4 (see its `README.md`).
 
-Version: see `VERSION` and `CHANGELOG.md`. Licence: see `LICENSE`.
+Version: see `VERSION` and `CHANGELOG.md`. Licence: CC BY-NC 4.0 (non-commercial use with attribution; see
+`LICENSE`).
 
 ## Paper figures
 
@@ -271,10 +272,11 @@ with its SHA-256. The user guide keeps its section numbers, which the code cites
 M. xanthus model, kept byte for byte. It is never executed; its hash is part of the identity of M. xanthus
 simulations.
 
-## Credits (authors to confirm)
+## Credits
 
 Pipeline and documentation: J.-G. Chiou, with AI assistance as declared in the paper. Reduced M. xanthus model and
-its reference script `Guzzo_noXA.m`: W.-H. Wang. Noise package `gef_pak_noise`: C. Hinds.
+its reference script `Guzzo_noXA.m`: W.-H. Wang. Implementation of the M. xanthus model in the pipeline: JB
+(Jean-Baptiste Saulnier). Noise package `gef_pak_noise`: C. Hinds.
 
 ## Appendix: paper ↔ code
 

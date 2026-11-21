@@ -14,6 +14,7 @@
   that reproduces the first 40 s of two stored runs exactly.
 - Documentation rewritten for readers of the paper: worked examples of the paper's three atlases, a figure map and
   a "Paper ↔ code" appendix in `README.md`; the models in the paper's notation in `docs/MODELS.md`.
+- Licence: CC BY-NC 4.0 (`LICENSE`). Credits in `README.md` confirmed by all authors.
 - Run folders written by 1.0.0-rc2 or earlier cannot be resumed with this version (the software version and code
   hashes differ); they can still be plotted, traced and used as `import_from` sources.
 

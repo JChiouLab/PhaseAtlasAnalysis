@@ -4,9 +4,9 @@
 # 216 files (EXPORT_MANIFEST.txt itself not listed)
 705fd4d6451a31d36b3df7de96f83f30ac976c9b4a6d1e51671d8e2f33e2d0da  8  .gitattributes  written for this repository
 e83168b890b3ad27143b29207c33a1007931b2174db5befe78d756fe0d860ddb  307  .gitignore  written for this repository
-abc739aead4dd9c07514c388b9541a92966f72b4470f3dbf38ae2490deb99603  3037  CHANGELOG.md  written for this repository
-719784e14e8e08ddc55afbab2e7a4ee7c890ad3e6a0f1019e5caaf74d7580a87  317  LICENSE  written for this repository
-019c98e1156a2583cd78bdd54958554fcbded5bdcbb5b6e094083ce00ede09a4  20044  README.md  written for this repository
+a08407c314ff1f83fbebf0394f1aad0d7c24e574a7e710ef6bd074990767b75a  3123  CHANGELOG.md  written for this repository
+493d083381c69aeefd9c513df35edf99ed77ef0c4fc54539ab5c1ddd5d417d0a  1080  LICENSE  written for this repository
+1f91f68f7d0738c23877778b1034e9e08af63ad175146c61467fa0374877cf9c  20160  README.md  written for this repository
 a0b84d2f768d5b8ee3badb9ab623a95938e7ae273cf4cba611f219eb34fcd287  10  VERSION  written for this repository
 b482ca72f646978edceee79b0eb1d191646a0a9935f893a6270f89eda9d57c07  6786  docs/MODELS.md  written for this repository
 666fbdea3992b4832f08fc76fb9eccc3107fb788452fcd937e67823cfd858319  4528  docs/SPEC.md  written for this repository

@@ -1,7 +1,20 @@
-Copyright © 2026 Jian-geng Chiou (Chiou Lab). All rights reserved.
+PhaseAtlasAnalysis
+Copyright © 2026 Wen-Han Wang, Jean-Baptiste Saulnier, Clara Hinds, Ian Shenyen Hsu, Kuan-yu Lin and Jian-geng Chiou
 
-Shared privately with named collaborators for testing; no redistribution.
-A license will be chosen before public release.
+This work is licensed under the Creative Commons Attribution-NonCommercial 4.0 International License
+(CC BY-NC 4.0). To view a copy of this license, visit https://creativecommons.org/licenses/by-nc/4.0/
 
-This repository contains no MathWorks code; the traced solver copy is generated
-locally from the user's MATLAB installation.
+You are free to:
+  Share — copy and redistribute the material in any medium or format.
+  Adapt — remix, transform, and build upon the material.
+
+Under the following terms:
+  Attribution — You must give appropriate credit, provide a link to the license, and indicate if changes
+  were made. Please cite the paper: Wang, Saulnier, Hinds, Hsu, Lin and Chiou, "Phase atlas geometry of
+  reaction-diffusion systems underlies cell polarity transitions".
+  NonCommercial — You may not use the material for commercial purposes.
+
+The full legal code is at https://creativecommons.org/licenses/by-nc/4.0/legalcode
+
+This repository contains no MathWorks code; the traced solver copy is generated locally from the user's
+MATLAB installation.
