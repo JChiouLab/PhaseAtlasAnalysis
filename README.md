@@ -79,7 +79,9 @@ These files are not tracked by git; no MathWorks file is in this repository. `ru
    before any work.
 2. **Plot.** The run saves `plots/roots_3d.fig` (the atlas in three dimensions, rotatable) and the 2-D sheets as
    PDFs in the style of Fig. 5, `plots/sheets_2d/<sheet>.pdf` and `all_families.pdf` (existence, flux arrows,
-   nullclines and an example profile); redraw with `seeded_atlas_plot(run_dir)`.
+   nullclines and an example profile); redraw with `seeded_atlas_plot(run_dir)`. *Note: Root family identification is based on arbitrary
+  thresholds and can be wrong. Manual inspection of the peak locations my be
+  needed in some cases.*
 3. **One simulation.** A full-model simulation started from one quasi-steady state:
    `seeded_atlas_trace(run_dir, struct('name', 'T1', 'root', '<a root_id from roots_index.csv>'))`, or list it in
    the script's `traces` block.
